@@ -153,3 +153,81 @@ h3 { font-size: 1.05rem; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ---------- การ์ดอุปกรณ์ที่ต้องเตรียม ---------- */
+
+.kit {
+  background: var(--paper);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: 4px 5px 0 var(--smudge);
+  margin: 22px 0;
+}
+
+.kit > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 15px 18px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+/* ซ่อนสามเหลี่ยมเริ่มต้นของเบราว์เซอร์ ใช้ไอคอนของเราเอง */
+.kit > summary::-webkit-details-marker { display: none; }
+.kit > summary::marker { content: ""; }
+
+.kit > summary:focus-visible {
+  outline: var(--stroke) solid var(--ink-blue);
+  outline-offset: 3px;
+  border-radius: var(--radius);
+}
+
+/* ไอคอนบวก/ลบ ทำด้วย CSS ล้วน */
+.kit > summary::after {
+  content: "+";
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  line-height: 1;
+  border: 2px solid var(--ink);
+  border-radius: 99px;
+}
+.kit[open] > summary::after { content: "−"; }
+
+.kit__list { list-style: none; margin: 0; padding: 0 18px; }
+
+.kit__list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 2px dashed var(--board-deep);
+}
+
+/* ชื่อของยาวได้ ตัดบรรทัดเอา แต่จำนวนห้ามหลุดบรรทัด */
+.kit__list .thing { overflow-wrap: anywhere; }
+.kit__list .qty {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: .9rem;
+  white-space: nowrap;
+}
+
+/* ของที่ต้องมีคนละอัน เน้นให้สะดุดตา เพราะเป็นจุดที่คนพลาดบ่อยสุด */
+.kit__list .qty--each { color: var(--ink-red); font-weight: 600; }
+
+.kit__note { padding: 14px 18px 0; }
+.kit__note p { margin: 0 0 10px; font-size: .88rem; color: #6C7472; }
+
+.kit__foot { padding: 2px 18px 16px; margin: 0; font-size: .82rem; }
