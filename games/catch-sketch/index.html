@@ -130,18 +130,34 @@
     display: flex; flex-direction: column;
     /* ต้องเป็น max-height ไม่ใช่ min-height
        ถ้าใช้ min กล่องจะยืดตามเนื้อหาจนปุ่มหลุดใต้จอ ต้องมีเพดานให้รายชื่อยุบเข้ามาแทน */
-    max-height: calc(100vh - 120px);
-    max-height: calc(100dvh - 120px);
+    max-height: calc(100vh - 96px);
+    max-height: calc(100dvh - 96px);
   }
+  /* รายชื่อเป็นตัวเดียวที่ยุบได้ ที่เหลือห้ามยุบ
+     ถ้าปล่อยให้กล่องคำยุบด้วย justify-content:center จะดันตัวอักษรทะลุออกนอกเส้นขอบ */
+  #s-word .word,
+  #s-word .clock,
+  #s-word .hint,
+  #s-word #claim-status,
+  #s-word #btn-all-done { flex: 0 0 auto; }
+  /* กล่องคำไม่ต้องสูงขั้นต่ำ 168px บนหน้านี้ เอาที่ไปให้รายชื่อดีกว่า */
+  #s-word .word { min-height: 0; padding: 22px 20px; }
+  #s-word .claims li { margin-bottom: 8px; }
   #s-word .claims { flex: 1 1 auto; overflow-y: auto; min-height: 84px; }
-  #s-word #btn-all-done { position: static; flex: 0 0 auto; }
+  #s-word #btn-all-done { position: static; }
 
-  /* จอเตี้ย ย่อกล่องคำลง จะได้เหลือที่ให้รายชื่อพอโดยไม่ต้องเลื่อน */
-  @media (max-height: 700px) {
-    .word { padding: 16px 16px; min-height: 0; }
-    .word__main { font-size: 1.9rem; }
-    .word__lv { margin-bottom: 4px; }
+  /* บอกว่ายังมีชื่ออยู่ข้างล่าง scrollbar แบบ overlay ไม่กินพื้นที่ คนเลยไม่รู้ว่าเลื่อนได้ */
+  #s-word .claims.has-more {
+    -webkit-mask-image: linear-gradient(#000 84%, rgba(0,0,0,.15));
+    mask-image: linear-gradient(#000 84%, rgba(0,0,0,.15));
   }
+  #claims-more {
+    display: none;
+    font-family: var(--font-mono); font-size: .72rem; letter-spacing: .06em;
+    color: var(--ink-blue); text-align: center; margin: 2px 0 8px;
+  }
+  #s-word .claims.has-more ~ #claims-more { display: block; }
+
   .claims li { display: flex; gap: 8px; margin-bottom: 10px; }
 
   .claim {
@@ -170,6 +186,21 @@
   }
   .giveup:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 3px; }
   .giveup[disabled] { opacity: .35; cursor: not-allowed; }
+
+  /* จอเตี้ย บีบทุกอย่างที่ไม่ใช่รายชื่อ จะได้เห็นชื่อได้มากที่สุดโดยไม่ต้องเลื่อนทั้งหน้า */
+  @media (max-height: 700px) {
+    /* padding ท้ายหน้าเป็นที่ว่างเปล่าบนหน้านี้ ตัดออกแล้วหน้าไม่ต้องเลื่อนเลย */
+    .wrap { padding-bottom: 16px; }
+    .word { padding: 10px 14px; min-height: 0; }
+    .word__main { font-size: 1.5rem; }
+    .word__lv { margin-bottom: 2px; }
+    .word__sub { margin-top: 2px; font-size: .88rem; }
+    #s-word .clock { margin-bottom: 4px; }
+    #s-word .hint { margin: 4px 0 0; }
+    .claim { padding: 10px 12px; font-size: 1rem; }
+    .claims li { margin-bottom: 7px; }
+    #claims-more { margin: 2px 0 5px; }
+  }
 
   /* ---- หน้าทาย ---- */
   .look { text-align: center; padding: 26px 0 10px; }
@@ -390,6 +421,7 @@
 
     <p class="hint" style="margin-bottom:10px">วาดเสร็จแล้วแตะชื่อตัวเองเพื่อคว้าคิว</p>
     <ul class="claims" id="claims"></ul>
+    <p id="claims-more" role="status">เลื่อนดูชื่อที่เหลือ</p>
 
     <p class="hint" id="claim-status" role="status" aria-live="polite" style="margin:0 0 10px"></p>
     <button class="btn btn--stick" id="btn-all-done" disabled>ทุกคนเสร็จแล้ว</button>
@@ -538,6 +570,9 @@
     for (var i = 0; i < all.length; i++) all[i].classList.remove("is-on");
     $(id).classList.add("is-on");
     window.scrollTo(0, 0);
+    /* วัดกล่องรายชื่อได้ก็ต่อเมื่อหน้าถูกแสดงแล้ว
+       ตอน renderClaims หน้ายังซ่อนอยู่ ความสูงเป็น 0 คำนวณยังไงก็ไม่มีทางรู้ว่าเลื่อนได้ */
+    if (id === "s-word") refreshClaimsCue();
     saveLive();
   }
   /* ---------- กันเกมที่เล่นค้างอยู่หาย ----------
@@ -1049,6 +1084,13 @@
     if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
   }
 
+  /* บอกว่ากล่องรายชื่อยังเลื่อนได้อีก ให้คนวาดคนท้ายๆ รู้ว่าชื่อตัวเองอยู่ข้างล่าง */
+  function refreshClaimsCue() {
+    var el = $("claims");
+    var more = el.scrollHeight - el.clientHeight - el.scrollTop > 2;
+    el.classList.toggle("has-more", more);
+  }
+
   function renderClaims() {
     var host = $("claims");
     host.innerHTML = "";
@@ -1103,13 +1145,13 @@
   }
 
   function claim(i) {
-    if (tappedTooFast(i)) return;
-    /* เพิ่งกดกลับเข้าเกมมาหมาดๆ ยังไม่นับเป็นคว้าคิว */
+    /* ต้องเช็คก่อน tap-guard ไม่งั้นคนที่กดเร็ว (ปกติคน double tap ที่ 150-250ms)
+       จะโดน tap-guard ตัดตั้งแต่ต้นทาง แล้วเจอความเงียบโดยไม่มีอะไรบอก */
     if (state.justBack[i] && Date.now() - state.justBack[i] < 900) {
-      /* กันเผลอ แต่ต้องบอกด้วย ไม่งั้นคนจะคิดว่าจอค้าง แล้วรัวแตะซ้ำ */
       $("claim-status").textContent = "แตะชื่ออีกครั้งเพื่อคว้าคิว";
       return;
     }
+    if (tappedTooFast(i)) return;
     if (state.queue.indexOf(i) !== -1) return;
     if (state.gaveUp.indexOf(i) !== -1) return;
     state.queue.push(i);
@@ -1136,6 +1178,7 @@
   }
 
   function refreshAllDone() {
+    refreshClaimsCue();
     var drawers = drawerIdxs().length;
     var settled = state.queue.length + state.gaveUp.length;
     var btn = $("btn-all-done");
@@ -1489,31 +1532,44 @@
     /* ข้อความต้องตรงกับสิ่งที่จะเกิดขึ้นจริงตอนกด
        เคยเขียนรวมๆ ว่า "เริ่มรอบใหม่ ลบไวท์บอร์ด" ทั้งที่บางทางไปต่อจากคิวเดิม
        คนที่ทำตามจะลบรูปที่กำลังจะให้คนทายดูทิ้ง แล้วรอบนั้นเล่นต่อไม่ได้ */
-    var keepQueue = (d.screen === "s-guess" || d.screen === "s-pass-guess") &&
-                    d.state.queue && d.state.queue.length > 0;
+    var atGuess = (d.screen === "s-guess" || d.screen === "s-pass-guess");
+    var keepQueue = atGuess && d.state.queue && d.state.queue.length > 0;
+    var emptyQueue = atGuess && !(d.state.queue && d.state.queue.length);
     var afterRound = (d.screen === "s-round");
-    var isOver = (d.state.phase === "over");
-    var showRound = Math.min(d.state.roundIdx + 1 + (afterRound ? 1 : 0), d.state.totalRounds);
+    /* รอบสุดท้ายจบไปแล้ว กดแล้วไปหน้าผลรวมเลย ไม่มีรอบใหม่ให้เริ่ม */
+    var lastDone = afterRound && (d.state.roundIdx + 1 >= d.state.totalRounds);
+    var isOver = (d.state.phase === "over") || lastDone;
+    var nextRoundNo = d.state.roundIdx + 1 + (afterRound ? 1 : 0);
 
-    var what, label;
+    var what, label, head;
     if (isOver) {
-      what = "เกมจบไปแล้ว กดเพื่อดูผลรวมอีกครั้ง";
+      what = lastDone
+        ? "เล่นครบทุกรอบแล้ว กดเพื่อดูผลรวม"
+        : "เกมจบไปแล้ว กดเพื่อดูผลรวมอีกครั้ง";
       label = "ดูผลรวม";
+      head = "เกมจบแล้ว";
     } else if (keepQueue) {
       what = "จะไปต่อจากคิวเดิม อย่าเพิ่งลบไวท์บอร์ด";
       label = "เล่นต่อ (ดูคิวเดิม)";
+      head = "รอบที่ " + nextRoundNo + " จาก " + d.state.totalRounds;
+    } else if (emptyQueue) {
+      /* ไม่มีใครวาดทัน กดแล้วไปหน้าเฉลยคำเดิม ไม่ได้เริ่มรอบใหม่ */
+      what = "รอบนี้ไม่มีใครวาดทัน กดแล้วจะไปหน้าเฉลยคำเดิม ไม่ต้องลบไวท์บอร์ด";
+      label = "เล่นต่อ (ดูเฉลย)";
+      head = "รอบที่ " + nextRoundNo + " จาก " + d.state.totalRounds;
     } else if (afterRound) {
-      what = "รอบที่ " + (d.state.roundIdx + 1) + " จบไปแล้ว จะเริ่มรอบที่ " + showRound +
+      what = "รอบที่ " + (d.state.roundIdx + 1) + " จบไปแล้ว จะเริ่มรอบที่ " + nextRoundNo +
              " ด้วยคำใหม่ ลบไวท์บอร์ดก่อนกด";
-      label = "เล่นต่อ (รอบที่ " + showRound + ")";
+      label = "เล่นต่อ (รอบที่ " + nextRoundNo + ")";
+      head = "รอบที่ " + nextRoundNo + " จาก " + d.state.totalRounds;
     } else {
       what = "รอบที่ค้างอยู่จะเริ่มใหม่ด้วยคำใหม่ ลบไวท์บอร์ดก่อนกด";
       label = "เล่นต่อ (เริ่มรอบนี้ใหม่)";
+      head = "รอบที่ " + nextRoundNo + " จาก " + d.state.totalRounds;
     }
 
     box.innerHTML = "<b>มีเกมที่เล่นค้างไว้</b>" +
-      "<p class='hint' style='margin:4px 0 4px'>" +
-      (isOver ? "เกมจบแล้ว" : "รอบที่ " + showRound + " จาก " + d.state.totalRounds) +
+      "<p class='hint' style='margin:4px 0 4px'>" + head +
       " · " + d.state.players.length + " คน · แต้มยังอยู่ครบ</p>" +
       "<p class='hint' style='margin:0 0 12px'>" + what + "</p>";
 
@@ -1538,7 +1594,7 @@
       /* กู้กลับไปได้เฉพาะหน้าที่วาดใหม่ได้จริง
          หน้าสรุปรอบสร้างจากข้อมูลตอนจบรอบ ซึ่งไม่ได้เก็บไว้ จึงข้ามไปรอบถัดไปแทน
          ดีกว่าโชว์หน้าสรุปเปล่าๆ ที่ทำให้คนคิดว่าแต้มหาย */
-      if (d.screen === "s-round") { nextRound(); return; }
+      if (d.screen === "s-round") { nextRound(); return; }   /* nextRound พาไปหน้าผลรวมเองถ้าครบรอบแล้ว */
       if (d.screen === "s-guess" || d.screen === "s-pass-guess") {
         if (!state.queue.length) { endRound(-1); return; }
         paintGuess(); show("s-guess"); return;
@@ -1585,6 +1641,8 @@
   $("btn-start").addEventListener("click", startGame);
   $("btn-open-word").addEventListener("click", openWord);
   $("btn-all-done").addEventListener("click", allDone);
+  /* เลื่อนแล้วต้องอัปเดตคำบอกใบ้ด้วย ไม่งั้นเลื่อนถึงล่างสุดแล้วยังขึ้นว่ามีต่อ */
+  $("claims").addEventListener("scroll", refreshClaimsCue);
   $("btn-ready-guess").addEventListener("click", toGuess);
   $("btn-right").addEventListener("click", guessRight);
   $("btn-wrong").addEventListener("click", guessWrong);

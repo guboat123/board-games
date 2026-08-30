@@ -185,8 +185,13 @@
     padding: 12px 14px;
     margin-bottom: 12px;
   }
-  /* line-height 1.2 เตี้ยเกินสำหรับไทย สระกับวรรณยุกต์ซ้อนกันจะล้นขึ้นไปทับป้ายข้างบน */
-  .cluebar .c1 { font-family: var(--font-display); font-weight: 700; font-size: 1.7rem; line-height: 1.55; overflow-wrap: anywhere; }
+  /* คำไทยที่ซ้อนสูงสุดคือ สระบน+วรรณยุกต์ (เกี๊ยว เจี๊ยบ เดี๋ยว) หมึกสูงถึง ~1.57em
+     line-height อย่างเดียวไม่พอ เพราะมันเพิ่มทั้งบนและล่าง ต้องดันถึง 2.0 ถึงจะพอ
+     จึงให้ตัวมันจองที่ด้วย padding ของตัวเอง แบบเดียวกับ h1/h2/h3 ใน assets/style.css */
+  .cluebar .c1 {
+    font-family: var(--font-display); font-weight: 700; font-size: 1.7rem;
+    line-height: 1.45; padding-top: .34em; overflow-wrap: anywhere;
+  }
   .cluebar .c2 { font-size: 1rem; margin-top: 4px; overflow-wrap: anywhere; }
   .cluebar .lb { font-family: var(--font-mono); font-size: .68rem; letter-spacing: .1em; color: var(--ink-blue); }
 
@@ -380,6 +385,8 @@
       <ul class="tally" id="reveal-tally"></ul>
     </div>
 
+    <div class="scores" id="scores-reveal" style="margin-top:14px"></div>
+
     <p style="margin-top:20px"><button class="btn" id="btn-next-round">รอบต่อไป</button></p>
   </section>
 
@@ -444,6 +451,17 @@
     "อ่อน","เข้ม","สว่าง","มืด","จาง","แก่",
     "light","dark","pale","deep"
   ];
+  /* ไทยเขียนติดกันไม่มีช่องว่าง การนับคำด้วย split(" ") จึงใช้ไม่ได้
+     คนพิมพ์ทั้งประโยคมาก็ยังผ่านเป็น "1 คำ" ต้องมีเพดานความยาวช่วยอีกชั้น
+     นับเฉพาะอักษรฐาน ตัดสระบน/ล่าง/วรรณยุกต์ออก ไม่งั้น "ก๋วยเตี๋ยว" (8 ฐาน) จะโดนบล็อกผิดๆ */
+  var THAI_MARKS = /[\u0e31\u0e34-\u0e3a\u0e47-\u0e4e]/g;
+  var MAX_BASE_1 = 12;   /* คำใบ้ที่ 1 หนึ่งคำ */
+  var MAX_BASE_2 = 22;   /* คำใบ้ที่ 2 ไม่เกินสองคำ */
+
+  function baseLen(str) {
+    return String(str).replace(THAI_MARKS, "").replace(/\s+/g, "").length;
+  }
+
   /* ชื่อเรียกตัวอักษรแถวแบบไทย ใช้ตรวจพิกัดอย่าง พี12 */
   var THAI_LETTERS = ["เอฟ","เอช","เอ็ม","เอ็น","แอล","เอ","บี","ซี","ดี","อี","จี","ไอ","เจ","เค","โอ","พี"];
 
@@ -463,9 +481,14 @@
 
   /* col 1..30 · rowIndex 0..15 (A..P) */
   function cellColor(col, rowIndex) {
-    var hue = (col - 1) / 30 * 360;
-    var lightness = 92 - rowIndex * 5;
-    var saturation = 32 + Math.sin(rowIndex / 15 * Math.PI) * 56;
+    /* สูตรเดิมทำให้แถวหัวและแถวท้ายแทบเป็นสีเดียวกันทั้งแถว 30 ช่อง
+       (แถว A ได้ความสว่าง 92% + ความอิ่มสี 32% = เกือบขาวหมดทุกเฉดสี)
+       ถ้าคนใบ้จับได้การ์ดแถวนั้น รอบนั้นจะใบ้คอลัมน์ไม่ได้เลย กลายเป็นโยนเหรียญ
+       จึงต้อง (1) ไม่ให้ความอิ่มสีตกที่ปลายทั้งสอง (2) แคบช่วงความสว่าง
+       (3) เลิกไล่เฉดสีครบวง ไม่งั้นคอลัมน์ 1 กับ 30 จะวนมาชนกันเอง ทั้งที่ห่างกัน 29 ช่อง */
+    var hue = (col - 1) / (COLS - 1) * 320;
+    var lightness = 80 - rowIndex * 4.0;
+    var saturation = 70 + Math.sin(rowIndex / (ROWS - 1) * Math.PI) * 25;
     return "hsl(" + hue + ", " + saturation + "%, " + lightness + "%)";
   }
 
@@ -507,7 +530,8 @@
     saveLive();
   }
 
-  /* เกมนี้มีข้อมูลลับ (สีลับของคนใบ้) จึงเก็บแค่พอเตือนว่ามีเกมค้าง
+  /* เกมนี้มีข้อมูลลับ (สีลับของคนใบ้) จึงกู้กลับได้แค่ "ต้นรอบปัจจุบัน" ทางเดียว
+     คนใบ้จับการ์ดใหม่ แต้มสะสมยังอยู่ครบ
      ไม่กู้กลางรอบ เพราะกู้ผิดจังหวะแล้วสีลับอาจโผล่ให้คนผิดเห็น */
   var LIVE_KEY = "bg.color.live.v1";
 
@@ -516,8 +540,29 @@
   function saveLive() {
     try {
       if (!isLive()) { localStorage.removeItem(LIVE_KEY); return; }
-      localStorage.setItem(LIVE_KEY, JSON.stringify({ at: Date.now(), handNo: state.roundIdx + 1 }));
-    } catch (e) {}
+      localStorage.setItem(LIVE_KEY, JSON.stringify({
+        at: Date.now(),
+        headcount: headcount,
+        leaderId: leaderId,
+        state: state
+      }));
+    } catch (e) { /* เขียนไม่ได้ก็เล่นต่อได้ แค่กู้ไม่ได้ */ }
+  }
+
+  function dropLive() {
+    try { localStorage.removeItem(LIVE_KEY); } catch (e) {}
+  }
+
+  function readLive() {
+    try {
+      var raw = localStorage.getItem(LIVE_KEY);
+      if (!raw) return null;
+      var d = JSON.parse(raw);
+      /* ค้างไว้เกินครึ่งวันถือว่าเลิกไปแล้ว */
+      if (!d || !d.state || !d.state.players || !d.state.players.length) return null;
+      if (Date.now() - d.at > 12 * 3600 * 1000) return null;
+      return d;
+    } catch (e) { return null; }
   }
 
   window.addEventListener("beforeunload", function (e) {
@@ -583,6 +628,14 @@
     var words = t.split(" ");
     if (words.length > maxWords) {
       return { ok: false, msg: "ยาวได้ไม่เกิน " + maxWords + " คำ ตอนนี้ " + words.length + " คำ" };
+    }
+
+    /* ด่านที่สอง กันพิมพ์ทั้งประโยคติดกันแบบไทย ซึ่งด่านนับคำจับไม่ได้ */
+    var cap = maxWords > 1 ? MAX_BASE_2 : MAX_BASE_1;
+    if (baseLen(t) > cap) {
+      return { ok: false, msg: maxWords > 1
+        ? "ยาวเกินไป คำใบ้ที่ 2 ให้ได้ไม่เกิน 2 คำสั้นๆ"
+        : "ยาวเกินไป คำใบ้ที่ 1 ให้ได้คำเดียวสั้นๆ" };
     }
 
     var low = t.toLowerCase();
@@ -828,7 +881,14 @@
       return;
     }
 
-    if (picked.length < headcount) picked.push(p.id);
+    if (picked.length < headcount) {
+      picked.push(p.id);
+      setNote($("pick-note"), "");
+    } else {
+      /* เลือกครบแล้ว ชื่อใหม่จะเข้าทะเบียนแต่ไม่ถูกเลือก ต้องบอก ไม่งั้นคนคิดว่าปุ่มพัง */
+      setNote($("pick-note"), "เพิ่ม " + p.name + " เข้าทะเบียนแล้ว แต่เลือกครบ " + headcount +
+        " คนแล้ว ถ้าจะให้เล่นด้วย ต้องเอาคนอื่นออกก่อน หรือเพิ่มจำนวนคนด้านบน", "bad");
+    }
     input.value = "";
     renderPickList();
     input.focus();
@@ -1207,7 +1267,12 @@
     state.order = order;
 
     $("show-c1").textContent = state.clue1;
-    $("show-c2").textContent = state.clue2 ? "คำใบ้ที่ 2 · " + state.clue2 : "";
+    /* รอบสองแล้วยังไม่มีคำใบ้ที่ 2 แปลว่าคนใบ้เลือกไม่ใบ้ต่อ ต้องเขียนบอก
+       ไม่งั้นคนทายคนท้ายๆ จะนึกว่ามันแสดงไม่ขึ้นแล้วรอเก้อ
+       แต่รอบแรกต้องเงียบ เพราะคำใบ้ที่ 2 ยังมาไม่ถึงตามลำดับ */
+    $("show-c2").textContent = state.clue2
+      ? "คำใบ้ที่ 2 · " + state.clue2
+      : (pass === 2 ? "ไม่มีคำใบ้ที่ 2" : "");
 
     moveBoardTo("board-host");
     setNote($("guess-note"), "");
@@ -1306,6 +1371,9 @@
 
     moveBoardTo("reveal-host");
     scoreRound();
+    /* ต้องวาดหลัง scoreRound เพื่อให้เห็นแต้มที่บวกของรอบนี้เข้าไปแล้ว
+       หน้านี้คือจุดเดียวที่ทุกคนล้อมดูจอพร้อมกัน แต่กลับเป็นหน้าเดียวที่ไม่บอกว่าใครนำ */
+    paintScores($("scores-reveal"), -1);
     show("s-reveal");
   }
 
@@ -1465,7 +1533,7 @@
 
   function gameOver(winners) {
     state.phase = "over";
-    try { localStorage.removeItem("bg.color.live.v1"); } catch (e) {}
+    dropLive();
 
     var isWin = {};
     winners.forEach(function (i) { isWin[i] = true; });
@@ -1566,6 +1634,49 @@
 
   renderHeadcount();
   renderPickList();
+
+  /* มีเกมค้างจากคราวก่อน (ปิดแท็บ / จอดับ / เผลอ reload)
+     กู้กลับได้ทางเดียวคือเริ่มรอบที่ค้างใหม่ คนใบ้จับการ์ดใหม่ แต้มสะสมอยู่ครบ
+     ทำทางเดียวเพื่อไม่ให้สีลับของรอบที่ค้างหลุดไปให้คนผิดเห็น */
+  (function offerResume() {
+    var d = readLive();
+    if (!d) return;
+
+    var box = document.createElement("div");
+    box.className = "card";
+    box.style.cssText = "margin-bottom:18px; border-color:var(--ink-orange)";
+    box.innerHTML = "<b>มีเกมที่เล่นค้างไว้</b>" +
+      "<p class='hint' style='margin:4px 0 4px'>รอบที่ " + (d.state.roundIdx + 1) +
+      " จาก " + d.state.totalRounds + " · " + d.state.players.length + " คน · แต้มยังอยู่ครบ</p>" +
+      "<p class='hint' style='margin:0 0 12px'>รอบที่ค้างอยู่จะเริ่มใหม่ คนใบ้จับการ์ดใหม่ " +
+      "หมากที่วางไว้ในรอบนั้นจะถูกล้าง</p>";
+
+    var go = document.createElement("button");
+    go.type = "button"; go.className = "btn";
+    go.textContent = "เล่นต่อ (เริ่มรอบนี้ใหม่)";
+    go.addEventListener("click", function () {
+      state = d.state;
+      headcount = d.headcount || state.players.length;
+      leaderId = d.leaderId || null;
+      picked = [];
+      for (var i = 0; i < state.players.length; i++) picked.push(state.players[i].id);
+      /* รอบที่ค้างถูกนับไปแล้วตอนเริ่มครั้งแรก จะเริ่มใหม่จึงต้องถอยกลับ ไม่งั้นนับซ้ำ */
+      if (state.only && state.tiePlayed > 0) state.tiePlayed--;
+      box.remove();
+      buildBoard();
+      startRound();
+    });
+    box.appendChild(go);
+
+    var no = document.createElement("button");
+    no.type = "button"; no.className = "btn btn--ghost btn--sm";
+    no.style.marginTop = "8px"; no.textContent = "ทิ้งแล้วเริ่มใหม่";
+    no.addEventListener("click", function () { dropLive(); box.remove(); });
+    box.appendChild(no);
+
+    var host = $("s-players");
+    host.insertBefore(box, host.firstChild);
+  })();
 
   $("btn-add").addEventListener("click", addName);
   $("new-name").addEventListener("keydown", function (e) {
