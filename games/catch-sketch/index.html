@@ -119,7 +119,7 @@
      line-height อย่างเดียวไม่พอ เพราะมันเพิ่มทั้งบนและล่าง แล้วกินที่ของรายชื่อไปด้วย */
   .word__main {
     font-family: var(--font-display); font-weight: 700; font-size: 2.5rem;
-    line-height: 1.5; padding-top: .2em; overflow-wrap: anywhere;
+    line-height: 1.5; padding-top: .3em; overflow-wrap: anywhere;
   }
   .word__sub  { font-size: .95rem; color: #6C7472; margin-top: 8px; }
   .word__lv   { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .12em; color: var(--ink-blue); margin-bottom: 10px; }
@@ -1691,7 +1691,20 @@
   /* ความสูงกล่องผูกกับ 100dvh ซึ่งเปลี่ยนเองตลอดบนมือถือเวลาแถบ URL ยุบ/กาง
      ถ้าไม่วัดใหม่ คำใบ้ "เลื่อนดูชื่อที่เหลือ" จะค้างเป็นค่าเก่า
      แล้วคนวาดคนสุดท้ายจะหาชื่อตัวเองไม่เจอ ตอนที่ทุกคนกำลังแย่งคว้าคิวพอดี */
+  /* ResizeObserver จับได้ทุกครั้งที่กล่องเปลี่ยนขนาดจริง ไม่ว่าสาเหตุอะไร
+     ดีกว่ารอ event resize ของหน้าต่าง ซึ่งบนมือถือไม่ได้ยิงทุกครั้งที่ 100dvh ขยับ
+     ตอนแถบ URL ค่อยๆ ยุบ/กาง */
+  if (window.ResizeObserver) {
+    new ResizeObserver(function () { refreshClaimsCue(); }).observe($("claims"));
+  }
   window.addEventListener("resize", refreshClaimsCue);
+
+  /* ตาข่ายกันพลาดชั้นสุดท้าย: เช็คซ้ำเบาๆ ตอนอยู่หน้าคว้าคิว
+     เพราะบางเบราว์เซอร์ไม่ยิง resize/ResizeObserver ระหว่างแถบ URL กำลังเลื่อน
+     ถ้าคำใบ้ค้าง คนวาดคนสุดท้ายจะหาชื่อตัวเองไม่เจอตอนที่ทุกคนกำลังแย่งคว้าคิวพอดี */
+  setInterval(function () {
+    if ($("s-word").classList.contains("is-on")) refreshClaimsCue();
+  }, 500);
   if (window.visualViewport) {
     window.visualViewport.addEventListener("resize", refreshClaimsCue);
     window.visualViewport.addEventListener("scroll", refreshClaimsCue);
