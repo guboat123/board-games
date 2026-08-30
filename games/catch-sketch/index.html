@@ -256,6 +256,13 @@
     </div>
 
     <div class="field">
+      <label>หมวดหมู่ <span class="count" id="cat-count"></span></label>
+      <p class="hint" style="margin:0 0 8px">เลือกเฉพาะหมวดที่อยากเล่นได้ ต้องเหลืออย่างน้อย 1 หมวด</p>
+      <div class="chips" id="opt-cats"></div>
+      <p style="margin-top:10px"><button class="btn btn--ghost btn--sm" id="btn-cats-all">เลือกทุกหมวด</button></p>
+    </div>
+
+    <div class="field">
       <label>ความยาก</label>
       <div class="chips" id="opt-levels"></div>
     </div>
@@ -367,6 +374,9 @@
 <script src="words/general-2.js"></script>
 <script src="words/characters-2.js"></script>
 <script src="words/thai-2.js"></script>
+<!-- คลังคำชุดที่ 3 หมวดใหม่ -->
+<script src="words/general-3.js"></script>
+<script src="words/thai-3.js"></script>
 <script>
 (function () {
   "use strict";
@@ -391,12 +401,28 @@
 
   var LV_LABEL = { 1: "ง่าย", 2: "กลาง", 3: "ยาก" };
 
+  /* ชื่อไทยของหมวดหมู่ ตรงกับค่า cat ในไฟล์คลังคำ
+     ถ้าเพิ่มหมวดใหม่ในไฟล์คำ ใส่ชื่อไทยเพิ่มตรงนี้ ถ้าไม่ใส่จะโชว์ชื่ออังกฤษแทน */
+  var CAT_LABEL = {
+    object: "สิ่งของ", animal: "สัตว์", food: "อาหาร", job: "อาชีพ",
+    action: "ท่าทาง", place: "สถานที่", nature: "ธรรมชาติ",
+    vehicle: "ยานพาหนะ", sport: "กีฬา", body: "ร่างกาย",
+    anime: "อนิเมะ", movie: "หนัง", cartoon: "การ์ตูน", game: "เกม",
+    "thai-food": "อาหารไทย", "thai-culture": "วัฒนธรรมไทย",
+    "thai-life": "ชีวิตไทย", "thai-place": "สถานที่ไทย",
+    music: "ดนตรี", tool: "เครื่องมือช่าง", clothes: "เสื้อผ้า",
+    weather: "อากาศ", space: "อวกาศ", fantasy: "แฟนตาซี",
+    tech: "เทคโนโลยี", school: "โรงเรียน", holiday: "เทศกาล",
+    "thai-festival": "เทศกาลไทย", "thai-fruit": "ผลไม้ไทย", "thai-snack": "ขนมไทย"
+  };
+
   var MIN_PLAYERS = 3;
   var MAX_PLAYERS = 6;
   var TAP_GUARD_MS = 300;      /* กันกดซ้ำปุ่มเดิมรัวๆ */
 
   var cfg = {
     packs: ["general", "characters", "thai"],
+    cats: [],                  /* ว่าง = ยังไม่เคยเลือก เดี๋ยว renderCats เติมให้ครบ */
     levels: [1, 2, 3],
     roundsPer: 2               /* ทุกคนได้เป็นคนทายกี่รอบ */
   };
@@ -487,17 +513,66 @@
       var p = PACKS[key];
       if (!p) return;
       p.data.forEach(function (item) {
-        if (cfg.levels.indexOf(item.lv) !== -1) out.push(item);
+        if (cfg.levels.indexOf(item.lv) === -1) return;
+        /* คำที่ไม่ได้ระบุหมวดไว้ ให้ติดมาเสมอ จะได้ไม่หายไปเงียบๆ */
+        if (item.cat && cfg.cats.indexOf(item.cat) === -1) return;
+        out.push(item);
       });
     });
     return out;
   }
 
+  /* หมวดที่มีจริงในชุดคำที่เลือกอยู่ตอนนี้ */
+  function catsForPacks() {
+    var out = [];
+    cfg.packs.forEach(function (key) {
+      var p = PACKS[key];
+      if (!p) return;
+      p.data.forEach(function (item) {
+        if (item.cat && out.indexOf(item.cat) === -1) out.push(item.cat);
+      });
+    });
+    return out;
+  }
+
+  function renderCats() {
+    var avail = catsForPacks();
+
+    /* ตัดหมวดที่ไม่มีอยู่ในชุดคำที่เลือกแล้วออก */
+    var keep = [];
+    for (var i = 0; i < cfg.cats.length; i++) {
+      if (avail.indexOf(cfg.cats[i]) !== -1) keep.push(cfg.cats[i]);
+    }
+    cfg.cats = keep.length ? keep : avail.slice();
+
+    var host = $("opt-cats");
+    host.innerHTML = "";
+
+    avail.forEach(function (c) {
+      var b = chip(CAT_LABEL[c] || c, c, cfg.cats.indexOf(c) !== -1);
+      b.addEventListener("click", function () {
+        var at = cfg.cats.indexOf(c);
+        if (at === -1) cfg.cats.push(c);
+        else if (cfg.cats.length > 1) cfg.cats.splice(at, 1);
+        else return;   /* ต้องเหลืออย่างน้อย 1 หมวด */
+        b.setAttribute("aria-pressed", cfg.cats.indexOf(c) !== -1 ? "true" : "false");
+        refreshSetupInfo();
+      });
+      host.appendChild(b);
+    });
+
+    refreshSetupInfo();
+  }
+
   function refreshSetupInfo() {
     var n = buildPool().length;
-    $("pool-info").textContent = "มีคำให้สุ่มตอนนี้ " + n + " คำ";
+    var rounds = picked.length * cfg.roundsPer;
+
+    $("cat-count").textContent = "เลือก " + cfg.cats.length + " / " + catsForPacks().length + " หมวด";
+    $("pool-info").textContent = "มีคำให้สุ่มตอนนี้ " + n + " คำ" +
+      (n && n < rounds ? " (น้อยกว่าจำนวนรอบ เดี๋ยวคำจะวนซ้ำ)" : "");
     $("rounds-info").textContent = "เล่น " + picked.length + " คน คนละ " + cfg.roundsPer +
-      " รอบ รวม " + (picked.length * cfg.roundsPer) + " รอบ";
+      " รอบ รวม " + rounds + " รอบ";
     $("btn-start").disabled = n < 1;
   }
 
@@ -1099,7 +1174,7 @@
 
   buildMulti($("opt-packs"),
     Object.keys(PACKS).map(function (k) { return { label: PACKS[k].label, value: k }; }),
-    cfg.packs, refreshSetupInfo);
+    cfg.packs, renderCats);
 
   buildMulti($("opt-levels"),
     [{label:"ง่าย",value:1},{label:"กลาง",value:2},{label:"ยาก",value:3}],
@@ -1109,8 +1184,14 @@
     [{label:"1 รอบ",value:1},{label:"2 รอบ",value:2},{label:"3 รอบ",value:3}],
     cfg.roundsPer, function (v) { cfg.roundsPer = Number(v); refreshSetupInfo(); });
 
+  renderCats();
   renderHeadcount();
   renderPickList();
+
+  $("btn-cats-all").addEventListener("click", function () {
+    cfg.cats = catsForPacks();
+    renderCats();
+  });
 
   $("btn-add").addEventListener("click", addName);
   $("new-name").addEventListener("keydown", function (e) {
