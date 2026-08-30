@@ -13,6 +13,10 @@ const MAX_SEATS = 9;
 export const DEFAULTS = {
   smallBlind: 10,
   bigBlind: 20,
+  /* จบรอบเล่นเมื่อไหร่: none = เล่นไปเรื่อยๆ · hands = ครบกี่ตา · minutes = ครบกี่นาที
+     ถ้าหมดเวลาระหว่างเล่นอยู่ ให้เล่นตานั้นจนจบก่อน แล้วค่อยนับคะแนน */
+  limitType: "none",
+  limitValue: 0,
   minBuyIn: 200,     /* ขอบเขตเท่านั้น แต่ละคนเลือกเองว่าจะเอาเท่าไหร่ */
   maxBuyIn: 100000,
   defaultBuyIn: 1000 /* ค่าที่เติมให้ในช่องกรอก เปลี่ยนได้ */
@@ -31,6 +35,9 @@ export function createTable(opts = {}) {
     currentBet: 0,
     minRaise: cfg.bigBlind,
     handNo: 0,
+    startedAt: 0,        /* เวลาที่กดเริ่มตาแรก ใช้นับถอยหลัง */
+    sessionOver: false,  /* ครบตามที่ตั้งไว้แล้ว */
+    standings: null,     /* ผลรวมตอนจบรอบเล่น */
     lastResult: null,        /* สรุปมือที่เพิ่งจบ */
     log: []                  /* ข้อความสั้นๆ ให้โชว์ข้างโต๊ะ */
   };
@@ -124,11 +131,14 @@ export function createTable(opts = {}) {
       if (st.current === seatId) advance();
       else checkRoundEnd();
     }
-    /* ถ้าไม่มีใครต่ออยู่เลย ล้างที่นั่งทิ้งเพื่อให้ห้องสะอาด */
-    if (!seated().some(x => x.connected)) {
-      st.seats = new Array(MAX_SEATS).fill(null);
-      st.phase = "waiting";
-    }
+    /* ไม่ล้างที่นั่งทิ้ง เผื่อเน็ตหลุดแล้วกลับเข้ามาใหม่
+       ชิปกับที่นั่งเดิมต้องยังอยู่ ห้องจะถูกเก็บกวาดโดยตัวกลางเองถ้าไม่มีใครกลับมานาน */
+    if (!seated().some(x => x.connected)) st.phase = "waiting";
+  }
+
+  /* ชื่อที่ว่างอยู่ตอนนี้ (คนหลุด) ให้หน้าจอเอาไปโชว์ว่ากลับเข้ามาได้ */
+  function openSeats() {
+    return seated().filter(s => !s.connected).map(s => ({ name: s.name, stack: s.stack }));
   }
 
   /* ---------- เริ่มมือใหม่ ---------- */
@@ -138,8 +148,10 @@ export function createTable(opts = {}) {
   }
 
   function startHand() {
+    if (st.sessionOver) return { error: "รอบเล่นนี้จบแล้ว กดเริ่มรอบใหม่ถ้าจะเล่นต่อ" };
     const ready = readyPlayers();
     if (ready.length < 2) return { error: "ต้องมีอย่างน้อย 2 คนที่มีชิป" };
+    if (!st.startedAt) st.startedAt = Date.now();
 
     st.handNo++;
     st.board = [];
@@ -373,7 +385,39 @@ export function createTable(opts = {}) {
     st.phase = "showdown";
     st.current = -1;
     for (const s of seated()) { s.inHand = false; s.bet = 0; }
+
+    /* เช็คหลังจบตาเสมอ ไม่ตัดกลางตา */
+    if (limitReached()) closeSession();
     return {};
+  }
+
+  /* ---------- จบรอบเล่น ---------- */
+
+  function limitReached() {
+    if (cfg.limitType === "hands") return st.handNo >= cfg.limitValue;
+    if (cfg.limitType === "minutes") {
+      if (!st.startedAt) return false;
+      return Date.now() - st.startedAt >= cfg.limitValue * 60000;
+    }
+    return false;
+  }
+
+  /* เวลาที่เหลือเป็นมิลลิวินาที (null = ไม่ได้จำกัดเวลา) */
+  function msLeft() {
+    if (cfg.limitType !== "minutes" || !st.startedAt) return null;
+    return Math.max(0, cfg.limitValue * 60000 - (Date.now() - st.startedAt));
+  }
+
+  function closeSession() {
+    st.sessionOver = true;
+    st.standings = seated()
+      .map(s => ({
+        seatId: s.seatId, name: s.name,
+        stack: s.stack, boughtIn: s.boughtIn,
+        net: s.stack - s.boughtIn
+      }))
+      .sort((a, b) => b.net - a.net);
+    note("— จบรอบเล่น —");
   }
 
   /* ---------- มุมมองที่ส่งให้แต่ละเครื่อง ---------- */
@@ -400,9 +444,18 @@ export function createTable(opts = {}) {
       buyInRange: { min: cfg.minBuyIn, max: cfg.maxBuyIn, suggested: cfg.defaultBuyIn },
       mySeat,
       toCall,
-      canStart: st.phase === "waiting" || st.phase === "showdown",
+      canStart: (st.phase === "waiting" || st.phase === "showdown") && !st.sessionOver,
+      limit: {
+        type: cfg.limitType,
+        value: cfg.limitValue,
+        handsLeft: cfg.limitType === "hands" ? Math.max(0, cfg.limitValue - st.handNo) : null,
+        msLeft: msLeft(),
+        over: st.sessionOver
+      },
+      standings: st.standings,
       readyCount: readyPlayers().length,
       log: st.log.slice(-8),
+      openSeats: openSeats(),
       lastResult: st.lastResult,
       seats: st.seats.map((s, i) => s ? {
         seatId: i,
@@ -459,6 +512,10 @@ export function createTable(opts = {}) {
       if (isFinite(sb) && sb > 0) cfg.smallBlind = sb;
       if (isFinite(bb) && bb > 0) cfg.bigBlind = bb;
       if (cfg.bigBlind < cfg.smallBlind) cfg.bigBlind = cfg.smallBlind * 2;
+      if (msg.limitType === "none" || msg.limitType === "hands" || msg.limitType === "minutes") {
+        cfg.limitType = msg.limitType;
+        cfg.limitValue = Math.max(1, Math.floor(Number(msg.limitValue)) || 1);
+      }
       const mn = Math.floor(Number(msg.minBuyIn));
       const mx = Math.floor(Number(msg.maxBuyIn));
       if (isFinite(mn) && mn > 0) cfg.minBuyIn = mn;
@@ -467,9 +524,23 @@ export function createTable(opts = {}) {
       note("ตั้งค่าโต๊ะใหม่: บอด " + cfg.smallBlind + "/" + cfg.bigBlind);
       return {};
     }
+    /* เริ่มรอบเล่นใหม่: ล้างเวลาและจำนวนตา แต่ชิปคงไว้ */
+    if (msg.type === "newsession") {
+      st.sessionOver = false;
+      st.standings = null;
+      st.startedAt = 0;
+      st.handNo = 0;
+      st.phase = "waiting";
+      note("เริ่มรอบเล่นใหม่");
+      return {};
+    }
+
     if (msg.type === "act") return playerAction(seatId, msg);
     return { error: "คำสั่งไม่รู้จัก" };
   }
 
-  return { sit, disconnect, action, viewFor, _state: st, _cfg: cfg };
+  /* มีใครยังต่ออยู่ไหม ใช้ตัดสินว่าจะเก็บห้องทิ้งได้หรือยัง */
+  function anyConnected() { return seated().some(s => s.connected); }
+
+  return { sit, disconnect, action, viewFor, openSeats, anyConnected, _state: st, _cfg: cfg };
 }

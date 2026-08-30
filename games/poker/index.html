@@ -83,6 +83,8 @@ button { font-family: inherit; }
 }
 .btn-main:disabled { opacity: .45; cursor: not-allowed; }
 .btn-main:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+.hint-sm { font-size: .78rem; color: var(--muted); margin: 6px 0 0; }
+.qbtn.is-on { background: var(--gold); color: #06170f; border-color: var(--gold); font-weight: 700; }
 .join .err { color: #ff8f84; font-size: .85rem; min-height: 1.2em; margin: 8px 0 0; }
 .join .back { display: block; text-align: center; margin-top: 14px; color: var(--muted); font-size: .85rem; }
 
@@ -345,6 +347,13 @@ button { font-family: inherit; }
       <div class="chips-row" id="chip-presets"></div>
     </div>
 
+    <div class="fld">
+      <label>รอบเล่นนี้จบเมื่อไหร่</label>
+      <div class="chips-row" id="limit-kind" style="margin:0 0 8px"></div>
+      <input id="f-limit" type="number" min="1" step="1" value="20" style="display:none">
+      <p class="hint-sm" id="limit-hint">เล่นไปเรื่อยๆ จนกดเลิกเอง</p>
+    </div>
+
     <details style="margin:2px 0 14px">
       <summary style="cursor:pointer; color:var(--muted); font-size:.84rem">ตั้งค่าบอด (คนแรกที่เข้าห้องเป็นคนตั้ง)</summary>
       <div class="two" style="margin-top:10px">
@@ -373,7 +382,10 @@ button { font-family: inherit; }
       <div class="blinds" id="t-blinds">10 / 20</div>
       <div class="hand" id="t-hand">ห้อง —</div>
     </div>
-    <div class="hand" id="t-me">—</div>
+    <div style="text-align:right">
+      <div class="hand" id="t-me">—</div>
+      <div class="blinds" id="t-left" style="font-size:.78rem"></div>
+    </div>
   </div>
 
   <div class="table-area" id="table-area">
@@ -384,6 +396,7 @@ button { font-family: inherit; }
       <div class="pot" id="t-pot">กองกลาง 0</div>
     </div>
     <div class="result" id="t-result"></div>
+    <div class="result" id="t-standings"></div>
   </div>
 
   <div class="log" id="t-log"></div>
@@ -445,6 +458,32 @@ button { font-family: inherit; }
 
   /* ---------- หน้าเข้าห้อง ---------- */
 
+  /* ตัวเลือกว่ารอบเล่นนี้จะจบเมื่อไหร่ */
+  var limitType = "none", limitValue = 20;
+  (function buildLimit() {
+    var host = $("limit-kind");
+    var opts = [
+      { k: "none",    label: "ไม่จำกัด", hint: "เล่นไปเรื่อยๆ จนกดเลิกเอง" },
+      { k: "hands",   label: "ครบกี่ตา", hint: "ครบจำนวนตาแล้วนับคะแนนทันที" },
+      { k: "minutes", label: "ครบกี่นาที", hint: "หมดเวลาแล้วเล่นตาที่ค้างให้จบก่อน แล้วค่อยนับคะแนน" }
+    ];
+    opts.forEach(function (o) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "qbtn" + (o.k === "none" ? " is-on" : "");
+      b.textContent = o.label;
+      b.addEventListener("click", function () {
+        limitType = o.k;
+        Array.prototype.forEach.call(host.children, function (c) { c.classList.remove("is-on"); });
+        b.classList.add("is-on");
+        $("f-limit").style.display = o.k === "none" ? "none" : "block";
+        $("f-limit").value = o.k === "minutes" ? 30 : 20;
+        $("limit-hint").textContent = o.hint;
+      });
+      host.appendChild(b);
+    });
+  })();
+
   var PRESETS = [500, 1000, 2000, 5000, 10000];
   (function buildPresets() {
     var host = $("chip-presets");
@@ -498,7 +537,9 @@ button { font-family: inherit; }
       ws.send(JSON.stringify({
         type: "config",
         smallBlind: Math.floor(Number($("f-sb").value)) || 10,
-        bigBlind: Math.floor(Number($("f-bb").value)) || 20
+        bigBlind: Math.floor(Number($("f-bb").value)) || 20,
+        limitType: limitType,
+        limitValue: Math.floor(Number($("f-limit").value)) || 20
       }));
     };
 
@@ -636,10 +677,12 @@ button { font-family: inherit; }
     /* ถ้าไม่ใช่ตาเราแล้ว ปิดแผงใส่เงินทิ้ง */
     if (view.current !== mySeat) $("bet-sheet").classList.remove("is-on");
 
+    paintLimit();
     paintSeats();
     paintHole();
     paintActions();
     paintResult();
+    paintStandings();
   }
 
   function paintSeats() {
@@ -739,7 +782,7 @@ button { font-family: inherit; }
         view.phase === "showdown" ? "มือต่อไป" : "เริ่มเล่น",
         view.readyCount >= 2 ? null : "ต้องมีอย่างน้อย 2 คน",
         function () { send({ type: "start" }); });
-      start.disabled = view.readyCount < 2;
+      start.disabled = view.readyCount < 2 || (view.limit && view.limit.over);
       row.appendChild(start);
 
       if (me.stack <= 0) {
@@ -912,6 +955,88 @@ button { font-family: inherit; }
   $("bet-sheet").addEventListener("click", function (e) {
     if (e.target === $("bet-sheet")) closeRaise();
   });
+
+  /* ---------- เวลา/ตาที่เหลือ ---------- */
+
+  var tickTimer = null;
+
+  function fmtMs(ms) {
+    var total = Math.ceil(ms / 1000);
+    var m = Math.floor(total / 60), sec = total % 60;
+    return m + ":" + (sec < 10 ? "0" : "") + sec;
+  }
+
+  function paintLimit() {
+    var el = $("t-left");
+    var L = view.limit;
+    if (!L || L.type === "none") { el.textContent = ""; stopTick(); return; }
+
+    if (L.type === "hands") {
+      el.textContent = L.over ? "จบรอบเล่นแล้ว" : "เหลือ " + L.handsLeft + " ตา";
+      stopTick();
+      return;
+    }
+
+    /* นับถอยหลังในเครื่องเอง จะได้ไม่ต้องยิงข้อความถี่ๆ */
+    stopTick();
+    if (L.over) { el.textContent = "จบรอบเล่นแล้ว"; return; }
+    var endAt = Date.now() + (L.msLeft || 0);
+    function tick() {
+      var left = endAt - Date.now();
+      if (left <= 0) {
+        el.textContent = "หมดเวลา · เล่นตานี้ให้จบ";
+        stopTick();
+        return;
+      }
+      el.textContent = "เหลือ " + fmtMs(left);
+    }
+    tick();
+    tickTimer = setInterval(tick, 1000);
+  }
+
+  function stopTick() { if (tickTimer) { clearInterval(tickTimer); tickTimer = null; } }
+
+  /* ---------- สรุปตอนจบรอบเล่น ---------- */
+
+  function paintStandings() {
+    var box = $("t-standings");
+    if (!view.limit || !view.limit.over || !view.standings) { box.classList.remove("is-on"); return; }
+
+    box.innerHTML = "";
+    var h = document.createElement("h3");
+    h.textContent = "จบรอบเล่น";
+    box.appendChild(h);
+
+    var sub = document.createElement("p");
+    sub.style.cssText = "margin:0 0 8px; font-size:.8rem; color:var(--muted)";
+    sub.textContent = view.limit.type === "hands"
+      ? "ครบ " + view.limit.value + " ตาแล้ว"
+      : "ครบ " + view.limit.value + " นาทีแล้ว";
+    box.appendChild(sub);
+
+    view.standings.forEach(function (p, i) {
+      var row = document.createElement("div");
+      row.className = "row";
+      var left = document.createElement("span");
+      left.textContent = (i + 1) + ". " + p.name;
+      var right = document.createElement("b");
+      right.textContent = (p.net >= 0 ? "+" : "") + p.net.toLocaleString("th-TH");
+      right.style.color = p.net > 0 ? "var(--good)" : (p.net < 0 ? "#ff8f84" : "var(--muted)");
+      row.appendChild(left);
+      row.appendChild(right);
+      box.appendChild(row);
+    });
+
+    var again = document.createElement("button");
+    again.type = "button";
+    again.className = "btn-main";
+    again.style.marginTop = "12px";
+    again.textContent = "เริ่มรอบเล่นใหม่";
+    again.addEventListener("click", function () { send({ type: "newsession" }); });
+    box.appendChild(again);
+
+    box.classList.add("is-on");
+  }
 
   /* ---------- ผลมือที่จบ ---------- */
 

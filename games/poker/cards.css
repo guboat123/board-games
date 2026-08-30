@@ -37,8 +37,16 @@
 .pc__corner--tl { left: 6%; top: 3.5%; }
 .pc__corner--br { right: 6%; bottom: 3.5%; transform: rotate(180deg); }
 
-.pc__cr { font-size: 1.9em; letter-spacing: -.04em; }
-.pc__cs { font-size: 1.5em; margin-top: -.1em; }
+.pc__cr { font-size: 1.55em; letter-spacing: -.05em; }
+.pc__cs { font-size: 1.2em; margin-top: -.12em; }
+
+/* ไพ่ 10: เลขมุมย่อลงกับขยับชิดขอบ จะได้ไม่กินพื้นที่ดอก */
+.pc--wide .pc__cr { font-size: 1.05em; letter-spacing: -.12em; }
+.pc--wide .pc__cs { font-size: .92em; }
+.pc--wide .pc__corner--tl { left: 2.5%; top: 3%; }
+.pc--wide .pc__corner--br { right: 2.5%; bottom: 3%; }
+/* ดอกของไพ่ 10 เล็กลงนิด เพราะมี 10 ดอกในใบเดียว */
+.pc--wide .pc__pip { font-size: 1.02em; }
 
 /* ไพ่ใบเล็กโชว์แค่มุมบนซ้าย พื้นที่ไม่พอ */
 .pc--sm { font-size: 5.5px; }
@@ -50,33 +58,34 @@
 }
 .pc--sm .pc__corner--br { display: none; }
 .pc--sm .pc__face { display: none; }
+.pc--sm .pc__letter { display: none; }
 .pc--sm .pc__corner--tl { left: 50%; top: 50%; transform: translate(-50%, -50%); }
 
-/* ---- หน้าไพ่ ---- */
-.pc__face { position: absolute; inset: 16% 20%; }
+/* ---- หน้าไพ่ ----
+   พิกัดดอกอิงทั้งใบ จึงกินพื้นที่เต็ม แล้วเว้นมุมไว้ให้เลขแทน */
+.pc__face { position: absolute; inset: 0; }
 
 .pc__pip {
   position: absolute;
   transform: translate(-50%, -50%);
-  font-size: 2.4em;
+  font-size: 1.15em;      /* ~18% ของความกว้างไพ่ เท่าไพ่จริง */
   line-height: 1;
 }
 .pc__pip.is-flip { transform: translate(-50%, -50%) rotate(180deg); }
 
 /* ไพ่คน J Q K */
+/* ไพ่คน: ตัวอักษรกลางใบ ไม่ให้ชนเลขมุม */
 .pc__letter {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 5.2em; font-weight: 700; line-height: 1;
+  position: absolute; left: 50%; top: 46%;
+  transform: translate(-50%, -50%);
+  font-size: 2.9em; font-weight: 700; line-height: 1;
   letter-spacing: -.04em;
-  opacity: .92;
 }
 .pc__letter-suit {
-  position: absolute; right: -6%; bottom: -4%;
-  font-size: 2.2em; line-height: 1; opacity: .85;
+  position: absolute; left: 50%; top: 72%;
+  transform: translateX(-50%);
+  font-size: 1.5em; line-height: 1; opacity: .9;
 }
-.pc--md .pc__letter { font-size: 4.4em; }
-.pc--sm .pc__letter { font-size: 3em; }
 
 /* ---- ไพ่คว่ำ ---- */
 .pc--back {

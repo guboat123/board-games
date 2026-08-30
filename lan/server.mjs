@@ -138,7 +138,8 @@ function decodeFrames(buf, onMessage, onClose) {
 /* ---------- ห้องเล่น ---------- */
 
 let nextId = 1;
-const rooms = new Map();   /* code -> { code, table, clients:Set } */
+const rooms = new Map();   /* code -> { code, table, clients:Set, reaper } */
+const ROOM_GRACE_MIN = 10; /* ไม่มีใครต่ออยู่กี่นาทีถึงจะปิดห้อง */
 
 function getRoom(code) {
   let r = rooms.get(code);
@@ -183,8 +184,16 @@ server.on("upgrade", (req, socket) => {
       client.room.clients.delete(client);
       client.room.table.disconnect(client.seatId);
       if (client.room.clients.size === 0) {
-        rooms.delete(client.room.code);
-        log("ห้อง", client.room.code, "ว่างแล้ว ปิดห้อง");
+        /* ไม่ปิดห้องทันที เผื่อทุกคนเน็ตหลุดพร้อมกัน ให้เวลากลับเข้ามา */
+        const room = client.room;
+        log("ห้อง", room.code, "ไม่มีใครต่ออยู่ รอ", ROOM_GRACE_MIN, "นาทีก่อนปิด");
+        clearTimeout(room.reaper);
+        room.reaper = setTimeout(() => {
+          if (room.clients.size === 0) {
+            rooms.delete(room.code);
+            log("ห้อง", room.code, "ไม่มีใครกลับมา ปิดห้องแล้ว");
+          }
+        }, ROOM_GRACE_MIN * 60000);
       } else {
         broadcastState(client.room);
       }
@@ -208,6 +217,7 @@ server.on("upgrade", (req, socket) => {
     if (msg.type === "join") {
       const code = String(msg.room || "").toUpperCase().slice(0, 8) || "HOME";
       const room = getRoom(code);
+      clearTimeout(room.reaper);   /* มีคนกลับมาแล้ว ยกเลิกคิวปิดห้อง */
       client.room = room;
       room.clients.add(client);
 
