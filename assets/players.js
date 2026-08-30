@@ -299,13 +299,15 @@ window.Players = (function () {
       var results = hist[i].results;
       for (j = 0; j < results.length; j++) {
         var r = results[j];
-        /* คนที่ถูกลบออกจากทะเบียนแล้ว จับกลุ่มด้วยชื่อที่บันทึกไว้ */
-        var key = r.playerId && findIndex(r.playerId) !== -1
-                    ? r.playerId
-                    : (r.playerId || "name:" + norm(r.name));
+        /* ยังอยู่ในทะเบียน จับกลุ่มด้วย id
+           ถูกลบไปแล้ว จับกลุ่มด้วยชื่อที่บันทึกไว้ จะได้ไม่ปนกับคนใหม่ที่ตั้งชื่อซ้ำ
+           (ห้ามใช้ r.playerId เป็น fallback เพราะ id ของคนที่ถูกลบก็ยังมีค่าอยู่) */
         var known = r.playerId ? get(r.playerId) : null;
+        var key = known ? String(r.playerId) : "name:" + norm(r.name);
         var it = row(key, known ? known.name : r.name);
-        if (known) it.name = known.name;   /* เปลี่ยนชื่อแล้วให้ตารางอันดับใช้ชื่อใหม่ */
+        /* อัปเดตชื่อทุกครั้ง ยังอยู่ก็ใช้ชื่อปัจจุบัน ถูกลบแล้วก็ใช้ชื่อล่าสุดที่บันทึกไว้
+           (ไล่ประวัติจากเก่าไปใหม่ ค่าสุดท้ายจึงเป็นชื่อล่าสุด) */
+        it.name = known ? known.name : r.name;
         it.games += 1;
         if (r.won) it.wins += 1;
         it.points += r.score;
