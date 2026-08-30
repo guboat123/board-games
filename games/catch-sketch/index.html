@@ -114,14 +114,34 @@
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     margin-bottom: 18px;
   }
-  .word__main { font-family: var(--font-display); font-weight: 700; font-size: 2.5rem; line-height: 1.2; overflow-wrap: anywhere; }
+  /* คำที่ต้องวาด ตัวใหญ่สุดในเกม ถ้ามีวรรณยุกต์ซ้อนจะไปทับป้าย "คำของคุณ" ข้างบน */
+  .word__main { font-family: var(--font-display); font-weight: 700; font-size: 2.5rem; line-height: 1.5; overflow-wrap: anywhere; }
   .word__sub  { font-size: .95rem; color: #6C7472; margin-top: 8px; }
   .word__lv   { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .12em; color: var(--ink-blue); margin-bottom: 10px; }
 
   /* ---- ปุ่มคว้าคิว ---- */
-  /* เผื่อที่ให้ปุ่มที่ติดขอบล่าง ไม่ให้ไปทับปุ่มชื่อคนสุดท้าย
-     ถ้าทับ คนจะกดปิดรอบทั้งที่ตั้งใจกดชื่อตัวเอง */
-  .claims { list-style: none; padding: 0 0 80px; margin: 0 0 16px; }
+  .claims { list-style: none; padding: 0; margin: 0 0 16px; }
+
+  /* ปุ่ม "ทุกคนเสร็จแล้ว" ห้ามลอยทับปุ่มชื่อเด็ดขาด
+     ถ้าทับ คนตั้งใจคว้าคิว แต่กลายเป็นปิดรอบให้ทุกคน ซึ่งแก้กลับไม่ได้
+     เพิ่ม padding ท้ายลิสต์ไม่ช่วย เพราะ sticky ลอยทับสิ่งที่เลื่อนอยู่ข้างใต้เสมอ
+     จึงให้รายชื่อเลื่อนในกล่องของตัวเอง แล้วปุ่มอยู่ในแถวของมันจริงๆ */
+  #s-word.is-on {
+    display: flex; flex-direction: column;
+    /* ต้องเป็น max-height ไม่ใช่ min-height
+       ถ้าใช้ min กล่องจะยืดตามเนื้อหาจนปุ่มหลุดใต้จอ ต้องมีเพดานให้รายชื่อยุบเข้ามาแทน */
+    max-height: calc(100vh - 120px);
+    max-height: calc(100dvh - 120px);
+  }
+  #s-word .claims { flex: 1 1 auto; overflow-y: auto; min-height: 84px; }
+  #s-word #btn-all-done { position: static; flex: 0 0 auto; }
+
+  /* จอเตี้ย ย่อกล่องคำลง จะได้เหลือที่ให้รายชื่อพอโดยไม่ต้องเลื่อน */
+  @media (max-height: 700px) {
+    .word { padding: 16px 16px; min-height: 0; }
+    .word__main { font-size: 1.9rem; }
+    .word__lv { margin-bottom: 4px; }
+  }
   .claims li { display: flex; gap: 8px; margin-bottom: 10px; }
 
   .claim {
@@ -184,7 +204,7 @@
 
   .reveal-word {
     font-family: var(--font-display); font-weight: 700; font-size: 2.1rem;
-    line-height: 1.2; overflow-wrap: anywhere;
+    line-height: 1.5; overflow-wrap: anywhere;
   }
 
   /* ---- หมวดหมู่ ----
@@ -233,7 +253,7 @@
 
   /* หัวข้อจบเกม ให้ชื่อคนชนะเด่นกว่าคำว่าชนะ */
   .over-head { text-align: center; padding: 12px 0 4px; }
-  .over-head h1 { font-size: 2.3rem; line-height: 1.15; overflow-wrap: anywhere; }
+  .over-head h1 { font-size: 2.3rem; line-height: 1.4; overflow-wrap: anywhere; }
 
   .steps { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .1em; color: var(--ink-blue); }
 
@@ -536,7 +556,7 @@
       localStorage.setItem(LIVE_KEY, JSON.stringify({
         at: Date.now(),
         screen: (document.querySelector(".screen.is-on") || {}).id || "",
-        cfg: cfg, state: state
+        cfg: cfg, state: state, leaderId: leaderId
       }));
     } catch (e) { /* เขียนไม่ได้ก็เล่นต่อได้ แค่กู้ไม่ได้ */ }
   }
@@ -724,9 +744,12 @@
         (n < rounds ? " (น้อยกว่าจำนวนรอบ เดี๋ยวคำจะวนซ้ำ)" : "");
       $("pool-info").className = "hint";
     }
-    $("rounds-info").textContent = "เล่น " + picked.length + " คน คนละ " + cfg.roundsPer +
-      " รอบ รวม " + rounds + " รอบ";
-    $("btn-start").disabled = n < 1;
+    /* ปุ่มเทาเฉยๆ หรือกดแล้วเงียบ ทำให้คนติดตรงนี้ ต้องบอกเสมอว่าขาดอะไร */
+    var ready = pickedPlayers().length >= MIN_PLAYERS;
+    $("rounds-info").textContent = ready
+      ? "เล่น " + picked.length + " คน คนละ " + cfg.roundsPer + " รอบ รวม " + rounds + " รอบ"
+      : "ยังไม่ได้เลือกคนเล่น กด “← เปลี่ยนคนเล่น” ด้านล่างเพื่อกลับไปเลือกก่อน";
+    $("btn-start").disabled = n < 1 || !ready;
   }
 
   /* สุ่มแบบ shuffle bag ไม่ให้คำซ้ำจนกว่าจะครบกอง */
@@ -1082,7 +1105,11 @@
   function claim(i) {
     if (tappedTooFast(i)) return;
     /* เพิ่งกดกลับเข้าเกมมาหมาดๆ ยังไม่นับเป็นคว้าคิว */
-    if (state.justBack[i] && Date.now() - state.justBack[i] < 900) return;
+    if (state.justBack[i] && Date.now() - state.justBack[i] < 900) {
+      /* กันเผลอ แต่ต้องบอกด้วย ไม่งั้นคนจะคิดว่าจอค้าง แล้วรัวแตะซ้ำ */
+      $("claim-status").textContent = "แตะชื่ออีกครั้งเพื่อคว้าคิว";
+      return;
+    }
     if (state.queue.indexOf(i) !== -1) return;
     if (state.gaveUp.indexOf(i) !== -1) return;
     state.queue.push(i);
@@ -1459,17 +1486,52 @@
     var box = document.createElement("div");
     box.className = "card";
     box.style.cssText = "margin-bottom:18px; border-color:var(--ink-orange)";
+    /* ข้อความต้องตรงกับสิ่งที่จะเกิดขึ้นจริงตอนกด
+       เคยเขียนรวมๆ ว่า "เริ่มรอบใหม่ ลบไวท์บอร์ด" ทั้งที่บางทางไปต่อจากคิวเดิม
+       คนที่ทำตามจะลบรูปที่กำลังจะให้คนทายดูทิ้ง แล้วรอบนั้นเล่นต่อไม่ได้ */
+    var keepQueue = (d.screen === "s-guess" || d.screen === "s-pass-guess") &&
+                    d.state.queue && d.state.queue.length > 0;
+    var afterRound = (d.screen === "s-round");
+    var isOver = (d.state.phase === "over");
+    var showRound = Math.min(d.state.roundIdx + 1 + (afterRound ? 1 : 0), d.state.totalRounds);
+
+    var what, label;
+    if (isOver) {
+      what = "เกมจบไปแล้ว กดเพื่อดูผลรวมอีกครั้ง";
+      label = "ดูผลรวม";
+    } else if (keepQueue) {
+      what = "จะไปต่อจากคิวเดิม อย่าเพิ่งลบไวท์บอร์ด";
+      label = "เล่นต่อ (ดูคิวเดิม)";
+    } else if (afterRound) {
+      what = "รอบที่ " + (d.state.roundIdx + 1) + " จบไปแล้ว จะเริ่มรอบที่ " + showRound +
+             " ด้วยคำใหม่ ลบไวท์บอร์ดก่อนกด";
+      label = "เล่นต่อ (รอบที่ " + showRound + ")";
+    } else {
+      what = "รอบที่ค้างอยู่จะเริ่มใหม่ด้วยคำใหม่ ลบไวท์บอร์ดก่อนกด";
+      label = "เล่นต่อ (เริ่มรอบนี้ใหม่)";
+    }
+
     box.innerHTML = "<b>มีเกมที่เล่นค้างไว้</b>" +
-      "<p class='hint' style='margin:4px 0 4px'>รอบที่ " + (d.state.roundIdx + 1) +
-      " จาก " + d.state.totalRounds + " · " + d.state.players.length + " คน · แต้มยังอยู่ครบ</p>" +
-      "<p class='hint' style='margin:0 0 12px'>รอบที่ค้างอยู่จะเริ่มใหม่ด้วยคำใหม่ ลบไวท์บอร์ดก่อนกด</p>";
+      "<p class='hint' style='margin:4px 0 4px'>" +
+      (isOver ? "เกมจบแล้ว" : "รอบที่ " + showRound + " จาก " + d.state.totalRounds) +
+      " · " + d.state.players.length + " คน · แต้มยังอยู่ครบ</p>" +
+      "<p class='hint' style='margin:0 0 12px'>" + what + "</p>";
 
     var go = document.createElement("button");
     go.type = "button"; go.className = "btn";
-    go.textContent = "เล่นต่อ (เริ่มรอบนี้ใหม่)";
+    go.textContent = label;
     go.addEventListener("click", function () {
       cfg = d.cfg; state = d.state;
       if (!state.justBack) state.justBack = {};
+
+      /* กู้เกมแล้วต้องกู้หน้าตั้งค่าด้วย
+         ไม่งั้นพอเล่นจบแล้วกด "เล่นอีกรอบ" จะเจอหน้าที่บอกว่าเล่น 0 คน และปุ่มกดไม่ติด */
+      headcount = state.players.length;
+      picked = [];
+      for (var ri = 0; ri < state.players.length; ri++) picked.push(state.players[ri].id);
+      leaderId = d.leaderId || picked[0] || null;
+      renderHeadcount();
+      renderPickList();
       box.remove();
       if (state.phase === "over") { gameOver(); return; }
       /* กลับไปหน้าส่งเครื่อง ปลอดภัยสุด เพราะคำถูกซ่อนไปแล้ว */

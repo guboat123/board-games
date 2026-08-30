@@ -37,6 +37,9 @@ body {
   font-size: 15px;
   line-height: 1.45;
   user-select: none;
+  /* หน้านี้ไม่มีอะไรที่ต้องเลื่อนแนวนอน
+     เหรียญดีลเลอร์ของที่นั่งขวาสุดโผล่ออกนอกจอ 2px ทำให้เลื่อนได้ทั้งหน้า ซึ่งกวนมือตอนเล่น */
+  overflow-x: hidden;
 }
 button { font-family: inherit; }
 
@@ -163,8 +166,15 @@ button { font-family: inherit; }
   position: absolute; left: 50%; top: 47%;
   transform: translate(-50%, -50%);
   text-align: center; width: 92%;
+  /* ไพ่กลางคือสิ่งที่ทุกคนต้องอ่าน ต้องอยู่บนที่นั่งเสมอ */
+  z-index: 3; pointer-events: none;
 }
 .board { display: flex; gap: 5px; justify-content: center; }
+/* ไพ่กลางต้องแคบพอที่จะไม่ชนที่นั่งซ้าย/ขวา (อยู่ที่ 11% กับ 89% ของโต๊ะ)
+   มุมไพ่ใบแรกกับใบที่ห้าคือที่พิมพ์เลขหน้าไพ่ไว้ ถ้าโดนทับก็อ่านไม่ออก
+   ผูกกับ vw ตรงๆ แทนการตั้ง breakpoint จะได้ไม่มีจุดที่พังเป็นช่วงๆ
+   10.1vw = ค่ากว้างสุดที่ยังไม่ชนที่นั่ง ตั้งแต่ 360px ขึ้นไป */
+.board .pc--md { width: min(54px, 10.1vw); font-size: min(8.8px, 1.65vw); }
 .pot {
   display: inline-block; margin-top: 10px;
   padding: 5px 15px;
@@ -179,13 +189,19 @@ button { font-family: inherit; }
 
 /* ---------- ที่นั่ง ---------- */
 .seat {
-  position: absolute; width: 76px;
+  position: absolute;
+  /* ค่อยๆ กว้างขึ้นตามจอ ไม่ใช่กระโดดทีเดียว
+     ของเดิมกระโดด 76 -> 104px ที่ 430px พอดี ซึ่งเป็นความกว้างของ iPhone Pro Max
+     ทำให้ที่นั่งล้นขอบจอและทับกันเองบนเครื่องที่คนใช้จริงกันเยอะ */
+  width: clamp(70px, 19vw, 104px);
   transform: translate(-50%, -50%);
   text-align: center;
+  z-index: 2;
 }
-@media (min-width: 430px) { .seat { width: 104px; } }
-/* จอแคบมาก บีบให้แคบลงอีก ไม่ให้ที่นั่งชนกันเอง */
-@media (max-width: 380px) { .seat { width: 70px; } .seat__cards { height: 24px; } }
+@media (max-width: 380px) {
+  .seat__cards { height: 25px; }
+  .seat__cards .pc--sm { width: 17px; font-size: 3.9px; }
+}
 .seat__box {
   background: linear-gradient(#16321f, #0e2417);
   border: 1px solid #2f5540; border-radius: 9px;
@@ -201,7 +217,17 @@ button { font-family: inherit; }
 }
 .seat__stack { font-family: var(--mono); font-size: .8rem; color: var(--gold); }
 .seat__box { max-width: 100%; }
+/* จอเตี้ย (360x640) วงที่นั่งบีบกันในแนวตั้ง ต้องลดความสูงของแต่ละที่นั่ง
+   ไม่งั้นไพ่ของคนหนึ่งจะไปทับกล่องชื่อของอีกคน */
+@media (max-height: 700px) {
+  .seat__cards { height: 21px; }
+  .seat__cards .pc--sm { width: 15px; font-size: 3.4px; }
+  .seat__box { padding: 3px 5px; }
+}
 .seat__cards { display: flex; gap: 2px; justify-content: center; margin-bottom: 3px; height: 30px; }
+/* ไพ่ต้องพอดีกับกล่อง ไม่งั้นล้นออกไปทับที่นั่งข้างเคียง
+   pc--sm กว้าง 24px จะสูง 33.6px (อัตราส่วน 5/7) ซึ่งเกินกล่อง 30px ไป 3.6px */
+.seat__cards .pc--sm { width: 21px; font-size: 4.8px; }
 .seat__act {
   margin-top: 3px; font-size: .66rem; color: var(--muted);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -356,6 +382,10 @@ button { font-family: inherit; }
   border-radius: 14px; padding: 16px; text-align: center;
   box-shadow: 0 20px 50px rgba(0,0,0,.6);
   display: none;
+  /* แถวผลมีได้ถึง 9 แถว ต้องเลื่อนในกล่องตัวเอง
+     ไม่ใช่ยืดขึ้นไปเรื่อยๆ จนทับกองกลางกับไพ่กลาง */
+  max-height: 44%;
+  overflow-y: auto;
 }
 .result.is-on { display: block; }
 .result h3 { margin: 0 0 4px; font-size: 1.1rem; color: var(--gold); }
@@ -398,11 +428,13 @@ button { font-family: inherit; }
       <p class="hint-sm" id="seat-hint">ไม่เลือกก็ได้ ระบบจะหาที่ว่างให้เอง</p>
     </div>
 
-    <div class="fld">
+    <div class="fld" id="fld-chips">
       <label for="f-chips">ชิปที่จะซื้อเข้าโต๊ะ — แต่ละคนไม่ต้องเท่ากัน</label>
       <input id="f-chips" type="number" min="1" step="1" value="1000">
       <div class="chips-row" id="chip-presets"></div>
     </div>
+
+    <p class="hint-sm" id="rejoin-note" style="display:none"></p>
 
     <div class="fld">
       <label>รอบเล่นนี้จบเมื่อไหร่</label>
@@ -567,6 +599,24 @@ button { font-family: inherit; }
   /* ---------- รายการโต๊ะที่เปิดอยู่ ---------- */
 
   var lobbyWs = null;
+  var lobbyWanted = false, lobbyRetry = 0, lobbyTimer = null;
+
+  /* รหัสประจำเครื่อง ใช้พิสูจน์ว่าเป็นเจ้าของที่นั่งเดิมจริงตอนกลับเข้ามา
+     ชื่ออย่างเดียวใช้ไม่ได้ เพราะคนอื่นก็เห็นชื่อเราในหน้ารวมโต๊ะ */
+  function myToken() {
+    var k = "bg.poker.token.v1", t = "";
+    try { t = localStorage.getItem(k) || ""; } catch (e) {}
+    if (!t) {
+      t = "t" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+      try { localStorage.setItem(k, t); } catch (e) {}
+    }
+    return t;
+  }
+
+  function myName() {
+    try { return (JSON.parse(localStorage.getItem("bg.poker.v1") || "{}").name || ""); }
+    catch (e) { return ""; }
+  }
 
   function paintTables(rooms) {
     var host = $("tables-list");
@@ -608,9 +658,11 @@ button { font-family: inherit; }
 
       b.addEventListener("click", function () {
         $("f-room").value = r.code;
-        /* ถ้าเคยนั่งโต๊ะนี้แล้วหลุดไป เติมชื่อเดิมให้เลย */
-        if (r.away && r.away.length === 1 && !$("f-name").value.trim()) {
-          $("f-name").value = r.away[0];
+        /* เติมชื่อให้เฉพาะเมื่อเป็นชื่อของเครื่องนี้เอง
+           ของเดิมเติมชื่อใครก็ได้ที่หลุดไป คนกดต่อโดยไม่ทันดูก็สวมสิทธิ์เขาไปเลย */
+        var mine = myName();
+        if (mine && r.away && r.away.indexOf(mine) !== -1 && !$("f-name").value.trim()) {
+          $("f-name").value = mine;
         }
         paintTables(window.__rooms || []);
         paintSeatPicker();
@@ -682,29 +734,64 @@ button { font-family: inherit; }
       })(i);
     }
 
+    refreshBuyIn();
+
     var room2 = currentRoom();
     $("seat-hint").textContent = room2
       ? "โต๊ะ " + room2.code + " · เลือกช่องว่างได้ ช่องที่ขึ้นว่าหลุดคือกลับเข้าที่เดิมพร้อมชิปเดิม"
       : "โต๊ะใหม่ยังไม่มีใครนั่ง เลือกช่องไหนก็ได้";
   }
 
+  /* กลับเข้าที่เดิม เซิร์ฟเวอร์คืนชิปเดิมให้ ไม่ได้ใช้ตัวเลขในช่องนี้
+     ถ้ายังโชว์ช่องไว้ คนจะเข้าใจว่าจะได้ชิปตามที่พิมพ์ */
+  function refreshBuyIn() {
+    var room = currentRoom();
+    var name = ($("f-name").value || "").trim();
+    var back = false;
+    if (room && name && room.seats) {
+      for (var i = 0; i < room.seats.length; i++) {
+        var s = room.seats[i];
+        if (s && !s.connected && s.name === name) { back = true; break; }
+      }
+    }
+    $("fld-chips").style.display = back ? "none" : "";
+    $("rejoin-note").style.display = back ? "" : "none";
+    $("rejoin-note").textContent = back
+      ? "กลับเข้าที่เดิมของ " + name + " · ได้ชิปเดิมที่ค้างไว้คืน ไม่ต้องซื้อใหม่"
+      : "";
+  }
+
   $("f-room").addEventListener("input", function () { paintSeatPicker(); paintTables(window.__rooms || []); });
+  $("f-name").addEventListener("input", refreshBuyIn);
 
   function openLobby() {
+    lobbyWanted = true;
     var proto = location.protocol === "https:" ? "wss://" : "ws://";
     try { lobbyWs = new WebSocket(proto + location.host); } catch (e) { return; }
 
-    lobbyWs.onopen = function () { lobbyWs.send(JSON.stringify({ type: "lobby" })); };
+    lobbyWs.onopen = function () { lobbyRetry = 0; lobbyWs.send(JSON.stringify({ type: "lobby" })); };
     lobbyWs.onmessage = function (ev) {
       var msg;
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
       if (msg.type === "rooms") { window.__rooms = msg.rooms; paintTables(msg.rooms); paintSeatPicker(); }
     };
     lobbyWs.onerror = function () { $("tables-list").innerHTML = ""; $("join-err").innerHTML = hostedHint(); };
-    lobbyWs.onclose = function () { lobbyWs = null; };
+    lobbyWs.onclose = function () {
+      lobbyWs = null;
+      if (!lobbyWanted) return;
+      /* ต้องต่อใหม่เอง ไม่งั้นรายชื่อโต๊ะจะค้างอยู่แบบเก่าโดยไม่มีอะไรบอกว่าตายแล้ว
+         แล้วคนจะเลือกโต๊ะที่ไม่มีอยู่จริง */
+      window.__rooms = [];
+      $("tables-list").innerHTML =
+        "<p class='hint-sm' style='opacity:.65;margin:0'>กำลังต่อใหม่...</p>";
+      lobbyRetry = Math.min(lobbyRetry + 1, 6);
+      lobbyTimer = setTimeout(openLobby, 500 * lobbyRetry);
+    };
   }
 
   function closeLobby() {
+    lobbyWanted = false;
+    if (lobbyTimer) { clearTimeout(lobbyTimer); lobbyTimer = null; }
     if (lobbyWs) { try { lobbyWs.close(); } catch (e) {} lobbyWs = null; }
   }
 
@@ -745,7 +832,7 @@ button { font-family: inherit; }
 
     ws.onopen = function () {
       ws.send(JSON.stringify({
-        type: "join", room: room, name: name, buyIn: chips,
+        type: "join", room: room, name: name, buyIn: chips, token: myToken(),
         seatId: wantSeat === null ? undefined : wantSeat
       }));
       /* คนแรกที่เข้าเป็นคนตั้งบอด ถ้าโต๊ะยังว่าง ฝั่งเซิร์ฟเวอร์จะรับไว้ */

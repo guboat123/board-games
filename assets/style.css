@@ -56,7 +56,14 @@ body {
 
 /* ---------- ตัวอักษร ---------- */
 
-h1, h2, h3 { font-family: var(--font-display); font-weight: 700; margin: 0; line-height: 1.25; }
+/* หัวข้อไทยที่มีวรรณยุกต์ซ้อนกัน (ไม้โท+สระอำ เช่น u0e41u0e21u0e48u0e19u0e49u0e33)
+   หมึกสูงกว่าที่กล่องบรรทัดจองไว้ถึง 0.28em เลยล้นขึ้นไปทับบรรทัดบน
+   จึงต้องจองที่ด้วย padding ของตัวหัวข้อเอง จะได้ไม่ต้องไปไล่เพิ่มช่องว่างทีละจุด
+   (line-height อย่างเดียวไม่พอ เพราะมันเพิ่มทั้งบนและล่าง ต้องดันถึง 2.0 ถึงจะพอ) */
+h1, h2, h3 {
+  font-family: var(--font-display); font-weight: 700; margin: 0;
+  line-height: 1.35; padding-top: .34em;
+}
 h1 { font-size: 2rem; }
 h2 { font-size: 1.35rem; }
 h3 { font-size: 1.05rem; }

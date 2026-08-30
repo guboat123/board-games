@@ -185,7 +185,8 @@
     padding: 12px 14px;
     margin-bottom: 12px;
   }
-  .cluebar .c1 { font-family: var(--font-display); font-weight: 700; font-size: 1.7rem; line-height: 1.2; overflow-wrap: anywhere; }
+  /* line-height 1.2 เตี้ยเกินสำหรับไทย สระกับวรรณยุกต์ซ้อนกันจะล้นขึ้นไปทับป้ายข้างบน */
+  .cluebar .c1 { font-family: var(--font-display); font-weight: 700; font-size: 1.7rem; line-height: 1.55; overflow-wrap: anywhere; }
   .cluebar .c2 { font-size: 1rem; margin-top: 4px; overflow-wrap: anywhere; }
   .cluebar .lb { font-family: var(--font-mono); font-size: .68rem; letter-spacing: .1em; color: var(--ink-blue); }
 
@@ -595,6 +596,10 @@
     for (i = 0; i < words.length; i++) {
       toks.push(words[i].toLowerCase().replace(/^สี/, ""));
     }
+    /* คำใบ้ 2 คำ เขียนแยกช่องว่างเพื่อเลี่ยงชื่อสีได้ เช่น "น้ำ เงิน" "ชม พู"
+       จึงต้องเอาทั้งก้อนที่ลบช่องว่างออกมาตรวจด้วย แบบเดียวกับที่ทำกับพิกัด
+       คำปกติไม่กระทบ เพราะเทียบแบบทั้งคำ "ท้องฟ้า" จึงไม่ตรงกับ "ฟ้า" */
+    if (words.length > 1) toks.push(low.replace(/\s+/g, "").replace(/^สี/, ""));
 
     /* เทียบว่าคำนั้น "เป็น" คำต้องห้ามจริงๆ ไม่ใช่แค่ขึ้นต้นด้วย
        ไม่งั้น ส้มตำ ส้มโอ ฟ้าทะลายโจร จะโดนบล็อกทั้งที่ไม่ได้บอกสี
@@ -675,6 +680,17 @@
 
   function renderPickList() {
     var all = Players.all();
+
+    /* ทะเบียนอาจถูกแก้จากแท็บอื่น คนที่เลือกไว้จึงหายไปได้
+       ต้องตัดออกก่อนนับ ไม่งั้นตัวนับจะบอกว่าครบ ทั้งที่กดจริงไม่ครบ แล้วเกมจะเริ่มด้วยคนน้อยกว่าที่บอก */
+    var live = {}, ai;
+    for (ai = 0; ai < all.length; ai++) live[String(all[ai].id)] = true;
+    var kept = [];
+    for (ai = 0; ai < picked.length; ai++) {
+      if (live[String(picked[ai])]) kept.push(picked[ai]);
+    }
+    picked = kept;
+
     var host = $("pick-list");
     host.innerHTML = "";
 
@@ -1584,6 +1600,13 @@
     state = null;
     renderPickList();
     show("s-players");
+  });
+
+  /* ทะเบียนถูกแก้จากแท็บอื่น หน้านี้ต้องตามให้ทัน ไม่ใช่ค้างรายชื่อเก่าไว้ */
+  window.addEventListener("storage", function (e) {
+    if (e && e.key && e.key.indexOf("bg.players") !== 0) return;
+    if (state) return;   /* กำลังเล่นอยู่ ไม่ยุ่งกับหน้าจอ */
+    renderPickList();
   });
 
 })();

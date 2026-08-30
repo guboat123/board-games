@@ -35,6 +35,7 @@ export function createTable(opts = {}) {
     currentBet: 0,
     minRaise: cfg.bigBlind,
     handNo: 0,
+    hostSeat: null,      /* ช่องของคนที่เปิดโต๊ะ ใช้ตัดสินว่าใครตั้งค่าโต๊ะได้ */
     startedAt: 0,        /* เวลาที่กดเริ่มตาแรก ใช้นับถอยหลัง */
     sessionOver: false,  /* ครบตามที่ตั้งไว้แล้ว */
     standings: null,     /* ผลรวมตอนจบรอบเล่น */
@@ -72,17 +73,27 @@ export function createTable(opts = {}) {
     return Math.max(cfg.minBuyIn, Math.min(cfg.maxBuyIn, n));
   }
 
-  function sit(name, preferred, buyIn) {
+  function sit(name, preferred, buyIn, token) {
     name = String(name || "").trim() || "ผู้เล่น";
+    token = String(token || "").slice(0, 64);
 
-    /* กลับเข้ามาใหม่ด้วยชื่อเดิม ให้นั่งที่เดิมพร้อมชิปเดิม */
+    /* กลับเข้ามาใหม่ด้วยชื่อเดิม ให้นั่งที่เดิมพร้อมชิปเดิม
+       แต่ "ชื่อ" อย่างเดียวใช้เป็นหลักฐานไม่ได้ เพราะรายชื่อคนที่หลุด
+       ถูกประกาศให้ทุกคนที่เปิดหน้ารวมโต๊ะเห็น ใครพิมพ์ชื่อนั้นก็เอาชิปไปได้
+       จึงต้องเข้าเงื่อนไขอย่างใดอย่างหนึ่ง
+         1) token ตรงกัน = เครื่องเดิมกลับมาเอง ผ่านได้เงียบๆ
+         2) เจาะจงกดที่นั่งนั้นเอง = หน้าเว็บถามยืนยันตัวตนไปแล้ว
+       ถ้าไม่เข้าทั้งสองข้อ ให้ถือเป็นคนใหม่ (ได้ช่องว่างกับชื่อต่อเลข) ซึ่งไม่กระทบชิปใคร */
     for (let i = 0; i < MAX_SEATS; i++) {
       const s = st.seats[i];
-      if (s && s.name === name && !s.connected) {
-        s.connected = true;
-        note(name + " กลับเข้าโต๊ะ");
-        return { ok: true, seatId: i, name, stack: s.stack };
-      }
+      if (!s || s.name !== name || s.connected) continue;
+      const sameDevice = !!token && s.token === token;
+      const askedForIt = Number.isInteger(preferred) && preferred === i;
+      if (!sameDevice && !askedForIt) continue;
+      s.connected = true;
+      if (token) s.token = token;
+      note(name + " กลับเข้าโต๊ะ");
+      return { ok: true, seatId: i, name, stack: s.stack };
     }
 
     let idx = -1;
@@ -118,8 +129,11 @@ export function createTable(opts = {}) {
       acted: false,
       connected: true,
       sitOut: false,
-      lastAction: ""
+      lastAction: "",
+      token: token      /* รหัสประจำเครื่อง ใช้พิสูจน์ตัวตนตอนกลับเข้ามา */
     };
+    /* คนแรกที่นั่งลง = เจ้าภาพ จำไว้เลย ที่นั่งจะเปลี่ยนทีหลังไม่ได้ */
+    if (st.hostSeat === null) st.hostSeat = idx;
     note(finalName + " เข้าโต๊ะด้วย " + chips + " ชิป");
     return { ok: true, seatId: idx, name: finalName, stack: chips };
   }
@@ -451,7 +465,14 @@ export function createTable(opts = {}) {
   /* ---------- มุมมองที่ส่งให้แต่ละเครื่อง ---------- */
 
   function potTotal() {
-    return seated().reduce((a, s) => a + s.committed, 0);
+    /* เงินส่วนที่ยังไม่มีใครตาม ไม่นับเป็นกองกลาง เพราะเดี๋ยวก็คืนเจ้าของ
+       (กติกาเดียวกับ returnUncalled ตอนจบมือ)
+       ถ้านับรวม ตัวเลขกองจะพองเกินจริง และปุ่มเดิมพัน "ครึ่งกอง/เต็มกอง"
+       ที่คิดจากตัวเลขนี้ก็จะผิดตามไปทั้งหมด */
+    const all = seated().map(s => s.committed).sort((a, b) => b - a);
+    if (all.length < 2) return 0;
+    const cap = all[1];
+    return seated().reduce((a, s) => a + Math.min(s.committed, cap), 0);
   }
 
   function viewFor(mySeat) {
@@ -544,11 +565,15 @@ export function createTable(opts = {}) {
       if (st.phase !== "waiting" && st.phase !== "showdown") {
         return { error: "แก้ค่าโต๊ะระหว่างเล่นมือไม่ได้" };
       }
-      /* ตั้งค่าโต๊ะได้เฉพาะก่อนเริ่มมือแรก และเฉพาะคนที่นั่งช่องแรก
-         ไม่งั้นใครเข้ามาทีหลังก็ลบบอดที่เจ้าภาพตั้งไว้ได้ */
+      /* ตั้งค่าโต๊ะได้เฉพาะก่อนเริ่มมือแรก และเฉพาะเจ้าภาพ
+         เจ้าภาพ = คนที่นั่งลงคนแรก ไม่ใช่ "คนที่ได้ช่องเลขน้อยสุด"
+         เพราะเจ้าภาพเลือกนั่งช่องไหนก็ได้ ถ้าเทียบด้วยเลขช่อง
+         คนที่เข้ามาทีหลังแต่ได้ช่องเลขน้อยกว่าจะแย่งสิทธิ์ตั้งบอดไปเฉยๆ
+         ถ้าเจ้าภาพลุกไปแล้ว ให้คนที่ยังอยู่ตั้งได้ ไม่งั้นโต๊ะจะตั้งค่าไม่ได้เลย */
       if (st.handNo > 0) return { error: "โต๊ะเริ่มเล่นไปแล้ว แก้ค่าไม่ได้" };
-      const firstSeat = st.seats.findIndex(x => !!x);
-      if (firstSeat !== -1 && seatId !== firstSeat) {
+      let host = st.hostSeat;
+      if (host === null || !st.seats[host]) host = st.seats.findIndex(x => !!x);
+      if (host !== -1 && seatId !== host) {
         return { error: "เฉพาะคนที่เปิดโต๊ะเท่านั้นที่ตั้งค่าได้" };
       }
       const sb = Math.floor(Number(msg.smallBlind));

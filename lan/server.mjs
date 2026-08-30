@@ -253,7 +253,7 @@ server.on("upgrade", (req, socket) => {
 
       /* ต้องนั่งให้สำเร็จก่อน ค่อยตัดจากโต๊ะเดิม
          ไม่งั้นขอที่นั่งที่มีคนอยู่แล้วพลาด จะหลุดจากโต๊ะที่นั่งอยู่ดีๆ ไปเลย */
-      const r = room.table.sit(String(msg.name || "").slice(0, 16), msg.seatId, msg.buyIn);
+      const r = room.table.sit(String(msg.name || "").slice(0, 16), msg.seatId, msg.buyIn, msg.token);
       if (!r.ok) { send(client, { type: "error", message: r.error }); return; }
 
       /* ออกจากห้องเดิมให้ขาด ไม่งั้นห้องเดิมยังยิง state มาให้
