@@ -151,6 +151,33 @@ export function describeScore(score) {
    คืน [{ amount, eligible:[id,...] }] เรียงจากกองหลักไปกองย่อย
    =========================================================== */
 
+/* หาเงินส่วนที่ไม่มีใครตาม แล้วคืนเจ้าของก่อนแบ่งกอง
+   เช่นเดิมพัน 2000 แต่คู่แข่งหมอบตั้งแต่ลงไป 20
+   1980 นั้นไม่เคยเป็นของกอง ต้องคืนคนเดิมเต็มจำนวน ไม่ใช่เอาไปหาร
+
+   คืน { id, amount } หรือ null ถ้าไม่มีส่วนเกิน
+   หมายเหตุ: แก้ค่า contributed ใน players ให้ด้วย */
+export function returnUncalled(players) {
+  const live = players.filter(p => p.contributed > 0);
+  if (live.length < 2) {
+    /* เหลือคนเดียวที่ลงเงิน คืนทั้งหมด */
+    if (live.length === 1 && live[0].contributed > 0) {
+      const back = { id: live[0].id, amount: live[0].contributed };
+      live[0].contributed = 0;
+      return back;
+    }
+    return null;
+  }
+
+  const sorted = live.slice().sort((a, b) => b.contributed - a.contributed);
+  const top = sorted[0], second = sorted[1];
+  if (top.contributed <= second.contributed) return null;
+
+  const excess = top.contributed - second.contributed;
+  top.contributed -= excess;
+  return { id: top.id, amount: excess };
+}
+
 export function buildPots(players) {
   const pots = [];
   /* ระดับเงินที่แต่ละคนลงไป เอาเฉพาะที่มากกว่า 0 ไม่ซ้ำ เรียงจากน้อยไปมาก */
@@ -162,16 +189,21 @@ export function buildPots(players) {
     const step = lv - prev;
     let amount = 0;
     const eligible = [];
+    /* จำไว้ว่าใครลงเท่าไหร่ในกองนี้ เผื่อต้องคืนเงินเพราะไม่มีใครเหลือชนะ */
+    const contributors = {};
     for (const p of players) {
       if (p.contributed >= lv) {
         amount += step;
+        contributors[p.id] = (contributors[p.id] || 0) + step;
         /* คนที่หมอบแล้วยังต้องจ่ายเงินเข้ากอง แต่ไม่มีสิทธิ์ชนะ */
         if (!p.folded) eligible.push(p.id);
       } else if (p.contributed > prev) {
-        amount += p.contributed - prev;
+        const part = p.contributed - prev;
+        amount += part;
+        contributors[p.id] = (contributors[p.id] || 0) + part;
       }
     }
-    if (amount > 0) pots.push({ amount, eligible });
+    if (amount > 0) pots.push({ amount, eligible, contributors });
     prev = lv;
   }
 
@@ -182,8 +214,15 @@ export function buildPots(players) {
     if (last && last.eligible.length === pot.eligible.length &&
         last.eligible.every(id => pot.eligible.includes(id))) {
       last.amount += pot.amount;
+      for (const id in pot.contributors) {
+        last.contributors[id] = (last.contributors[id] || 0) + pot.contributors[id];
+      }
     } else {
-      merged.push({ amount: pot.amount, eligible: pot.eligible.slice() });
+      merged.push({
+        amount: pot.amount,
+        eligible: pot.eligible.slice(),
+        contributors: Object.assign({}, pot.contributors)
+      });
     }
   }
   return merged;
@@ -195,13 +234,21 @@ export function settlePots(pots, scoreById, contributedById) {
   for (const pot of pots) {
     const live = pot.eligible.filter(id => scoreById[id]);
 
-    /* ไม่มีใครเหลือให้ชนะกองนี้ ต้องคืนเงินตามสัดส่วนที่ลงไป ไม่ใช่ทำหาย */
+    /* ไม่มีใครเหลือให้ชนะกองนี้ ต้องคืนให้ตรงคนตามที่แต่ละคนลงไปจริง
+       ห้ามเอามาหารเฉลี่ย ไม่งั้นเงินจะย้ายไปอยู่ผิดคน */
     if (!live.length) {
-      const back = pot.eligible.length ? pot.eligible : Object.keys(contributedById || {});
-      if (!back.length) continue;
-      const share = Math.floor(pot.amount / back.length);
-      let rest = pot.amount - share * back.length;
-      for (const id of back) won[id] = (won[id] || 0) + share + (rest-- > 0 ? 1 : 0);
+      const src = pot.contributors || contributedById || {};
+      let given = 0;
+      for (const id in src) {
+        if (!Object.prototype.hasOwnProperty.call(src, id)) continue;
+        won[id] = (won[id] || 0) + src[id];
+        given += src[id];
+      }
+      /* เผื่อข้อมูลไม่ครบ ที่เหลือคืนคนแรกไว้ก่อน ดีกว่าทำหาย */
+      if (given < pot.amount) {
+        const first = Object.keys(src)[0];
+        if (first !== undefined) won[first] = (won[first] || 0) + (pot.amount - given);
+      }
       continue;
     }
 

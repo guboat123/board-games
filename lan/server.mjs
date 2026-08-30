@@ -248,22 +248,22 @@ server.on("upgrade", (req, socket) => {
 
     if (msg.type === "join") {
       const code = String(msg.room || "").toUpperCase().slice(0, 8) || "HOME";
-      /* ออกจากห้องเดิมให้ขาดก่อน ไม่งั้นห้องเดิมยังยิง state มาให้
-         โดยใช้เลขที่นั่งของห้องใหม่ = เห็นไพ่ในมือคนอื่น */
-      if (client.room) {
-        client.room.clients.delete(client);
-        client.room.table.disconnect(client.seatId);
-        broadcastState(client.room);
-        client.room = null;
-        client.seatId = null;
-      }
-
       const room = getRoom(code);
       clearTimeout(room.reaper);   /* มีคนกลับมาแล้ว ยกเลิกคิวปิดห้อง */
 
+      /* ต้องนั่งให้สำเร็จก่อน ค่อยตัดจากโต๊ะเดิม
+         ไม่งั้นขอที่นั่งที่มีคนอยู่แล้วพลาด จะหลุดจากโต๊ะที่นั่งอยู่ดีๆ ไปเลย */
       const r = room.table.sit(String(msg.name || "").slice(0, 16), msg.seatId, msg.buyIn);
-      /* นั่งไม่สำเร็จ ต้องไม่ผูกเข้าห้อง ไม่งั้นสั่งเริ่มเกม/ล้างรอบได้ทั้งที่ไม่ได้เล่น */
       if (!r.ok) { send(client, { type: "error", message: r.error }); return; }
+
+      /* ออกจากห้องเดิมให้ขาด ไม่งั้นห้องเดิมยังยิง state มาให้
+         โดยใช้เลขที่นั่งของห้องใหม่ = เห็นไพ่ในมือคนอื่น */
+      if (client.room && client.room !== room) {
+        const old = client.room;
+        old.clients.delete(client);
+        old.table.disconnect(client.seatId);
+        broadcastState(old);
+      }
 
       client.room = room;
       room.clients.add(client);

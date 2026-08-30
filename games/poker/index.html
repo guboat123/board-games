@@ -179,11 +179,13 @@ button { font-family: inherit; }
 
 /* ---------- ที่นั่ง ---------- */
 .seat {
-  position: absolute; width: 84px;
+  position: absolute; width: 76px;
   transform: translate(-50%, -50%);
   text-align: center;
 }
 @media (min-width: 430px) { .seat { width: 104px; } }
+/* จอแคบมาก บีบให้แคบลงอีก ไม่ให้ที่นั่งชนกันเอง */
+@media (max-width: 380px) { .seat { width: 70px; } .seat__cards { height: 24px; } }
 .seat__box {
   background: linear-gradient(#16321f, #0e2417);
   border: 1px solid #2f5540; border-radius: 9px;
@@ -346,8 +348,9 @@ button { font-family: inherit; }
 .toast.is-on { opacity: 1; }
 
 /* ---------- ผลมือที่จบ ---------- */
+/* วางไว้ล่างโต๊ะ ไม่ใช่กลางจอ ไม่งั้นไปบังไพ่กลางตอนเปิดไพ่พอดี */
 .result {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%);
   width: min(92%, 400px); z-index: 40;
   background: rgba(6,22,15,.96); border: 1px solid var(--gold);
   border-radius: 14px; padding: 16px; text-align: center;
@@ -664,9 +667,14 @@ button { font-family: inherit; }
           b.disabled = true;
         } else {
           b.addEventListener("click", function () {
+            /* กดที่นั่งของคนที่หลุด = สวมสิทธิ์เขา ต้องยืนยันก่อน
+               ไม่งั้นใครก็เดินมานั่งทับชิปเพื่อนได้ */
+            if (s && !s.connected) {
+              if (!confirm("ที่นั่งนี้เป็นของ " + s.name + " ที่หลุดไป · " +
+                           "กดตกลงถ้าคุณคือ " + s.name + " จะได้ชิปเดิมคืน")) return;
+              $("f-name").value = s.name;
+            }
             wantSeat = idx;
-            /* ที่นั่งของคนที่หลุดไป กดแล้วเติมชื่อเดิมให้ จะได้ชิปคืน */
-            if (s && !s.connected) $("f-name").value = s.name;
             paintSeatPicker();
           });
         }
@@ -852,10 +860,11 @@ button { font-family: inherit; }
      ที่นั่งของเราจะถูกหมุนให้มาอยู่ล่างสุดเสมอ */
   /* ที่นั่งข้างโต๊ะต้องไม่ตรงแถวเดียวกับไพ่กลาง (ไพ่กลางอยู่ราว 40-52%)
      และตัวเราต้องไม่ล้นลงไปทับแถบข้อความล่าง */
+  /* ที่นั่งข้างโต๊ะต้องห่างกันพอ และไม่ล้ำแถวไพ่กลาง (ราว 40-56%) */
   var SPOTS = [
-    [50, 88],                      /* ตัวเราอยู่ล่างสุดเสมอ */
-    [16, 80], [13, 58], [19, 30], [37, 13],
-    [63, 13], [81, 30], [87, 58], [84, 80]
+    [50, 90],                      /* ตัวเราอยู่ล่างสุดเสมอ */
+    [17, 78], [11, 54], [17, 26], [38, 11],
+    [62, 11], [83, 26], [89, 54], [83, 78]
   ];
 
   function seatOrder() {
@@ -1006,7 +1015,8 @@ button { font-family: inherit; }
       start.disabled = view.readyCount < 2 || (view.limit && view.limit.over);
       row.appendChild(start);
 
-      if (me.stack <= 0) {
+      /* ชิปน้อยกว่า 10 บิ๊กบลายด์ ก็ควรเติมได้แล้ว ไม่ต้องรอให้หมดเกลี้ยง */
+      if (me.stack < view.blinds.bb * 10) {
         row.appendChild(mkBtn("act", "เติมชิป", null, function () {
           openAmount("เติมชิปเท่าไหร่", view.buyInRange.min, view.buyInRange.max,
             view.buyInRange.suggested, function (v) { send({ type: "rebuy", amount: v }); });

@@ -5,7 +5,7 @@
 
 import {
   freshDeck, shuffle, evaluate7, compareScore, describeScore,
-  buildPots, settlePots, cardCode
+  buildPots, settlePots, returnUncalled, cardCode
 } from "./poker-engine.mjs";
 
 const MAX_SEATS = 9;
@@ -351,6 +351,17 @@ export function createTable(opts = {}) {
       .filter(s => s.committed > 0 || s.inHand)
       .map(s => ({ id: s.seatId, contributed: s.committed, folded: s.folded || !s.inHand }));
 
+    /* คืนเงินส่วนที่ไม่มีใครตามให้เจ้าของก่อน แล้วค่อยแบ่งกองที่เหลือ */
+    const uncalled = returnUncalled(players);
+    if (uncalled && uncalled.amount > 0) {
+      const owner = st.seats[uncalled.id];
+      if (owner) {
+        owner.stack += uncalled.amount;
+        owner.committed -= uncalled.amount;
+        note(owner.name + " ได้เงินที่ไม่มีใครตามคืน " + uncalled.amount);
+      }
+    }
+
     const pots = buildPots(players);
     const live = inHand();
 
@@ -532,6 +543,13 @@ export function createTable(opts = {}) {
     if (msg.type === "config") {
       if (st.phase !== "waiting" && st.phase !== "showdown") {
         return { error: "แก้ค่าโต๊ะระหว่างเล่นมือไม่ได้" };
+      }
+      /* ตั้งค่าโต๊ะได้เฉพาะก่อนเริ่มมือแรก และเฉพาะคนที่นั่งช่องแรก
+         ไม่งั้นใครเข้ามาทีหลังก็ลบบอดที่เจ้าภาพตั้งไว้ได้ */
+      if (st.handNo > 0) return { error: "โต๊ะเริ่มเล่นไปแล้ว แก้ค่าไม่ได้" };
+      const firstSeat = st.seats.findIndex(x => !!x);
+      if (firstSeat !== -1 && seatId !== firstSeat) {
+        return { error: "เฉพาะคนที่เปิดโต๊ะเท่านั้นที่ตั้งค่าได้" };
       }
       const sb = Math.floor(Number(msg.smallBlind));
       const bb = Math.floor(Number(msg.bigBlind));
