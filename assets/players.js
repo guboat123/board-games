@@ -22,6 +22,7 @@ window.Players = (function () {
   var cache = { players: null, history: null };
 
   var idCounter = 0;
+  var removedIds = [];   /* ชื่อที่ลบไปในแท็บนี้ กันไม่ให้ merge ดึงกลับมา */
 
   /* ---------- ตัวช่วยเรื่องที่เก็บ ---------- */
 
@@ -140,8 +141,33 @@ window.Players = (function () {
     return false;
   }
 
+  /* เขียนทับทั้งก้อนไม่ได้ เพราะถ้าเปิดไว้สองแท็บ
+     แท็บที่แคชเก่ากว่าจะลบชื่อที่อีกแท็บเพิ่งเพิ่มทิ้งไปเงียบๆ
+     จึงต้องอ่านของจริงจากเครื่องมารวมก่อนเสมอ */
   function savePlayers() {
-    save(KEY_PLAYERS, players());
+    var mine = players();
+    var onDisk = load(KEY_PLAYERS);
+    var byId = {};
+    var i;
+
+    for (i = 0; i < onDisk.length; i++) {
+      var d = onDisk[i];
+      if (d && d.id && clean(d.name)) {
+        byId[String(d.id)] = { id: String(d.id), name: clean(d.name), createdAt: num(d.createdAt) };
+      }
+    }
+    /* ของในหน่วยความจำถือว่าใหม่กว่าเสมอ */
+    for (i = 0; i < mine.length; i++) byId[mine[i].id] = mine[i];
+
+    /* ชื่อที่เพิ่งลบในแท็บนี้ ต้องไม่ถูกดึงกลับมาจากดิสก์ */
+    for (i = 0; i < removedIds.length; i++) delete byId[removedIds[i]];
+
+    var merged = [];
+    for (var id in byId) {
+      if (Object.prototype.hasOwnProperty.call(byId, id)) merged.push(byId[id]);
+    }
+    cache.players = merged;
+    save(KEY_PLAYERS, merged);
   }
 
   function all() {
@@ -182,6 +208,7 @@ window.Players = (function () {
     var at = findIndex(id);
     if (at === -1) return false;
     players().splice(at, 1);
+    removedIds.push(String(id));
     savePlayers();
     return true;
   }
@@ -320,6 +347,14 @@ window.Players = (function () {
       return byName(a, b);
     });
   }
+
+  /* แท็บอื่นแก้ทะเบียนหรือประวัติ ให้ทิ้งแคชแล้วอ่านใหม่รอบหน้า */
+  try {
+    window.addEventListener("storage", function (e) {
+      if (e.key === KEY_PLAYERS) cache.players = null;
+      if (e.key === KEY_HISTORY) cache.history = null;
+    });
+  } catch (e) { /* ไม่มี window ก็ข้ามไป */ }
 
   /* ---------- หน้าตาของโมดูล ---------- */
 
