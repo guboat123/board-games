@@ -42,6 +42,19 @@
   .game h2 { margin: 4px 0 6px; }
   .game__meta { font-size: .85rem; color: #6C7472; margin-top: 12px; }
 
+  /* จำนวนคนที่แนะนำ ให้เห็นชัดเป็นบรรทัดของตัวเอง */
+  .game__people {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 5px 12px;
+    font-family: var(--font-mono);
+    font-size: .8rem;
+    color: var(--ink);
+    background: var(--board);
+    border: 2px solid var(--ink);
+    border-radius: 99px;
+  }
+
   .game--soon {
     background: transparent;
     border-style: dashed;
@@ -50,6 +63,7 @@
   }
   .game--soon:hover { transform: rotate(0); box-shadow: none; }
   .game--soon h2 { color: #8B9391; }
+  .game--soon .game__people { background: transparent; border-style: dashed; color: #6C7472; }
 
   .tag {
     display: inline-block;
@@ -62,6 +76,90 @@
     color: var(--paper);
   }
   .tag--soon { background: var(--smudge); color: #4A5250; }
+
+  /* ---------- การ์ดผู้เล่น ---------- */
+
+  .roster { margin-top: 26px; }
+  .roster h2 { margin-bottom: 4px; }
+
+  .addrow { display: flex; gap: 9px; margin: 14px 0 4px; }
+  .addrow input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 12px 14px;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    color: var(--ink);
+    background: var(--paper);
+    border: var(--stroke) solid var(--ink);
+    border-radius: var(--radius);
+  }
+  .addrow input:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 3px; }
+  .addrow .btn { flex: 0 0 auto; }
+
+  .note { font-size: .85rem; margin: 10px 0 0; min-height: 1.4em; }
+  .note--bad { color: var(--ink-red); font-weight: 600; }
+
+  .plist { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 16px; padding: 0; list-style: none; }
+
+  .pchip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    padding: 7px 8px 7px 14px;
+    font-weight: 600;
+    font-size: .92rem;
+    background: var(--paper);
+    border: var(--stroke) solid var(--ink);
+    border-radius: 99px;
+  }
+  .pchip__name { overflow-wrap: anywhere; }
+
+  .pchip__x {
+    flex: 0 0 auto;
+    width: 26px; height: 26px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 1rem; line-height: 1;
+    color: var(--ink);
+    background: var(--board);
+    border: 2px solid var(--ink);
+    border-radius: 99px;
+    cursor: pointer;
+  }
+  .pchip__x:hover { background: var(--ink-red); border-color: var(--ink-red); color: var(--paper); }
+  .pchip__x:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 3px; }
+
+  /* สถานะถามยืนยันก่อนลบจริง */
+  .pchip.is-asking { border-color: var(--ink-red); background: #FFF3F2; }
+  .pchip__ask { font-weight: 600; color: var(--ink-red); }
+  .pchip__mini {
+    flex: 0 0 auto;
+    padding: 5px 11px;
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: .82rem;
+    border: 2px solid var(--ink);
+    border-radius: 99px;
+    cursor: pointer;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .pchip__mini--yes { background: var(--ink-red); border-color: var(--ink-red); color: var(--paper); }
+  .pchip__mini:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 3px; }
+
+  .empty {
+    margin-top: 16px;
+    padding: 18px;
+    text-align: center;
+    color: #6C7472;
+    font-size: .92rem;
+    border: 2px dashed var(--smudge);
+    border-radius: var(--radius);
+  }
+
+  .roster__foot { margin-top: 18px; font-size: .9rem; }
+  .roster__foot a { color: var(--ink-blue); font-weight: 600; }
 
   footer { margin-top: 40px; font-size: .85rem; color: #6C7472; }
   footer a { color: var(--ink-blue); }
@@ -84,9 +182,10 @@
       <span class="game__no">เกม 01</span>
       <h2>วาดให้ทาย</h2>
       <p>สุ่มคำขึ้นจอ คนวาดมีเวลาจำกัด ทีมไหนทายได้ก่อนได้แต้ม</p>
+      <div class="game__people">แนะนำ 4 ถึง 12 คน</div>
       <div class="game__meta">
         <span class="tag">เล่นได้แล้ว</span>
-        &nbsp; 4 คนขึ้นไป · ใช้ไวท์บอร์ด
+        &nbsp; แบ่ง 2–4 ทีม · ใช้ไวท์บอร์ด
       </div>
     </a>
 
@@ -94,20 +193,173 @@
       <span class="game__no">เกม 02</span>
       <h2>เดาสีจากคำใบ้</h2>
       <p>คนใบ้เลือกสีลับ 1 สี แล้วให้คำใบ้ได้คำเดียว คนอื่นทายตำแหน่งบนกระดานสี</p>
+      <div class="game__people">แนะนำ 3 ถึง 10 คน</div>
       <div class="game__meta">
         <span class="tag tag--soon">กำลังทำ</span>
-        &nbsp; 3 คนขึ้นไป · เล่นบนจอ
+        &nbsp; เล่นบนจอเดียว
       </div>
     </div>
 
   </main>
 
+  <!-- ============ ทะเบียนผู้เล่น ============ -->
+  <section class="card roster">
+    <h2>ใครเล่นบ้าง</h2>
+    <p class="muted" style="margin:6px 0 0; font-size:.9rem">
+      ลงชื่อเพื่อนไว้ครั้งเดียว แล้วทุกเกมจะเก็บแต้มให้เอง
+    </p>
+
+    <div class="addrow">
+      <label class="sr-only" for="new-name">ชื่อผู้เล่น</label>
+      <input id="new-name" type="text" placeholder="พิมพ์ชื่อเพื่อน" autocomplete="off" maxlength="24">
+      <button class="btn btn--sm" id="btn-add">เพิ่มชื่อ</button>
+    </div>
+
+    <p class="note" id="note" role="status" aria-live="polite"></p>
+
+    <ul class="plist" id="plist"></ul>
+    <div class="empty" id="empty">ยังไม่มีใครลงชื่อ พิมพ์ชื่อเพื่อนด้านบนแล้วกดเพิ่มชื่อได้เลย</div>
+
+    <p class="roster__foot"><a href="scoreboard.html">ดูกระดานคะแนน →</a></p>
+  </section>
+
   <footer>
     <div class="rule"></div>
     โอเพนซอร์ส · อยากเพิ่มคำหรือเกมใหม่ ส่ง Pull Request มาได้ที่
-    <a href="https://github.com/guboat123">GitHub</a>
+    <a href="https://github.com/guboat123/board-games">GitHub</a>
   </footer>
 
 </div>
+
+<script src="assets/players.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  function $(id) { return document.getElementById(id); }
+
+  var input   = $("new-name");
+  var noteEl  = $("note");
+  var listEl  = $("plist");
+  var emptyEl = $("empty");
+
+  var askingId = null;   /* ชิปที่กำลังถามยืนยันลบอยู่ */
+
+  function note(msg, bad) {
+    noteEl.textContent = msg || "";
+    noteEl.className = "note" + (bad ? " note--bad" : "");
+  }
+
+  /* ---------- วาดรายชื่อ ---------- */
+
+  function chipFor(p) {
+    var li = document.createElement("li");
+    li.className = "pchip";
+
+    if (askingId === p.id) {
+      /* ถามยืนยันก่อนลบจริง */
+      li.className += " is-asking";
+
+      var ask = document.createElement("span");
+      ask.className = "pchip__ask";
+      ask.textContent = "ลบ " + p.name + " ?";
+      li.appendChild(ask);
+
+      var yes = document.createElement("button");
+      yes.type = "button";
+      yes.className = "pchip__mini pchip__mini--yes";
+      yes.textContent = "ลบเลย";
+      yes.addEventListener("click", function () {
+        Players.remove(p.id);
+        askingId = null;
+        note("ลบ " + p.name + " ออกจากทะเบียนแล้ว ประวัติเก่ายังอยู่");
+        render();
+      });
+      li.appendChild(yes);
+
+      var no = document.createElement("button");
+      no.type = "button";
+      no.className = "pchip__mini";
+      no.textContent = "ไม่ลบ";
+      no.addEventListener("click", function () {
+        askingId = null;
+        note("");
+        render();
+      });
+      li.appendChild(no);
+
+      return li;
+    }
+
+    var name = document.createElement("span");
+    name.className = "pchip__name";
+    name.textContent = p.name;
+    li.appendChild(name);
+
+    var x = document.createElement("button");
+    x.type = "button";
+    x.className = "pchip__x";
+    x.textContent = "✕";
+    x.setAttribute("aria-label", "ลบ " + p.name);
+    x.addEventListener("click", function () {
+      askingId = p.id;
+      note("");
+      render();
+    });
+    li.appendChild(x);
+
+    return li;
+  }
+
+  function render() {
+    var list = Players.all();
+    listEl.innerHTML = "";
+
+    for (var i = 0; i < list.length; i++) {
+      listEl.appendChild(chipFor(list[i]));
+    }
+
+    /* ไม่มีใครเลย ให้ขึ้นข้อความชวนลงชื่อ ไม่ใช่ช่องว่างเปล่า */
+    emptyEl.style.display = list.length ? "none" : "block";
+
+    /* ถ้ามีชิปที่กำลังถามยืนยัน ย้ายโฟกัสไปที่ปุ่มยืนยัน */
+    if (askingId) {
+      var btn = listEl.querySelector(".pchip__mini--yes");
+      if (btn) btn.focus();
+    }
+  }
+
+  /* ---------- เพิ่มชื่อ ---------- */
+
+  function addName() {
+    var raw = input.value;
+    if (!raw.replace(/\s/g, "")) {
+      note("ยังไม่ได้พิมพ์ชื่อ", true);
+      input.focus();
+      return;
+    }
+
+    var p = Players.add(raw);
+    if (!p) {
+      note("มีชื่อนี้อยู่แล้ว ลองใส่ชื่อเล่นหรือตัวย่อแทน", true);
+      input.select();
+      return;
+    }
+
+    input.value = "";
+    askingId = null;
+    note("เพิ่ม " + p.name + " แล้ว");
+    render();
+    input.focus();
+  }
+
+  $("btn-add").addEventListener("click", addName);
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); addName(); }
+  });
+
+  render();
+})();
+</script>
 </body>
 </html>
