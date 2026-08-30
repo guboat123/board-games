@@ -87,6 +87,7 @@ button { font-family: inherit; }
 
 /* รายการโต๊ะที่เปิดอยู่ */
 .tables { margin-bottom: 16px; }
+#tables-list { max-height: 40vh; overflow-y: auto; }
 .tables h2 { font-size: .84rem; color: var(--muted); font-weight: 500; margin: 0 0 8px; }
 .tbl {
   width: 100%; text-align: left;
@@ -159,7 +160,7 @@ button { font-family: inherit; }
 }
 
 .center {
-  position: absolute; left: 50%; top: 46%;
+  position: absolute; left: 50%; top: 47%;
   transform: translate(-50%, -50%);
   text-align: center; width: 92%;
 }
@@ -430,7 +431,7 @@ button { font-family: inherit; }
 <!-- ============ โต๊ะ ============ -->
 <div id="game">
   <div class="topbar">
-    <a href="../../index.html">← ออก</a>
+    <a href="../../index.html" id="btn-leave">← ออก</a>
     <div>
       <div class="blinds" id="t-blinds">10 / 20</div>
       <div class="hand" id="t-hand">ห้อง —</div>
@@ -609,7 +610,7 @@ button { font-family: inherit; }
           $("f-name").value = r.away[0];
         }
         paintTables(window.__rooms || []);
-        paintSeats();
+        paintSeatPicker();
         $("f-name").focus();
       });
 
@@ -626,7 +627,7 @@ button { font-family: inherit; }
     return (window.__rooms || []).filter(function (r) { return r.code === code; })[0] || null;
   }
 
-  function paintSeats() {
+  function paintSeatPicker() {
     var host = $("seatpick");
     host.innerHTML = "";
     var room = currentRoom();
@@ -639,7 +640,7 @@ button { font-family: inherit; }
     any.type = "button";
     any.className = "sp" + (wantSeat === null ? " is-on" : "");
     any.innerHTML = "ที่ไหนก็ได้";
-    any.addEventListener("click", function () { wantSeat = null; paintSeats(); });
+    any.addEventListener("click", function () { wantSeat = null; paintSeatPicker(); });
     host.appendChild(any);
 
     for (var i = 0; i < 9; i++) {
@@ -665,8 +666,8 @@ button { font-family: inherit; }
           b.addEventListener("click", function () {
             wantSeat = idx;
             /* ที่นั่งของคนที่หลุดไป กดแล้วเติมชื่อเดิมให้ จะได้ชิปคืน */
-            if (s && !s.connected && !$("f-name").value.trim()) $("f-name").value = s.name;
-            paintSeats();
+            if (s && !s.connected) $("f-name").value = s.name;
+            paintSeatPicker();
           });
         }
         host.appendChild(b);
@@ -679,7 +680,7 @@ button { font-family: inherit; }
       : "โต๊ะใหม่ยังไม่มีใครนั่ง เลือกช่องไหนก็ได้";
   }
 
-  $("f-room").addEventListener("input", function () { paintSeats(); paintTables(window.__rooms || []); });
+  $("f-room").addEventListener("input", function () { paintSeatPicker(); paintTables(window.__rooms || []); });
 
   function openLobby() {
     var proto = location.protocol === "https:" ? "wss://" : "ws://";
@@ -689,7 +690,7 @@ button { font-family: inherit; }
     lobbyWs.onmessage = function (ev) {
       var msg;
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
-      if (msg.type === "rooms") { window.__rooms = msg.rooms; paintTables(msg.rooms); paintSeats(); }
+      if (msg.type === "rooms") { window.__rooms = msg.rooms; paintTables(msg.rooms); paintSeatPicker(); }
     };
     lobbyWs.onerror = function () { $("tables-list").innerHTML = ""; $("join-err").innerHTML = hostedHint(); };
     lobbyWs.onclose = function () { lobbyWs = null; };
@@ -700,9 +701,18 @@ button { font-family: inherit; }
   }
 
   openLobby();
-  paintSeats();
+  paintSeatPicker();
 
   $("btn-join").addEventListener("click", join);
+
+  /* ออกจากโต๊ะกลางมือ = หมอบและเสียเงินในกอง ต้องถามก่อน */
+  $("btn-leave").addEventListener("click", function (e) {
+    if (view && view.phase !== "waiting" && view.phase !== "showdown") {
+      if (!confirm("ยังเล่นมือนี้อยู่ ออกตอนนี้จะถือว่าหมอบและเสียเงินในกอง ออกเลยไหม")) {
+        e.preventDefault();
+      }
+    }
+  });
   $("f-name").addEventListener("keydown", function (e) { if (e.key === "Enter") join(); });
 
   function join() {
@@ -731,13 +741,18 @@ button { font-family: inherit; }
         seatId: wantSeat === null ? undefined : wantSeat
       }));
       /* คนแรกที่เข้าเป็นคนตั้งบอด ถ้าโต๊ะยังว่าง ฝั่งเซิร์ฟเวอร์จะรับไว้ */
-      ws.send(JSON.stringify({
-        type: "config",
-        smallBlind: Math.floor(Number($("f-sb").value)) || 10,
-        bigBlind: Math.floor(Number($("f-bb").value)) || 20,
-        limitType: limitType,
-        limitValue: Math.floor(Number($("f-limit").value)) || 20
-      }));
+      /* ตั้งค่าโต๊ะเฉพาะตอนเปิดโต๊ะใหม่เท่านั้น
+         ไม่งั้นคนที่เข้าทีหลังจะลบบอดกับเวลาที่เจ้าภาพตั้งไว้ทิ้งเงียบๆ */
+      var known = (window.__rooms || []).filter(function (r) { return r.code === room; })[0];
+      if (!known) {
+        ws.send(JSON.stringify({
+          type: "config",
+          smallBlind: Math.floor(Number($("f-sb").value)) || 10,
+          bigBlind: Math.floor(Number($("f-bb").value)) || 20,
+          limitType: limitType,
+          limitValue: Math.floor(Number($("f-limit").value)) || 20
+        }));
+      }
     };
 
     ws.onmessage = function (ev) {
@@ -824,8 +839,10 @@ button { font-family: inherit; }
     knob.disabled = false;
     $("hand-hint").textContent = peeking ? "" : "กดค้างที่ปุ่มทองเพื่อแง้มดูไพ่";
 
+    /* ตอนเปิดไพ่แล้ว ไม่ต้องกดค้างอีก ทุกคนเห็นหมดแล้ว */
+    var reveal = peeking || (view.lastResult && view.lastResult.showdown);
     me.cards.forEach(function (c) {
-      host.appendChild(window.Cards.make(peeking ? c : "??", "lg"));
+      host.appendChild(window.Cards.make(reveal ? c : "??", "lg"));
     });
   }
 
@@ -833,10 +850,12 @@ button { font-family: inherit; }
 
   /* ตำแหน่ง 9 ที่นั่งรอบวงรี เป็นเปอร์เซ็นต์ของพื้นที่โต๊ะ
      ที่นั่งของเราจะถูกหมุนให้มาอยู่ล่างสุดเสมอ */
+  /* ที่นั่งข้างโต๊ะต้องไม่ตรงแถวเดียวกับไพ่กลาง (ไพ่กลางอยู่ราว 40-52%)
+     และตัวเราต้องไม่ล้นลงไปทับแถบข้อความล่าง */
   var SPOTS = [
-    [50, 95],                      /* ตัวเราอยู่ล่างสุดเสมอ */
-    [17, 86], [15, 62], [21, 36], [37, 16],
-    [63, 16], [79, 36], [85, 62], [83, 86]
+    [50, 88],                      /* ตัวเราอยู่ล่างสุดเสมอ */
+    [16, 80], [13, 58], [19, 30], [37, 13],
+    [63, 13], [81, 30], [87, 58], [84, 80]
   ];
 
   function seatOrder() {
@@ -860,6 +879,7 @@ button { font-family: inherit; }
     };
     $("t-phase").textContent = PHASE[view.phase] || "";
     $("t-pot").textContent = "กองกลาง " + view.pot.toLocaleString("th-TH");
+    $("t-hand").textContent = "ห้อง " + roomCode + (view.handNo ? " · มือที่ " + view.handNo : "");
     $("t-log").textContent = (view.log && view.log.length) ? view.log[view.log.length - 1] : "";
 
     /* ไพ่กลาง 5 ช่อง */
@@ -883,6 +903,7 @@ button { font-family: inherit; }
   }
 
   function paintSeats() {
+    if (!view) return;
     var area = $("table-area");
     /* ลบที่นั่งเดิมออกก่อน (เก็บ felt / center / result ไว้) */
     Array.prototype.slice.call(area.querySelectorAll(".seat")).forEach(function (n) { n.remove(); });
@@ -904,11 +925,14 @@ button { font-family: inherit; }
       /* ไพ่คว่ำเล็กๆ ข้างชื่อ */
       var cards = document.createElement("div");
       cards.className = "seat__cards";
-      if (s.inHand && s.cards.length && !s.folded) {
+      if (s.cards.length && !s.folded) {
         s.cards.forEach(function (c) {
           /* ไพ่ตัวเองบนโต๊ะยังคว่ำไว้ ดูได้จากแถบล่างเท่านั้น */
+          /* ไพ่ตัวเองบนโต๊ะคว่ำตลอด ดูได้จากแถบล่างที่บังมือเท่านั้น
+             ถ้าผูกกับ peeking ไพ่จะค้างหงายกลางจอหลังปล่อยปุ่ม */
+          var faceUp = (view.lastResult && view.lastResult.showdown && !s.folded);
           cards.appendChild(window.Cards.make(
-            (seatId === mySeat && !peeking) ? "??" : c, "sm"));
+            (seatId === mySeat && !faceUp) ? "??" : (faceUp ? c : "??"), "sm"));
         });
       }
       el.appendChild(cards);
@@ -984,8 +1008,8 @@ button { font-family: inherit; }
 
       if (me.stack <= 0) {
         row.appendChild(mkBtn("act", "เติมชิป", null, function () {
-          var v = prompt("เติมชิปเท่าไหร่", String(view.buyInRange.suggested));
-          if (v) send({ type: "rebuy", amount: Number(v) });
+          openAmount("เติมชิปเท่าไหร่", view.buyInRange.min, view.buyInRange.max,
+            view.buyInRange.suggested, function (v) { send({ type: "rebuy", amount: v }); });
         }));
       }
       return;
@@ -1012,7 +1036,11 @@ button { font-family: inherit; }
 
     if (toCall > 0) {
       var canCall = Math.min(toCall, me.stack);
-      row.appendChild(mkBtn("act act--call", "ตาม", canCall.toLocaleString("th-TH"), function () {
+      /* ตามแล้วหมดตักพอดี ก็คือ all-in อยู่แล้ว ไม่ต้องมีสองปุ่มที่ทำเหมือนกัน */
+      var callIsAllIn = me.stack <= toCall;
+      row.appendChild(mkBtn("act act--call",
+        callIsAllIn ? "หมดหน้าตัก" : "ตาม",
+        canCall.toLocaleString("th-TH"), function () {
         send({ type: "act", action: "call" });
       }));
     } else {
@@ -1028,10 +1056,6 @@ button { font-family: inherit; }
         openRaise(minTarget, maxTarget);
       });
       row.appendChild(raiseBtn);
-    } else if (me.stack > 0) {
-      row.appendChild(mkBtn("act act--raise", "หมดหน้าตัก", maxTarget.toLocaleString("th-TH"), function () {
-        send({ type: "act", action: "raise", amount: maxTarget });
-      }));
     }
   }
 
@@ -1058,15 +1082,37 @@ button { font-family: inherit; }
     return Math.max(betMin, Math.min(betMax, Math.floor(v)));
   }
 
-  function paintBet() {
+  function paintBet() { paintBetRaw(); }
+
+  /* วาดเลขตามที่พิมพ์จริง แล้วบอกว่ายังใช้ไม่ได้ถ้าต่ำกว่าขั้นต่ำ
+     ปุ่มตกลงจะกดไม่ได้จนกว่าจะถึงขั้นต่ำ */
+  function paintBetRaw() {
+    var okNow = betVal >= betMin && betVal <= betMax;
     $("bet-num").textContent = betVal.toLocaleString("th-TH");
-    $("bet-hint").textContent = "ต่ำสุด " + betMin.toLocaleString("th-TH") +
-                                " · สูงสุด " + betMax.toLocaleString("th-TH");
+    $("bet-num").style.color = okNow ? "var(--gold)" : "#ff8f84";
+    $("bet-hint").textContent = okNow
+      ? "ต่ำสุด " + betMin.toLocaleString("th-TH") + " · สูงสุด " + betMax.toLocaleString("th-TH")
+      : "ต้องอย่างน้อย " + betMin.toLocaleString("th-TH");
+    var ok = document.querySelector(".pad--ok");
+    if (ok) ok.disabled = !okNow;
   }
 
   function setBet(v) { betVal = clampBet(v); paintBet(); }
 
+  var betOnConfirm = null;   /* null = ส่งเป็นการเพิ่มเดิมพัน */
+
+  /* ใช้แผงเดิมกับงานอื่นได้ เช่นเติมชิป */
+  function openAmount(label, mn, mx, start, onOk) {
+    betMin = mn; betMax = mx; betVal = start; betTyping = false;
+    betOnConfirm = onOk;
+    $("bet-label").textContent = label;
+    $("bet-quick").innerHTML = "";
+    paintBetRaw();
+    $("bet-sheet").classList.add("is-on");
+  }
+
   function openRaise(minTarget, maxTarget) {
+    betOnConfirm = null;
     betMin = minTarget;
     betMax = maxTarget;
     betVal = minTarget;
@@ -1116,25 +1162,29 @@ button { font-family: inherit; }
 
       b.addEventListener("click", function () {
         if (k === "ok") {
-          send({ type: "act", action: "raise", amount: betVal });
+          if (betVal < betMin || betVal > betMax) return;
+          if (betOnConfirm) { var f = betOnConfirm; betOnConfirm = null; f(betVal); }
+          else send({ type: "act", action: "raise", amount: betVal });
           $("bet-sheet").classList.remove("is-on");
           return;
         }
         if (k === "cancel") { closeRaise(); return; }
         if (k === "del") {
-          var s2 = String(betTyping ? betVal : "").slice(0, -1);
+          /* ลบจากเลขที่เห็นอยู่จริงเสมอ ไม่ว่าจะเพิ่งพิมพ์หรือยัง */
+          var s2 = String(betVal).slice(0, -1);
           betVal = s2 ? Number(s2) : 0;
           betTyping = true;
-          $("bet-num").textContent = betVal.toLocaleString("th-TH");
+          paintBetRaw();
           return;
         }
-        /* พิมพ์ตัวเลขต่อท้าย ยังไม่ clamp ระหว่างพิมพ์ จะได้พิมพ์เลขยาวได้ */
+        /* ห้าม clamp ระหว่างพิมพ์ ไม่งั้นพิมพ์ผิดตัวเดียวกลายเป็นหมดหน้าตัก
+           ถ้าเกินหน้าตักให้ไม่รับตัวเลขนั้นไปเลย */
         var cur = betTyping ? String(betVal) : "";
         var next = Number(cur + k);
-        if (next > betMax) next = betMax;
+        if (next > betMax) return;
         betVal = next;
         betTyping = true;
-        $("bet-num").textContent = betVal.toLocaleString("th-TH");
+        paintBetRaw();
       });
       pad.appendChild(b);
     });
@@ -1240,7 +1290,10 @@ button { font-family: inherit; }
   function paintResult() {
     var box = $("t-result");
     var r = view.lastResult;
-    if (!r || view.phase !== "showdown") { box.classList.remove("is-on"); return; }
+    /* จบรอบเล่นแล้วให้โชว์แค่สรุปรวม ไม่งั้นสองกล่องซ้อนกันอ่านไม่ออก */
+    if (!r || view.phase !== "showdown" || (view.limit && view.limit.over)) {
+      box.classList.remove("is-on"); return;
+    }
 
     box.innerHTML = "";
     var h = document.createElement("h3");

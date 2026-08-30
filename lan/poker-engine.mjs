@@ -190,15 +190,26 @@ export function buildPots(players) {
 }
 
 /* แจกเงินแต่ละกองให้ผู้ชนะ คืน { [id]: จำนวนที่ได้ } */
-export function settlePots(pots, scoreById) {
+export function settlePots(pots, scoreById, contributedById) {
   const won = {};
   for (const pot of pots) {
     const live = pot.eligible.filter(id => scoreById[id]);
-    if (!live.length) continue;
 
+    /* ไม่มีใครเหลือให้ชนะกองนี้ ต้องคืนเงินตามสัดส่วนที่ลงไป ไม่ใช่ทำหาย */
+    if (!live.length) {
+      const back = pot.eligible.length ? pot.eligible : Object.keys(contributedById || {});
+      if (!back.length) continue;
+      const share = Math.floor(pot.amount / back.length);
+      let rest = pot.amount - share * back.length;
+      for (const id of back) won[id] = (won[id] || 0) + share + (rest-- > 0 ? 1 : 0);
+      continue;
+    }
+
+    /* ห้ามเช็คด้วย !best เพราะที่นั่ง 0 เป็น falsy
+       คนที่นั่งช่องแรกจะถูกแทนที่ทันทีโดยไม่เทียบไพ่ = ไม่มีวันชนะกองเลย */
     let best = null;
     for (const id of live) {
-      if (!best || compareScore(scoreById[id], scoreById[best]) > 0) best = id;
+      if (best === null || compareScore(scoreById[id], scoreById[best]) > 0) best = id;
     }
     const winners = live.filter(id => compareScore(scoreById[id], scoreById[best]) === 0);
 

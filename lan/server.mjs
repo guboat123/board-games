@@ -152,6 +152,13 @@ function roomList() {
   return out.sort((a, b) => b.online - a.online);
 }
 
+/* รวบการอัปเดตล็อบบี้ ไม่ยิงทุกครั้งที่มีคนกดปุ่ม */
+let lobbyTimer = null;
+function schedulePushLobby() {
+  if (lobbyTimer) return;
+  lobbyTimer = setTimeout(function () { lobbyTimer = null; pushLobby(); }, 800);
+}
+
 function pushLobby() {
   const list = roomList();
   for (const c of lobby) send(c, { type: "rooms", rooms: list });
@@ -241,14 +248,25 @@ server.on("upgrade", (req, socket) => {
 
     if (msg.type === "join") {
       const code = String(msg.room || "").toUpperCase().slice(0, 8) || "HOME";
+      /* ออกจากห้องเดิมให้ขาดก่อน ไม่งั้นห้องเดิมยังยิง state มาให้
+         โดยใช้เลขที่นั่งของห้องใหม่ = เห็นไพ่ในมือคนอื่น */
+      if (client.room) {
+        client.room.clients.delete(client);
+        client.room.table.disconnect(client.seatId);
+        broadcastState(client.room);
+        client.room = null;
+        client.seatId = null;
+      }
+
       const room = getRoom(code);
       clearTimeout(room.reaper);   /* มีคนกลับมาแล้ว ยกเลิกคิวปิดห้อง */
-      client.room = room;
-      room.clients.add(client);
 
       const r = room.table.sit(String(msg.name || "").slice(0, 16), msg.seatId, msg.buyIn);
+      /* นั่งไม่สำเร็จ ต้องไม่ผูกเข้าห้อง ไม่งั้นสั่งเริ่มเกม/ล้างรอบได้ทั้งที่ไม่ได้เล่น */
       if (!r.ok) { send(client, { type: "error", message: r.error }); return; }
 
+      client.room = room;
+      room.clients.add(client);
       client.seatId = r.seatId;
       send(client, { type: "joined", seatId: r.seatId, room: code, stack: r.stack });
       log("เข้าห้อง", code, "->", r.name, "(ที่นั่ง " + r.seatId + ")");
@@ -263,6 +281,7 @@ server.on("upgrade", (req, socket) => {
     const out = client.room.table.action(client.seatId, msg);
     if (out && out.error) send(client, { type: "error", message: out.error });
     broadcastState(client.room);
+    schedulePushLobby();
   }
 });
 

@@ -86,7 +86,12 @@ export function createTable(opts = {}) {
     }
 
     let idx = -1;
-    if (Number.isInteger(preferred) && preferred >= 0 && preferred < MAX_SEATS && !st.seats[preferred]) {
+    if (Number.isInteger(preferred) && preferred >= 0 && preferred < MAX_SEATS) {
+      /* ขอเจาะจงที่นั่ง ถ้าไม่ว่างต้องบอกตรงๆ ไม่ใช่ย้ายไปช่องอื่นเงียบๆ
+         เพราะคนกดตั้งใจจะกลับไปนั่งที่เดิมของตัวเอง */
+      if (st.seats[preferred]) {
+        return { ok: false, error: "ที่นั่งที่ " + (preferred + 1) + " มีคนแล้ว เลือกช่องอื่น" };
+      }
       idx = preferred;
     } else {
       for (let i = 0; i < MAX_SEATS; i++) if (!st.seats[i]) { idx = i; break; }
@@ -128,8 +133,9 @@ export function createTable(opts = {}) {
     if (s.inHand && !s.folded) {
       s.folded = true;
       s.lastAction = "หมอบ (หลุด)";
-      if (st.current === seatId) advance();
-      else checkRoundEnd();
+      /* เช็คจบมือเสมอ แต่บอกไปด้วยว่าคนที่หลุดคือใคร
+         จะได้ไม่ไปเลื่อนตาของคนอื่นที่ยังไม่ได้พูด */
+      checkRoundEnd(seatId);
     }
     /* ไม่ล้างที่นั่งทิ้ง เผื่อเน็ตหลุดแล้วกลับเข้ามาใหม่
        ชิปกับที่นั่งเดิมต้องยังอยู่ ห้องจะถูกเก็บกวาดโดยตัวกลางเองถ้าไม่มีใครกลับมานาน */
@@ -149,6 +155,8 @@ export function createTable(opts = {}) {
 
   function startHand() {
     if (st.sessionOver) return { error: "รอบเล่นนี้จบแล้ว กดเริ่มรอบใหม่ถ้าจะเล่นต่อ" };
+    /* หมดเวลาไปแล้วตั้งแต่ก่อนกด ต้องปิดรอบเล่นเลย ไม่ใช่แถมให้อีกมือ */
+    if (limitReached()) { closeSession(); return { error: "หมดเวลาแล้ว" }; }
     const ready = readyPlayers();
     if (ready.length < 2) return { error: "ต้องมีอย่างน้อย 2 คนที่มีชิป" };
     if (!st.startedAt) st.startedAt = Date.now();
@@ -215,6 +223,8 @@ export function createTable(opts = {}) {
     const toCall = st.currentBet - s.bet;
 
     if (msg.action === "fold") {
+      /* เหลือคนเดียวก็ชนะไปแล้ว ไม่ต้องหมอบ กันเงินหาย */
+      if (inHand().length <= 1) return { error: "เหลือคุณคนเดียว ชนะไปแล้ว" };
       s.folded = true;
       s.acted = true;
       s.lastAction = "หมอบ";
@@ -276,7 +286,7 @@ export function createTable(opts = {}) {
       return { error: "คำสั่งไม่รู้จัก" };
     }
 
-    checkRoundEnd();
+    checkRoundEnd(seatId);
     return {};
   }
 
@@ -287,11 +297,14 @@ export function createTable(opts = {}) {
     return live.every(s => s.acted && s.bet === st.currentBet);
   }
 
-  function checkRoundEnd() {
-    /* เหลือคนเดียว จบมือทันที ไม่ต้องเปิดไพ่ */
+  /* fromSeat = ที่นั่งที่เพิ่งลงมือ ถ้าไม่ใช่คนที่ถึงตา ห้ามเลื่อนตาไปคนอื่น
+     ไม่งั้นแค่มีคนเน็ตหลุด คนที่กำลังจะพูดจะถูกข้ามไปเฉยๆ */
+  function checkRoundEnd(fromSeat) {
     if (inHand().length <= 1) return finishHand(false);
     if (roundDone()) return nextPhase();
-    advance();
+    if (fromSeat === undefined || fromSeat === st.current) advance();
+    else if (st.current === -1 || !st.seats[st.current] ||
+             st.seats[st.current].folded || st.seats[st.current].allIn) advance();
   }
 
   function advance() {
@@ -359,7 +372,9 @@ export function createTable(opts = {}) {
       scoreById[live[0].seatId] = [99];
     }
 
-    const won = settlePots(pots, scoreById);
+    const contributedById = {};
+    for (const pl of players) contributedById[pl.id] = pl.contributed;
+    const won = settlePots(pots, scoreById, contributedById);
     const payouts = [];
     for (const idStr in won) {
       const id = Number(idStr);
@@ -384,7 +399,9 @@ export function createTable(opts = {}) {
 
     st.phase = "showdown";
     st.current = -1;
-    for (const s of seated()) { s.inHand = false; s.bet = 0; }
+    /* ล้าง committed ด้วย ไม่งั้นหน้าจอยังโชว์กองกลางทั้งที่จ่ายไปแล้ว
+       (ชิปจะดูเหมือนมีสองเท่า) */
+    for (const s of seated()) { s.inHand = false; s.bet = 0; s.committed = 0; }
 
     /* เช็คหลังจบตาเสมอ ไม่ตัดกลางตา */
     if (limitReached()) closeSession();
@@ -448,7 +465,11 @@ export function createTable(opts = {}) {
       limit: {
         type: cfg.limitType,
         value: cfg.limitValue,
-        handsLeft: cfg.limitType === "hands" ? Math.max(0, cfg.limitValue - st.handNo) : null,
+        /* ระหว่างเล่นมืออยู่ ตานี้ยังไม่จบ ต้องนับรวมด้วย */
+        handsLeft: cfg.limitType === "hands"
+          ? Math.max(0, cfg.limitValue - st.handNo +
+              ((st.phase === "waiting" || st.phase === "showdown") ? 0 : 1))
+          : null,
         msLeft: msLeft(),
         over: st.sessionOver
       },
@@ -481,6 +502,8 @@ export function createTable(opts = {}) {
 
   function action(seatId, msg) {
     if (!msg || typeof msg !== "object") return { error: "คำสั่งว่าง" };
+    /* คนที่นั่งไม่สำเร็จ (โต๊ะเต็ม) ต้องสั่งอะไรไม่ได้เลย */
+    if (seatId == null || !st.seats[seatId]) return { error: "ไม่ได้นั่งอยู่ที่โต๊ะนี้" };
 
     if (msg.type === "start") {
       if (st.phase !== "waiting" && st.phase !== "showdown") return { error: "มือนี้ยังไม่จบ" };
@@ -495,7 +518,10 @@ export function createTable(opts = {}) {
       const s = st.seats[seatId];
       if (!s) return { error: "ไม่ได้นั่งอยู่" };
       if (s.inHand) return { error: "เติมชิประหว่างเล่นมือไม่ได้" };
-      const add = clampBuyIn(msg.amount);
+      const raw = Math.floor(Number(msg.amount));
+      if (!isFinite(raw) || raw <= 0) return { error: "ใส่จำนวนชิปที่จะเติม" };
+      if (raw > cfg.maxBuyIn) return { error: "เติมได้ครั้งละไม่เกิน " + cfg.maxBuyIn };
+      const add = raw;   /* เติมเท่าไหร่ก็ได้ ขั้นต่ำมีไว้สำหรับซื้อครั้งแรกเท่านั้น */
       s.stack += add;
       s.boughtIn += add;
       note(s.name + " เติมชิป " + add);
@@ -526,11 +552,16 @@ export function createTable(opts = {}) {
     }
     /* เริ่มรอบเล่นใหม่: ล้างเวลาและจำนวนตา แต่ชิปคงไว้ */
     if (msg.type === "newsession") {
+      if (st.phase !== "waiting" && st.phase !== "showdown") {
+        return { error: "มือนี้ยังไม่จบ เริ่มรอบใหม่ตอนนี้ไม่ได้" };
+      }
       st.sessionOver = false;
       st.standings = null;
       st.startedAt = 0;
       st.handNo = 0;
       st.phase = "waiting";
+      /* กำไรขาดทุนต้องเริ่มนับใหม่ ไม่งั้นรอบใหม่ขึ้นบวกตั้งแต่ยังไม่แจกไพ่ */
+      for (const p2 of seated()) { p2.boughtIn = p2.stack; p2.committed = 0; }
       note("เริ่มรอบเล่นใหม่");
       return {};
     }
@@ -549,9 +580,10 @@ export function createTable(opts = {}) {
       players: all.length,
       online: all.filter(s => s.connected).length,
       away: all.filter(s => !s.connected).map(s => s.name),
-      names: all.map(s => s.name),
+      names: all.filter(s => s.connected).map(s => s.name),
       /* ที่นั่งทั้ง 9 ช่อง: null = ว่าง · มีชื่อ = มีคนจองอยู่ */
-      seats: st.seats.map(s => s ? { name: s.name, connected: s.connected, stack: s.stack } : null),
+      /* ไม่ส่งชิปของแต่ละคนออกไปนอกโต๊ะ คนที่ยังไม่ได้นั่งไม่ควรเห็น */
+      seats: st.seats.map(s => s ? { name: s.name, connected: s.connected } : null),
       blinds: cfg.smallBlind + "/" + cfg.bigBlind,
       phase: st.phase,
       handNo: st.handNo,
