@@ -489,7 +489,27 @@
     $(id).classList.add("is-on");
     closeSheet();
     window.scrollTo(0, 0);
+    saveLive();
   }
+
+  /* เกมนี้มีข้อมูลลับ (สีลับของคนใบ้) จึงเก็บแค่พอเตือนว่ามีเกมค้าง
+     ไม่กู้กลางรอบ เพราะกู้ผิดจังหวะแล้วสีลับอาจโผล่ให้คนผิดเห็น */
+  var LIVE_KEY = "bg.color.live.v1";
+
+  function isLive() { return !!state && state.phase !== "over"; }
+
+  function saveLive() {
+    try {
+      if (!isLive()) { localStorage.removeItem(LIVE_KEY); return; }
+      localStorage.setItem(LIVE_KEY, JSON.stringify({ at: Date.now(), handNo: state.roundIdx + 1 }));
+    } catch (e) {}
+  }
+
+  window.addEventListener("beforeunload", function (e) {
+    if (!isLive()) return;
+    e.preventDefault();
+    e.returnValue = "";
+  });
 
   function setNote(el, msg, kind) {
     el.textContent = msg || "";
@@ -562,31 +582,38 @@
       toks.push(words[i].toLowerCase().replace(/^สี/, ""));
     }
 
+    /* เทียบว่าคำนั้น "เป็น" คำต้องห้ามจริงๆ ไม่ใช่แค่ขึ้นต้นด้วย
+       ไม่งั้น ส้มตำ ส้มโอ ฟ้าทะลายโจร จะโดนบล็อกทั้งที่ไม่ได้บอกสี
+       แต่ยังจับ เขียวอ่อน แดงเข้ม ที่เป็นชื่อสีต่อด้วยคำบอกความเข้มได้ */
+    function isBanned(tok, word) {
+      if (/^[a-z]+$/.test(word)) return new RegExp("\\b" + word + "\\b").test(tok);
+      if (tok === word) return true;
+      for (var k = 0; k < BANNED_SHADE.length; k++) {
+        if (tok === word + BANNED_SHADE[k]) return true;
+      }
+      return false;
+    }
+
     for (i = 0; i < BANNED_COLOR.length; i++) {
-      var cw = BANNED_COLOR[i];
       for (j = 0; j < toks.length; j++) {
-        var hitColor = /^[a-z]+$/.test(cw)
-          ? new RegExp("\\b" + cw + "\\b").test(toks[j])   /* อังกฤษ เทียบเป็นคำเต็ม */
-          : toks[j].indexOf(cw) === 0;                      /* ไทย เทียบว่าขึ้นต้นด้วยชื่อสี */
-        if (hitColor) {
-          return { ok: false, msg: "ใช้ “" + cw + "” ไม่ได้ เพราะเป็นชื่อสี" };
+        if (isBanned(toks[j], BANNED_COLOR[i])) {
+          return { ok: false, msg: "ใช้ “" + BANNED_COLOR[i] + "” ไม่ได้ เพราะเป็นชื่อสี" };
         }
       }
     }
 
     for (i = 0; i < BANNED_SHADE.length; i++) {
-      var sw = BANNED_SHADE[i];
       for (j = 0; j < toks.length; j++) {
-        var hitShade = /^[a-z]+$/.test(sw)
-          ? new RegExp("\\b" + sw + "\\b").test(toks[j])
-          : toks[j].indexOf(sw) === 0;
-        if (hitShade) {
-          return { ok: false, msg: "ใช้ “" + sw + "” ไม่ได้ เพราะบอกความอ่อนเข้ม" };
+        if (isBanned(toks[j], BANNED_SHADE[i])) {
+          return { ok: false, msg: "ใช้ “" + BANNED_SHADE[i] + "” ไม่ได้ เพราะบอกความอ่อนเข้ม" };
         }
       }
     }
-    if (COORD_LATIN.test(low) || COORD_THAI.test(low)) {
-      return { ok: false, msg: "ใช้พิกัดเป็นคำใบ้ไม่ได้" };
+    for (j = 0; j < words.length; j++) {
+      var lw = words[j].toLowerCase();
+      if (COORD_LATIN.test(lw) || COORD_THAI.test(lw)) {
+        return { ok: false, msg: "ใช้ “" + words[j] + "” ไม่ได้ เพราะเป็นพิกัดบนกระดาน" };
+      }
     }
 
     for (i = 0; i < used.length; i++) {
@@ -890,9 +917,11 @@
   }
 
   function onCellTap(e) {
+    /* กล่องกระดานชื่อ "cells" ซึ่งมีคำว่า "cell" อยู่ข้างใน
+       ถ้าเทียบแบบหาคำย่อย การแตะขอบกระดานจะถูกนับเป็นช่อง แล้วได้พิกัด NaN */
     var el = e.target;
-    while (el && el.className.indexOf("cell") === -1) el = el.parentNode;
-    if (!el || !el.dataset) return;
+    while (el && el !== e.currentTarget && !el.classList.contains("cell")) el = el.parentNode;
+    if (!el || !el.classList || !el.classList.contains("cell")) return;
     if (!state || state.phase !== "guess") return;
 
     var col = Number(el.dataset.col);
@@ -961,6 +990,7 @@
       usedClues: [],
       tiebreak: 0,
       only: null,          /* รอบตัดสิน เล่นเฉพาะคนที่เสมอ */
+      tieRounds: 0,        /* รอบตัดสินต้องเล่นกี่รอบ = จำนวนคนที่เสมอ */
       recorded: false,
       phase: "",
       board: [], tokens: [], order: [], pass: 1, turnPos: 0,
@@ -1256,8 +1286,9 @@
     });
 
     /* คนใบ้ เล่น 3 คนได้ 2 แต้มต่อหมากในกรอบ นอกนั้น 1 แต้ม */
-    var active = activeIdxs().length;
-    var perToken = active === 3 ? 2 : 1;
+    /* อิงจำนวนคนทั้งโต๊ะ ไม่ใช่จำนวนคนที่เหลือในรอบตัดสิน
+       ไม่งั้นพอเหลือ 2 คนตัดสินกัน อัตราแต้มคนใบ้จะเปลี่ยนไปเงียบๆ */
+    var perToken = state.players.length === 3 ? 2 : 1;
     var giverPts = inBox * perToken;
     gained[state.giver] = (gained[state.giver] || 0) + giverPts;
 
@@ -1291,7 +1322,7 @@
 
     /* ปุ่มถัดไป */
     var last = state.only
-      ? true
+      ? (state.roundIdx + 1 >= (state.tieRounds || 1))
       : (state.roundIdx + 1 >= state.totalRounds);
     $("btn-next-round").textContent = last ? "ดูผลรวม" : "รอบต่อไป";
   }
@@ -1325,7 +1356,12 @@
   }
 
   function nextRound() {
-    if (state.only) return finishTiebreak();
+    if (state.only) {
+      /* เล่นรอบตัดสินให้ครบทุกคนที่เสมอก่อน แล้วค่อยตัดสิน */
+      state.roundIdx++;
+      if (state.roundIdx < (state.tieRounds || 1)) return startRound();
+      return finishTiebreak();
+    }
 
     state.roundIdx++;
     if (state.roundIdx >= state.totalRounds) return decide();
@@ -1353,6 +1389,8 @@
       state.tiebreak++;
       state.only = top;
       state.roundIdx = 0;
+      /* ให้ทุกคนที่เสมอได้เป็นคนใบ้คนละครั้ง ไม่ใช่คนแรกคนเดียว */
+      state.tieRounds = top.length;
       startRound();
       return;
     }
@@ -1365,6 +1403,8 @@
       state.tiebreak++;
       state.only = top;
       state.roundIdx = 0;
+      /* ให้ทุกคนที่เสมอได้เป็นคนใบ้คนละครั้ง ไม่ใช่คนแรกคนเดียว */
+      state.tieRounds = top.length;
       startRound();
       return;
     }
@@ -1374,6 +1414,7 @@
 
   function gameOver(winners) {
     state.phase = "over";
+    try { localStorage.removeItem("bg.color.live.v1"); } catch (e) {}
 
     var isWin = {};
     winners.forEach(function (i) { isWin[i] = true; });
