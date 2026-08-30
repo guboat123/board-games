@@ -1,0 +1,101 @@
+/* ===========================================================
+   หน้าตาไพ่ — วาดด้วย CSS ล้วน ไม่ใช้รูปภาพ
+   ใช้คู่กับ cards.js ที่สร้างโครง DOM ให้
+   =========================================================== */
+
+.pc {
+  position: relative;
+  flex: 0 0 auto;
+  aspect-ratio: 5 / 7;
+  background: linear-gradient(#ffffff, #f4f1e8);
+  border-radius: 6%/4.3%;
+  box-shadow: 0 2px 6px rgba(0,0,0,.4), inset 0 0 0 1px rgba(0,0,0,.12);
+  color: #16181a;
+  overflow: hidden;
+  font-family: "IBM Plex Sans Thai", system-ui, sans-serif;
+}
+
+/* ---- ขนาด ---- */
+.pc--sm { width: 24px; border-radius: 3px; }
+.pc--md { width: 46px; }
+.pc--lg { width: 78px; }
+
+@media (min-width: 480px) {
+  .pc--md { width: 54px; }
+  .pc--lg { width: 92px; }
+}
+
+.pc--red { color: #d8232a; }
+
+/* ---- มุมไพ่ ---- */
+.pc__corner {
+  position: absolute;
+  display: flex; flex-direction: column; align-items: center;
+  line-height: .95;
+  font-weight: 700;
+}
+.pc__corner--tl { left: 6%; top: 3.5%; }
+.pc__corner--br { right: 6%; bottom: 3.5%; transform: rotate(180deg); }
+
+.pc__cr { font-size: 1.9em; letter-spacing: -.04em; }
+.pc__cs { font-size: 1.5em; margin-top: -.1em; }
+
+/* ไพ่ใบเล็กโชว์แค่มุมบนซ้าย พื้นที่ไม่พอ */
+.pc--sm { font-size: 5.5px; }
+.pc--md { font-size: 7.5px; }
+.pc--lg { font-size: 12px; }
+@media (min-width: 480px) {
+  .pc--md { font-size: 8.5px; }
+  .pc--lg { font-size: 14px; }
+}
+.pc--sm .pc__corner--br { display: none; }
+.pc--sm .pc__face { display: none; }
+.pc--sm .pc__corner--tl { left: 50%; top: 50%; transform: translate(-50%, -50%); }
+
+/* ---- หน้าไพ่ ---- */
+.pc__face { position: absolute; inset: 16% 20%; }
+
+.pc__pip {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 2.4em;
+  line-height: 1;
+}
+.pc__pip.is-flip { transform: translate(-50%, -50%) rotate(180deg); }
+
+/* ไพ่คน J Q K */
+.pc__letter {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 5.2em; font-weight: 700; line-height: 1;
+  letter-spacing: -.04em;
+  opacity: .92;
+}
+.pc__letter-suit {
+  position: absolute; right: -6%; bottom: -4%;
+  font-size: 2.2em; line-height: 1; opacity: .85;
+}
+.pc--md .pc__letter { font-size: 4.4em; }
+.pc--sm .pc__letter { font-size: 3em; }
+
+/* ---- ไพ่คว่ำ ---- */
+.pc--back {
+  background:
+    repeating-linear-gradient(45deg,  #2f5fae 0 3px, #24488a 3px 6px),
+    #24488a;
+  box-shadow: 0 2px 6px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.18);
+}
+.pc--back .pc__pattern {
+  position: absolute; inset: 8%;
+  border: 1px solid rgba(255,255,255,.42);
+  border-radius: 3px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,.22) 0 18%, transparent 19%);
+}
+
+/* ---- ช่องว่างรอไพ่ ---- */
+.pc--slot {
+  background: rgba(255,255,255,.05);
+  border: 1px dashed rgba(255,255,255,.22);
+  box-shadow: none;
+}
