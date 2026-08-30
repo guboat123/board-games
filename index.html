@@ -40,20 +40,13 @@
     letter-spacing: .1em;
   }
   .game h2 { margin: 4px 0 6px; }
-  .game__meta { font-size: .85rem; color: #6C7472; margin-top: 12px; }
-
-  /* จำนวนคนที่แนะนำ ให้เห็นชัดเป็นบรรทัดของตัวเอง */
-  .game__people {
-    display: inline-block;
-    margin-top: 12px;
-    padding: 5px 12px;
-    font-family: var(--font-mono);
-    font-size: .8rem;
-    color: var(--ink);
-    background: var(--board);
-    border: 2px solid var(--ink);
-    border-radius: 99px;
+  /* แถวสถานะ + จำนวนคน + อุปกรณ์ ตัดบรรทัดได้บนจอแคบ
+     แต่ tag ต้องไม่ถูกหั่นกลางตัวเอง */
+  .game__meta {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
+    font-size: .85rem; color: #6C7472; margin-top: 12px;
   }
+  .game__spec { font-family: var(--font-mono); font-size: .78rem; }
 
   .game--soon {
     background: transparent;
@@ -63,9 +56,9 @@
   }
   .game--soon:hover { transform: rotate(0); box-shadow: none; }
   .game--soon h2 { color: #8B9391; }
-  .game--soon .game__people { background: transparent; border-style: dashed; color: #6C7472; }
 
   .tag {
+    white-space: nowrap;
     display: inline-block;
     font-family: var(--font-mono);
     font-size: .7rem;
@@ -181,24 +174,22 @@
     <a class="game" href="games/catch-sketch/index.html">
       <span class="game__no">เกม 01</span>
       <h2>วาดให้ทาย</h2>
-      <p>สุ่มคำขึ้นจอ คนวาดมีเวลาจำกัด ทีมไหนทายได้ก่อนได้แต้ม</p>
-      <div class="game__people">แนะนำ 4 ถึง 12 คน</div>
+      <p>คนทาย 1 คนหันหลัง คนที่เหลือวาดคำเดียวกันแข่งกัน ใครวาดเสร็จก่อนได้สิทธิ์ให้ทายก่อน</p>
       <div class="game__meta">
         <span class="tag">เล่นได้แล้ว</span>
-        &nbsp; แบ่ง 2–4 ทีม · ใช้ไวท์บอร์ด
+        <span class="game__spec">3–6 คน · ไวท์บอร์ดคนละอัน</span>
       </div>
     </a>
 
-    <div class="game game--soon">
+    <a class="game" href="games/color-clues/index.html">
       <span class="game__no">เกม 02</span>
       <h2>เดาสีจากคำใบ้</h2>
-      <p>คนใบ้เลือกสีลับ 1 สี แล้วให้คำใบ้ได้คำเดียว คนอื่นทายตำแหน่งบนกระดานสี</p>
-      <div class="game__people">แนะนำ 3 ถึง 10 คน</div>
+      <p>คนใบ้เลือกสีลับ 1 สี แล้วให้คำใบ้ได้คำเดียว คนอื่นทายตำแหน่งบนกระดานสี 480 ช่อง</p>
       <div class="game__meta">
-        <span class="tag tag--soon">กำลังทำ</span>
-        &nbsp; เล่นบนจอเดียว
+        <span class="tag">เล่นได้แล้ว</span>
+        <span class="game__spec">3–10 คน · แท็บเล็ตหรือโน้ตบุ๊ก 1 เครื่อง</span>
       </div>
-    </div>
+    </a>
 
   </main>
 
