@@ -167,6 +167,24 @@
     line-height: 1.2; overflow-wrap: anywhere;
   }
 
+  /* ---- หมวดหมู่ ----
+     มี 30 อัน ถ้าเลือกหมดแล้วทำเป็นชิปดำทั้งแผงจะทึบจนอ่านไม่ออก
+     เลยกลับด้าน: เลือกอยู่ = ขาวขอบเข้มมีติ๊ก · ไม่เลือก = จางลง */
+  .kit__body { padding: 4px 18px 16px; }
+  .cats { gap: 7px; }
+  .cats .chip {
+    padding: 7px 13px; font-size: .86rem; font-weight: 500;
+    background: var(--paper); color: #9AA2A0;
+    border-width: 2px; border-color: var(--smudge);
+  }
+  .cats .chip[aria-pressed="true"] {
+    background: var(--paper); color: var(--ink);
+    border-color: var(--ink); font-weight: 600;
+  }
+  .cats .chip[aria-pressed="true"]::before {
+    content: "✓"; margin-right: 6px; color: var(--ink-green); font-weight: 700;
+  }
+
   /* ---- อันดับจบเกม ---- */
   .rank { list-style: none; padding: 0; margin: 12px 0 0; }
   .rank li {
@@ -176,10 +194,26 @@
     border: var(--stroke) solid var(--ink);
     border-radius: var(--radius);
   }
-  .rank li.is-first { background: var(--ink-orange); }
-  .rank .no { font-family: var(--font-mono); font-size: .9rem; width: 1.6em; }
+  .rank li.is-first {
+    background: var(--ink-orange);
+    padding: 16px 14px;
+    box-shadow: 4px 5px 0 var(--smudge);
+  }
+  .rank .no {
+    flex: 0 0 auto; width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-size: .82rem; font-weight: 600;
+    background: var(--board); border: 2px solid var(--ink); border-radius: 99px;
+  }
+  .rank li.is-first .no { background: var(--paper); }
   .rank .nm { font-weight: 600; flex: 1 1 auto; overflow-wrap: anywhere; }
+  .rank li.is-first .nm { font-family: var(--font-display); font-size: 1.2rem; }
   .rank .pt { font-family: var(--font-mono); font-size: 1.3rem; font-weight: 600; }
+  .rank li.is-first .pt { font-size: 1.75rem; }
+
+  /* หัวข้อจบเกม ให้ชื่อคนชนะเด่นกว่าคำว่าชนะ */
+  .over-head { text-align: center; padding: 12px 0 4px; }
+  .over-head h1 { font-size: 2.3rem; line-height: 1.15; overflow-wrap: anywhere; }
 
   .steps { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .1em; color: var(--ink-blue); }
 </style>
@@ -255,12 +289,14 @@
       <div class="chips" id="opt-packs"></div>
     </div>
 
-    <div class="field">
-      <label>หมวดหมู่ <span class="count" id="cat-count"></span></label>
-      <p class="hint" style="margin:0 0 8px">เลือกเฉพาะหมวดที่อยากเล่นได้ ต้องเหลืออย่างน้อย 1 หมวด</p>
-      <div class="chips" id="opt-cats"></div>
-      <p style="margin-top:10px"><button class="btn btn--ghost btn--sm" id="btn-cats-all">เลือกทุกหมวด</button></p>
-    </div>
+    <details class="kit">
+      <summary>หมวดหมู่ <span class="count" id="cat-count"></span></summary>
+      <div class="kit__body">
+        <p class="hint" style="margin:0 0 10px">แตะเพื่อปิดหมวดที่ไม่อยากเล่น ต้องเหลืออย่างน้อย 1 หมวด</p>
+        <div class="chips cats" id="opt-cats"></div>
+        <p style="margin-top:12px"><button class="btn btn--ghost btn--sm" id="btn-cats-all">เลือกทุกหมวด</button></p>
+      </div>
+    </details>
 
     <div class="field">
       <label>ความยาก</label>
@@ -306,6 +342,7 @@
     <p class="hint" style="margin-bottom:10px">วาดเสร็จแล้วแตะชื่อตัวเองเพื่อคว้าคิว</p>
     <ul class="claims" id="claims"></ul>
 
+    <p class="hint" id="claim-status" role="status" aria-live="polite" style="margin:0 0 10px"></p>
     <button class="btn" id="btn-all-done" disabled>ทุกคนเสร็จแล้ว</button>
   </section>
 
@@ -356,8 +393,11 @@
 
   <!-- ============ 8. จบเกม ============ -->
   <section id="s-over" class="screen">
-    <span class="eyebrow">จบเกม</span>
-    <h1 id="over-title">—</h1>
+    <div class="over-head">
+      <span class="eyebrow">จบเกม</span>
+      <h1 id="over-title">—</h1>
+      <p class="hint" id="over-sub" style="margin-top:6px"></p>
+    </div>
     <ul class="rank" id="rank"></ul>
     <button class="btn" id="btn-again">เล่นอีกรอบ</button>
     <p style="margin-top:12px"><a class="back" href="../../scoreboard.html">ดูกระดานคะแนน →</a></p>
@@ -535,8 +575,24 @@
     return out;
   }
 
+  var lastPacks = null;
+
   function renderCats() {
     var avail = catsForPacks();
+
+    /* ชุดคำที่เพิ่งเปิดกลับมา ต้องดึงหมวดของมันกลับมาเลือกด้วย
+       ไม่งั้นเปิดชุดคำแล้วแต่ไม่มีคำจากชุดนั้นออกมาเลยสักคำ */
+    if (lastPacks) {
+      cfg.packs.forEach(function (k) {
+        if (lastPacks.indexOf(k) !== -1) return;
+        var pk = PACKS[k];
+        if (!pk) return;
+        pk.data.forEach(function (item) {
+          if (item.cat && cfg.cats.indexOf(item.cat) === -1) cfg.cats.push(item.cat);
+        });
+      });
+    }
+    lastPacks = cfg.packs.slice();
 
     /* ตัดหมวดที่ไม่มีอยู่ในชุดคำที่เลือกแล้วออก */
     var keep = [];
@@ -568,9 +624,18 @@
     var n = buildPool().length;
     var rounds = picked.length * cfg.roundsPer;
 
-    $("cat-count").textContent = "เลือก " + cfg.cats.length + " / " + catsForPacks().length + " หมวด";
-    $("pool-info").textContent = "มีคำให้สุ่มตอนนี้ " + n + " คำ" +
-      (n && n < rounds ? " (น้อยกว่าจำนวนรอบ เดี๋ยวคำจะวนซ้ำ)" : "");
+    var totalCats = catsForPacks().length;
+    $("cat-count").textContent = cfg.cats.length === totalCats
+      ? "ทั้งหมด " + totalCats + " หมวด"
+      : "เลือก " + cfg.cats.length + " จาก " + totalCats + " หมวด";
+    if (n < 1) {
+      $("pool-info").textContent = "ไม่มีคำให้สุ่มเลย ลองเลือกหมวดหมู่หรือความยากเพิ่ม";
+      $("pool-info").className = "note note--bad";
+    } else {
+      $("pool-info").textContent = "มีคำให้สุ่มตอนนี้ " + n + " คำ" +
+        (n < rounds ? " (น้อยกว่าจำนวนรอบ เดี๋ยวคำจะวนซ้ำ)" : "");
+      $("pool-info").className = "hint";
+    }
     $("rounds-info").textContent = "เล่น " + picked.length + " คน คนละ " + cfg.roundsPer +
       " รอบ รวม " + rounds + " รอบ";
     $("btn-start").disabled = n < 1;
@@ -619,7 +684,11 @@
       b.className = "pchip";
       b.textContent = p.name;
       b.setAttribute("aria-pressed", on ? "true" : "false");
-      if (full) b.disabled = true;
+      /* ไม่ disable จริง เพราะต้องให้กดแล้วมีข้อความบอกว่าทำไมเพิ่มไม่ได้ */
+      if (full) {
+        b.className += " is-full";
+        b.setAttribute("aria-disabled", "true");
+      }
 
       b.addEventListener("click", function () {
         var at = picked.indexOf(p.id);
@@ -740,9 +809,16 @@
       return;
     }
 
-    if (picked.length < headcount) picked.push(p.id);
     input.value = "";
-    renderPickList();
+    if (picked.length < headcount) {
+      picked.push(p.id);
+      renderPickList();
+      setNote($("pick-note"), "เพิ่ม " + p.name + " แล้ว", "ok");
+    } else {
+      renderPickList();
+      setNote($("pick-note"), "เพิ่ม " + p.name + " เข้าทะเบียนแล้ว แต่รอบนี้เลือกครบ " +
+              headcount + " คนแล้ว ถ้าจะให้เล่นด้วยต้องเอาคนอื่นออกก่อน", "bad");
+    }
     input.focus();
   }
 
@@ -864,11 +940,17 @@
       b.className = "claim" + (qpos !== -1 ? " is-done" : (out ? " is-out" : ""));
 
       if (qpos !== -1) b.textContent = state.players[i].name + " · คิว " + (qpos + 1);
-      else if (out)    b.textContent = state.players[i].name + " · ยอมแพ้";
+      else if (out)    b.textContent = state.players[i].name + " · ยอมแพ้ (แตะเพื่อกลับ)";
       else             b.textContent = state.players[i].name;
 
-      if (qpos !== -1 || out) b.disabled = true;
-      else b.addEventListener("click", function () { claim(i); });
+      if (qpos !== -1) {
+        b.disabled = true;                 /* คว้าคิวแล้วถือเป็นที่สิ้นสุด */
+      } else if (out) {
+        /* กดยอมแพ้พลาดได้ ให้แตะชื่อตัวเองกลับเข้าเกม ตราบที่ยังไม่จบรอบ */
+        b.addEventListener("click", function () { unGiveUp(i); });
+      } else {
+        b.addEventListener("click", function () { claim(i); });
+      }
 
       li.appendChild(b);
 
@@ -912,6 +994,14 @@
     renderClaims();
   }
 
+  function unGiveUp(i) {
+    if (tappedTooFast(i)) return;
+    var at = state.gaveUp.indexOf(i);
+    if (at === -1) return;
+    state.gaveUp.splice(at, 1);
+    renderClaims();
+  }
+
   function refreshAllDone() {
     var drawers = drawerIdxs().length;
     var settled = state.queue.length + state.gaveUp.length;
@@ -919,8 +1009,18 @@
 
     /* กดได้เมื่อมีคนคว้าคิวแล้วอย่างน้อย 1 คน
        หรือทุกคนยอมแพ้หมด จะได้ไม่ค้าง */
-    btn.disabled = !(state.queue.length >= 1 || (settled >= drawers && drawers > 0));
-    btn.textContent = state.queue.length ? "ทุกคนเสร็จแล้ว" : "ไม่มีใครวาดทัน ไปต่อ";
+    var allSettled = (settled >= drawers && drawers > 0);
+    btn.disabled = !(state.queue.length >= 1 || allSettled);
+
+    /* ตอนคำเพิ่งขึ้นยังไม่มีใครกด อย่าเพิ่งขึ้นว่า "ไม่มีใครวาดทัน" */
+    btn.textContent = (allSettled && !state.queue.length)
+      ? "ไม่มีใครวาดทัน ไปต่อ"
+      : "ทุกคนเสร็จแล้ว";
+
+    var waiting = drawers - settled;
+    $("claim-status").textContent = waiting > 0
+      ? "รออีก " + waiting + " คน แตะชื่อตัวเองเมื่อวาดเสร็จ"
+      : "";
   }
 
   function allDone() {
@@ -941,6 +1041,8 @@
 
   function toGuess() {
     state.qpos = 0;
+    /* เข้าหน้าทายใหม่ ให้กดครั้งแรกได้ทันที ไม่ติด guard จากรอบก่อน */
+    lastAdvance = 0;
     paintGuess();
     show("s-guess");
   }
@@ -957,11 +1059,24 @@
       : "คิวสุดท้ายแล้ว ถ้าผิดรอบนี้ไม่มีใครได้แต้ม";
   }
 
+  /* ปุ่มทายถูก/ทายผิดอยู่ตำแหน่งเดิมทั้งคู่ เผลอกดสองทีจะข้ามคิวคนถัดไปเงียบๆ
+     กันด้วยเวลาเหมือนปุ่มคว้าคิว */
+  var lastAdvance = 0;
+
+  function advancedTooFast() {
+    var now = Date.now();
+    if (now - lastAdvance < TAP_GUARD_MS) return true;
+    lastAdvance = now;
+    return false;
+  }
+
   function guessRight() {
+    if (advancedTooFast()) return;
     endRound(state.qpos);
   }
 
   function guessWrong() {
+    if (advancedTooFast()) return;
     state.qpos++;
     if (state.qpos >= state.queue.length) return endRound(-1);
     paintGuess();
@@ -1090,13 +1205,26 @@
       if (state.totals[i] === best) winners.push(i);
     }
 
+    /* ไม่มีใครทำแต้มได้เลย = ไม่มีผู้ชนะ ไม่ใช่เสมอกันทุกคน
+       ไม่งั้นกระดานคะแนนจะนับว่าทุกคนชนะ */
+    if (best <= 0) winners = [];
+
     var isWin = {};
     winners.forEach(function (w) { isWin[w] = true; });
 
     /* เสมอได้ ไม่ต้องตัดสิน */
-    $("over-title").textContent = winners.length === 1
-      ? state.players[winners[0]].name + " ชนะ"
-      : "เสมอกัน " + winners.length + " คน";
+    if (!winners.length) {
+      $("over-title").textContent = "ไม่มีใครทำแต้มได้";
+      $("over-sub").textContent = "รอบนี้ไม่มีใครทายถูกเลย เอาใหม่รอบหน้า";
+    } else if (winners.length === 1) {
+      $("over-title").textContent = state.players[winners[0]].name;
+      $("over-sub").textContent = "ชนะด้วย " + best + " แต้ม";
+    } else {
+      var names = [];
+      for (var wi = 0; wi < winners.length; wi++) names.push(state.players[winners[wi]].name);
+      $("over-title").textContent = "เสมอกัน";
+      $("over-sub").textContent = names.join(" กับ ") + " ได้ " + best + " แต้มเท่ากัน";
+    }
 
     var order = [];
     for (i = 0; i < state.players.length; i++) order.push(i);
@@ -1219,8 +1347,8 @@
 
   /* เล่นอีกรอบ กลับไปหน้าตั้งค่า โดยจำรายชื่อผู้เล่นไว้ */
   $("btn-again").addEventListener("click", function () {
-    state = null;
     stopClock();
+    state = null;
     refreshSetupInfo();
     show("s-setup");
   });
