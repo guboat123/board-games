@@ -1,0 +1,155 @@
+/* ===========================================================
+   ก๊วนบอร์ดเกม — shared design tokens
+   คอนเซปต์: ไวท์บอร์ดกับปากกาเมจิก
+   =========================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Mali:wght@500;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@600&display=swap');
+
+:root {
+  /* สีปากกาเมจิก */
+  --ink:        #17181A;
+  --ink-blue:   #1B4FD8;
+  --ink-red:    #E23B32;
+  --ink-green:  #1E9E5A;
+  --ink-orange: #F08A24;
+
+  /* พื้นไวท์บอร์ด */
+  --board:      #F2F4F3;
+  --board-deep: #E4E8E7;
+  --smudge:     #C9D0CE;
+  --paper:      #FFFFFF;
+
+  --stroke: 3px;
+  --radius: 14px;
+
+  --font-display: 'Mali', 'IBM Plex Sans Thai', sans-serif;
+  --font-body:    'IBM Plex Sans Thai', system-ui, sans-serif;
+  --font-mono:    'IBM Plex Mono', monospace;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background-color: var(--board);
+  background-image:
+    linear-gradient(var(--board-deep) 1px, transparent 1px),
+    linear-gradient(90deg, var(--board-deep) 1px, transparent 1px);
+  background-size: 32px 32px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 18px 48px;
+}
+
+/* ---------- ตัวอักษร ---------- */
+
+h1, h2, h3 { font-family: var(--font-display); font-weight: 700; margin: 0; line-height: 1.25; }
+h1 { font-size: 2rem; }
+h2 { font-size: 1.35rem; }
+h3 { font-size: 1.05rem; }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--smudge);
+  filter: brightness(.7);
+}
+
+.muted { color: #6C7472; }
+
+/* ---------- เส้นขีดปากกา ---------- */
+
+.rule {
+  height: var(--stroke);
+  background: var(--ink);
+  border-radius: 99px;
+  margin: 20px 0;
+  transform: rotate(-.4deg);
+}
+
+/* ---------- การ์ด ---------- */
+
+.card {
+  background: var(--paper);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: 4px 5px 0 var(--smudge);
+}
+
+/* ---------- ปุ่ม ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 15px 18px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--paper);
+  background: var(--ink);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: 3px 4px 0 var(--smudge);
+  cursor: pointer;
+  transition: transform .08s ease, box-shadow .08s ease;
+}
+
+.btn:active { transform: translate(3px, 4px); box-shadow: 0 0 0 var(--smudge); }
+.btn:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 3px; }
+
+.btn--ghost { background: var(--paper); color: var(--ink); }
+.btn--good  { background: var(--ink-green); border-color: var(--ink-green); }
+.btn--skip  { background: var(--paper); color: var(--ink-red); border-color: var(--ink-red); }
+.btn--sm    { width: auto; padding: 9px 15px; font-size: .9rem; }
+
+.btn[disabled] { opacity: .4; cursor: not-allowed; }
+
+/* ---------- ชิปตัวเลือก ---------- */
+
+.chips { display: flex; flex-wrap: wrap; gap: 9px; }
+
+.chip {
+  padding: 9px 15px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: .92rem;
+  background: var(--paper);
+  color: var(--ink);
+  border: var(--stroke) solid var(--ink);
+  border-radius: 99px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.chip:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 3px; }
+
+/* ---------- ฟอร์ม ---------- */
+
+.field { margin-bottom: 22px; }
+.field > label { display: block; font-weight: 600; margin-bottom: 9px; }
+
+.stack > * + * { margin-top: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

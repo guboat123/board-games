@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>วาดให้ทาย · ก๊วนบอร์ดเกม</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<style>
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 4px;
+  }
+  .back { font-size: .9rem; color: var(--ink-blue); text-decoration: none; font-weight: 600; }
+
+  .screen { display: none; }
+  .screen.is-on { display: block; }
+
+  /* ---- แถบคะแนน ---- */
+  .scores { display: flex; gap: 9px; flex-wrap: wrap; margin-bottom: 18px; }
+  .score {
+    flex: 1 1 0; min-width: 74px; text-align: center;
+    padding: 10px 6px;
+    background: var(--paper);
+    border: var(--stroke) solid var(--ink);
+    border-radius: var(--radius);
+  }
+  .score.is-turn { background: var(--ink-orange); }
+  .score b { display: block; font-family: var(--font-mono); font-size: 1.5rem; line-height: 1.1; }
+  .score span { font-size: .78rem; }
+
+  /* ---- หน้าพร้อมเล่น ---- */
+  .ready { text-align: center; padding: 30px 0 10px; }
+  .ready .who { font-family: var(--font-display); font-size: 2.1rem; font-weight: 700; margin: 6px 0 2px; }
+
+  /* ---- หน้าเล่น ---- */
+  .timer {
+    height: 14px; background: var(--paper);
+    border: var(--stroke) solid var(--ink);
+    border-radius: 99px; overflow: hidden; margin-bottom: 6px;
+  }
+  .timer i { display: block; height: 100%; background: var(--ink-green); width: 100%; }
+  .timer.is-low i { background: var(--ink-red); }
+
+  .clock {
+    font-family: var(--font-mono); font-size: 1.05rem;
+    text-align: right; margin-bottom: 16px;
+  }
+
+  .word {
+    background: var(--paper);
+    border: var(--stroke) solid var(--ink);
+    border-radius: var(--radius);
+    box-shadow: 6px 7px 0 var(--smudge);
+    padding: 42px 20px;
+    text-align: center;
+    min-height: 200px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    margin-bottom: 20px;
+  }
+  .word__main { font-family: var(--font-display); font-weight: 700; font-size: 2.5rem; line-height: 1.2; }
+  .word__sub  { font-size: .95rem; color: #6C7472; margin-top: 8px; }
+  .word__lv   { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .12em; color: var(--ink-blue); margin-bottom: 10px; }
+
+  .actions { display: flex; gap: 10px; }
+
+  /* ---- สรุปรอบ ---- */
+  .tally { list-style: none; padding: 0; margin: 14px 0 0; }
+  .tally li {
+    display: flex; justify-content: space-between; gap: 10px;
+    padding: 8px 0; border-bottom: 2px dashed var(--board-deep);
+  }
+  .tally .ok   { color: var(--ink-green); font-weight: 600; }
+  .tally .no   { color: var(--ink-red); }
+
+  .big-num { font-family: var(--font-mono); font-size: 3.4rem; line-height: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <a class="back" href="../../index.html">← ทุกเกม</a>
+    <span class="eyebrow">เกม 01</span>
+  </div>
+
+  <!-- ============ ตั้งค่า ============ -->
+  <section id="s-setup" class="screen is-on">
+    <h1>วาดให้ทาย</h1>
+    <p class="muted">คนวาดห้ามพูด ห้ามเขียนตัวหนังสือ ห้ามใบ้เป็นตัวเลข วาดอย่างเดียว</p>
+    <div class="rule"></div>
+
+    <div class="field">
+      <label>จำนวนทีม</label>
+      <div class="chips" id="opt-teams"></div>
+    </div>
+
+    <div class="field">
+      <label>เวลาต่อรอบ</label>
+      <div class="chips" id="opt-time"></div>
+    </div>
+
+    <div class="field">
+      <label>ชุดคำ</label>
+      <div class="chips" id="opt-packs"></div>
+    </div>
+
+    <div class="field">
+      <label>ความยาก</label>
+      <div class="chips" id="opt-levels"></div>
+    </div>
+
+    <div class="field">
+      <label>เล่นถึงกี่แต้ม</label>
+      <div class="chips" id="opt-target"></div>
+    </div>
+
+    <p class="muted" id="pool-info" style="font-size:.88rem"></p>
+    <button class="btn" id="btn-start">เริ่มเล่น</button>
+  </section>
+
+  <!-- ============ พร้อมเล่น ============ -->
+  <section id="s-ready" class="screen">
+    <div class="scores" id="scores-ready"></div>
+    <div class="card ready">
+      <span class="eyebrow">ส่งมือถือให้คนวาดของ</span>
+      <div class="who" id="ready-team">ทีม ก</div>
+      <p class="muted">คนอื่นอย่าแอบดูจอนะ กดเริ่มแล้วเวลาเดินทันที</p>
+      <button class="btn" id="btn-go">เริ่มรอบนี้</button>
+    </div>
+    <p style="margin-top:14px"><button class="btn btn--ghost btn--sm" id="btn-quit">จบเกม</button></p>
+  </section>
+
+  <!-- ============ กำลังเล่น ============ -->
+  <section id="s-play" class="screen">
+    <div class="timer" id="timer"><i id="timer-fill"></i></div>
+    <div class="clock"><span id="clock">60</span> วิ &nbsp;·&nbsp; ได้ <span id="run-score">0</span> คำ</div>
+
+    <div class="word">
+      <div class="word__lv" id="w-lv"></div>
+      <div class="word__main" id="w-main">—</div>
+      <div class="word__sub" id="w-sub"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn--skip" id="btn-skip">ข้าม</button>
+      <button class="btn btn--good" id="btn-ok">ทายถูก!</button>
+    </div>
+  </section>
+
+  <!-- ============ สรุปรอบ ============ -->
+  <section id="s-round" class="screen">
+    <span class="eyebrow">หมดเวลา</span>
+    <h1 id="round-team">ทีม ก</h1>
+    <p><span class="big-num" id="round-score">0</span> <span class="muted">คำ</span></p>
+
+    <div class="card">
+      <h3>คำที่ผ่านไป</h3>
+      <ul class="tally" id="round-list"></ul>
+    </div>
+
+    <p style="margin-top:20px"><button class="btn" id="btn-next">ทีมต่อไป</button></p>
+  </section>
+
+  <!-- ============ จบเกม ============ -->
+  <section id="s-over" class="screen">
+    <span class="eyebrow">จบเกม</span>
+    <h1 id="over-title">ทีม ก ชนะ</h1>
+    <div class="scores" id="scores-over" style="margin-top:18px"></div>
+    <button class="btn" id="btn-again">เล่นอีกรอบ</button>
+    <p style="margin-top:12px"><a class="back" href="../../index.html">← กลับไปเลือกเกมอื่น</a></p>
+  </section>
+
+</div>
+
+<script src="words/general.js"></script>
+<script src="words/characters.js"></script>
+<script src="words/thai.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var PACKS = {
+    general:    { label: "ทั่วไป",     data: window.WORDS_GENERAL    || [] },
+    characters: { label: "ตัวละครดัง", data: window.WORDS_CHARACTERS || [] },
+    thai:       { label: "ไทยๆ",       data: window.WORDS_THAI       || [] }
+  };
+
+  var LV_LABEL = { 1: "ง่าย", 2: "กลาง", 3: "ยาก" };
+  var TEAM_NAMES = ["ทีม ก", "ทีม ข", "ทีม ค", "ทีม ง"];
+
+  var cfg = {
+    teams: 2,
+    seconds: 60,
+    packs: ["general", "characters", "thai"],
+    levels: [1, 2, 3],
+    target: 15
+  };
+
+  var state = null;
+  var ticker = null;
+  var audioCtx = null;
+
+  /* ---------- helper ---------- */
+
+  function $(id) { return document.getElementById(id); }
+
+  function show(id) {
+    var all = document.querySelectorAll(".screen");
+    for (var i = 0; i < all.length; i++) all[i].classList.remove("is-on");
+    $(id).classList.add("is-on");
+    window.scrollTo(0, 0);
+  }
+
+  function chip(label, value, pressed) {
+    var b = document.createElement("button");
+    b.className = "chip";
+    b.type = "button";
+    b.textContent = label;
+    b.dataset.value = value;
+    b.setAttribute("aria-pressed", pressed ? "true" : "false");
+    return b;
+  }
+
+  function buildSingle(host, items, current, onPick) {
+    host.innerHTML = "";
+    items.forEach(function (it) {
+      var b = chip(it.label, it.value, String(it.value) === String(current));
+      b.addEventListener("click", function () {
+        onPick(it.value);
+        var kids = host.children;
+        for (var i = 0; i < kids.length; i++) {
+          kids[i].setAttribute("aria-pressed", kids[i] === b ? "true" : "false");
+        }
+        refreshPool();
+      });
+      host.appendChild(b);
+    });
+  }
+
+  function buildMulti(host, items, list, onChange) {
+    host.innerHTML = "";
+    items.forEach(function (it) {
+      var on = list.indexOf(it.value) !== -1;
+      var b = chip(it.label, it.value, on);
+      b.addEventListener("click", function () {
+        var at = list.indexOf(it.value);
+        if (at === -1) list.push(it.value);
+        else if (list.length > 1) list.splice(at, 1);
+        else return; // ต้องเหลืออย่างน้อย 1
+        b.setAttribute("aria-pressed", list.indexOf(it.value) !== -1 ? "true" : "false");
+        onChange();
+        refreshPool();
+      });
+      host.appendChild(b);
+    });
+  }
+
+  /* ---------- คลังคำ ---------- */
+
+  function buildPool() {
+    var out = [];
+    cfg.packs.forEach(function (key) {
+      var p = PACKS[key];
+      if (!p) return;
+      p.data.forEach(function (item) {
+        if (cfg.levels.indexOf(item.lv) !== -1) out.push(item);
+      });
+    });
+    return out;
+  }
+
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+
+  function refreshPool() {
+    var n = buildPool().length;
+    $("pool-info").textContent = "มีคำให้สุ่มตอนนี้ " + n + " คำ";
+    $("btn-start").disabled = n < 5;
+  }
+
+  function drawWord() {
+    if (!state.bag.length) state.bag = shuffle(buildPool());
+    return state.bag.pop();
+  }
+
+  /* ---------- เสียง ---------- */
+
+  function beep(freq, ms) {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var o = audioCtx.createOscillator();
+      var g = audioCtx.createGain();
+      o.frequency.value = freq;
+      o.type = "square";
+      g.gain.value = 0.06;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start();
+      o.stop(audioCtx.currentTime + ms / 1000);
+    } catch (e) { /* ปิดเสียงไว้ก็เล่นได้ */ }
+  }
+
+  /* ---------- แถบคะแนน ---------- */
+
+  function paintScores(host, highlight) {
+    host.innerHTML = "";
+    for (var i = 0; i < state.scores.length; i++) {
+      var d = document.createElement("div");
+      d.className = "score" + (highlight && i === state.turn ? " is-turn" : "");
+      d.innerHTML = "<b>" + state.scores[i] + "</b><span>" + TEAM_NAMES[i] + "</span>";
+      host.appendChild(d);
+    }
+  }
+
+  /* ---------- วงจรเกม ---------- */
+
+  function startGame() {
+    var scores = [];
+    for (var i = 0; i < cfg.teams; i++) scores.push(0);
+    state = {
+      scores: scores,
+      turn: 0,
+      bag: shuffle(buildPool()),
+      round: null
+    };
+    toReady();
+  }
+
+  function toReady() {
+    paintScores($("scores-ready"), true);
+    $("ready-team").textContent = TEAM_NAMES[state.turn];
+    show("s-ready");
+  }
+
+  function startRound() {
+    state.round = { got: 0, log: [], endAt: Date.now() + cfg.seconds * 1000, warned: false };
+    $("run-score").textContent = "0";
+    nextWord();
+    show("s-play");
+    beep(660, 90);
+    ticker = setInterval(tick, 100);
+    tick();
+  }
+
+  function tick() {
+    var left = Math.max(0, state.round.endAt - Date.now());
+    var secs = Math.ceil(left / 1000);
+    $("clock").textContent = secs;
+    $("timer-fill").style.width = (left / (cfg.seconds * 1000) * 100) + "%";
+
+    if (secs <= 10) {
+      $("timer").classList.add("is-low");
+      if (!state.round.warned) { state.round.warned = true; beep(880, 120); }
+    } else {
+      $("timer").classList.remove("is-low");
+    }
+
+    if (left <= 0) endRound();
+  }
+
+  function nextWord() {
+    var w = drawWord();
+    state.round.current = w;
+    $("w-main").textContent = w.w;
+    $("w-sub").textContent = w.en || "";
+    $("w-lv").textContent = LV_LABEL[w.lv] || "";
+  }
+
+  function score(hit) {
+    if (!state.round || Date.now() > state.round.endAt) return;
+    state.round.log.push({ w: state.round.current.w, hit: hit });
+    if (hit) {
+      state.round.got++;
+      $("run-score").textContent = state.round.got;
+      beep(1040, 60);
+    }
+    nextWord();
+  }
+
+  function endRound() {
+    clearInterval(ticker);
+    ticker = null;
+    beep(220, 400);
+
+    state.scores[state.turn] += state.round.got;
+
+    $("round-team").textContent = TEAM_NAMES[state.turn];
+    $("round-score").textContent = state.round.got;
+
+    var ul = $("round-list");
+    ul.innerHTML = "";
+    if (!state.round.log.length) {
+      ul.innerHTML = '<li class="muted">ยังไม่ได้คำไหนเลย เอาใหม่รอบหน้า</li>';
+    }
+    state.round.log.forEach(function (r) {
+      var li = document.createElement("li");
+      li.innerHTML = "<span>" + r.w + "</span><span class='" + (r.hit ? "ok" : "no") + "'>" +
+                     (r.hit ? "ได้" : "ข้าม") + "</span>";
+      ul.appendChild(li);
+    });
+
+    show("s-round");
+  }
+
+  function afterRound() {
+    var best = -1, winner = -1, tie = false;
+    for (var i = 0; i < state.scores.length; i++) {
+      if (state.scores[i] > best) { best = state.scores[i]; winner = i; tie = false; }
+      else if (state.scores[i] === best) { tie = true; }
+    }
+
+    var everyonePlayed = (state.turn === state.scores.length - 1);
+    if (best >= cfg.target && everyonePlayed && !tie) return gameOver(winner);
+
+    state.turn = (state.turn + 1) % state.scores.length;
+    toReady();
+  }
+
+  function gameOver(winner) {
+    $("over-title").textContent = winner >= 0 ? TEAM_NAMES[winner] + " ชนะ" : "จบเกม";
+    paintScores($("scores-over"), false);
+    show("s-over");
+  }
+
+  /* ---------- ผูกปุ่ม ---------- */
+
+  buildSingle($("opt-teams"),
+    [{label:"2 ทีม",value:2},{label:"3 ทีม",value:3},{label:"4 ทีม",value:4}],
+    cfg.teams, function (v) { cfg.teams = Number(v); });
+
+  buildSingle($("opt-time"),
+    [{label:"60 วิ",value:60},{label:"90 วิ",value:90},{label:"120 วิ",value:120}],
+    cfg.seconds, function (v) { cfg.seconds = Number(v); });
+
+  buildSingle($("opt-target"),
+    [{label:"10 แต้ม",value:10},{label:"15 แต้ม",value:15},{label:"20 แต้ม",value:20},{label:"30 แต้ม",value:30}],
+    cfg.target, function (v) { cfg.target = Number(v); });
+
+  buildMulti($("opt-packs"),
+    Object.keys(PACKS).map(function (k) { return { label: PACKS[k].label, value: k }; }),
+    cfg.packs, function () {});
+
+  buildMulti($("opt-levels"),
+    [{label:"ง่าย",value:1},{label:"กลาง",value:2},{label:"ยาก",value:3}],
+    cfg.levels, function () {});
+
+  refreshPool();
+
+  $("btn-start").addEventListener("click", startGame);
+  $("btn-go").addEventListener("click", startRound);
+  $("btn-ok").addEventListener("click", function () { score(true); });
+  $("btn-skip").addEventListener("click", function () { score(false); });
+  $("btn-next").addEventListener("click", afterRound);
+  $("btn-quit").addEventListener("click", function () { gameOver(-1); });
+  $("btn-again").addEventListener("click", function () { show("s-setup"); });
+
+  document.addEventListener("keydown", function (e) {
+    if (!$("s-play").classList.contains("is-on")) return;
+    if (e.key === " " || e.key === "Enter") { e.preventDefault(); score(true); }
+    if (e.key === "ArrowRight" || e.key === "s") { e.preventDefault(); score(false); }
+  });
+
+})();
+</script>
+</body>
+</html>

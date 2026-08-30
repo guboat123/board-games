@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ก๊วนบอร์ดเกม</title>
+<meta name="description" content="รวมบอร์ดเกมเล่นกับเพื่อน เปิดในมือถือได้เลย ไม่ต้องติดตั้ง">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .hero { padding: 28px 0 8px; }
+  .hero h1 { font-size: 2.6rem; letter-spacing: -.01em; }
+  .hero h1 em {
+    font-style: normal;
+    background: linear-gradient(transparent 62%, var(--ink-orange) 62%, var(--ink-orange) 88%, transparent 88%);
+  }
+  .hero p { max-width: 34ch; margin: 12px 0 0; }
+
+  .games { display: grid; gap: 18px; margin-top: 8px; }
+
+  .game {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: var(--paper);
+    border: var(--stroke) solid var(--ink);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: 5px 6px 0 var(--smudge);
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .game:nth-child(odd)  { transform: rotate(-.5deg); }
+  .game:nth-child(even) { transform: rotate(.45deg); }
+  .game:hover, .game:focus-visible { transform: rotate(0) translateY(-3px); box-shadow: 7px 9px 0 var(--smudge); }
+  .game:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 4px; }
+
+  .game__no {
+    font-family: var(--font-mono);
+    font-size: .78rem;
+    color: var(--ink-blue);
+    letter-spacing: .1em;
+  }
+  .game h2 { margin: 4px 0 6px; }
+  .game__meta { font-size: .85rem; color: #6C7472; margin-top: 12px; }
+
+  .game--soon {
+    background: transparent;
+    border-style: dashed;
+    box-shadow: none;
+    cursor: default;
+  }
+  .game--soon:hover { transform: rotate(0); box-shadow: none; }
+  .game--soon h2 { color: #8B9391; }
+
+  .tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    letter-spacing: .1em;
+    padding: 3px 9px;
+    border-radius: 99px;
+    background: var(--ink-green);
+    color: var(--paper);
+  }
+  .tag--soon { background: var(--smudge); color: #4A5250; }
+
+  footer { margin-top: 40px; font-size: .85rem; color: #6C7472; }
+  footer a { color: var(--ink-blue); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow">เล่นในเบราว์เซอร์ · ไม่ต้องโหลดแอป</p>
+    <h1>ก๊วน<em>บอร์ดเกม</em></h1>
+    <p>เปิดลิงก์ แจกให้เพื่อน แล้วเล่นได้เลย มีไวท์บอร์ดกับปากกาก็พอ</p>
+  </header>
+
+  <div class="rule"></div>
+
+  <main class="games">
+
+    <a class="game" href="games/catch-sketch/index.html">
+      <span class="game__no">เกม 01</span>
+      <h2>วาดให้ทาย</h2>
+      <p>สุ่มคำขึ้นจอ คนวาดมีเวลาจำกัด ทีมไหนทายได้ก่อนได้แต้ม</p>
+      <div class="game__meta">
+        <span class="tag">เล่นได้แล้ว</span>
+        &nbsp; 4 คนขึ้นไป · ใช้ไวท์บอร์ด
+      </div>
+    </a>
+
+    <div class="game game--soon">
+      <span class="game__no">เกม 02</span>
+      <h2>เดาสีจากคำใบ้</h2>
+      <p>คนใบ้เลือกสีลับ 1 สี แล้วให้คำใบ้ได้คำเดียว คนอื่นทายตำแหน่งบนกระดานสี</p>
+      <div class="game__meta">
+        <span class="tag tag--soon">กำลังทำ</span>
+        &nbsp; 3 คนขึ้นไป · เล่นบนจอ
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    <div class="rule"></div>
+    โอเพนซอร์ส · อยากเพิ่มคำหรือเกมใหม่ ส่ง Pull Request มาได้ที่
+    <a href="https://github.com/guboat123">GitHub</a>
+  </footer>
+
+</div>
+</body>
+</html>
