@@ -37,6 +37,7 @@
     border-radius: var(--radius);
   }
   .score.is-turn { background: var(--ink-orange); }
+  .score.is-out { opacity: .35; }
   .score b { display: block; font-family: var(--font-mono); font-size: 1.25rem; line-height: 1.1; }
   .score span { font-size: .7rem; overflow-wrap: anywhere; display: block; }
   .score i { display: block; width: 12px; height: 12px; margin: 3px auto 0; border-radius: 99px; border: 2px solid var(--ink); }
@@ -97,7 +98,13 @@
   .colorcard[aria-pressed="true"] .co { background: var(--ink-blue); color: var(--paper); }
 
   /* ---- กระดานสี ---- */
-  .boardwrap { margin: 14px 0 10px; }
+  /* กระดานไม่ควรติดเพดาน 640px ของคอลัมน์ข้อความ
+     จอ 10 นิ้วที่เกมแนะนำให้ใช้ จะได้ช่องใหญ่ขึ้นจริง */
+  .boardwrap {
+    margin: 14px 0 10px;
+    width: min(96vw, 1100px);
+    margin-inline: calc(50% - min(48vw, 550px));
+  }
   .boardgrid { display: grid; grid-template-columns: 14px 1fr; gap: 3px; }
 
   .lab { font-family: var(--font-mono); font-size: .5rem; color: #6C7472; line-height: 1; }
@@ -439,8 +446,15 @@
   /* ชื่อเรียกตัวอักษรแถวแบบไทย ใช้ตรวจพิกัดอย่าง พี12 */
   var THAI_LETTERS = ["เอฟ","เอช","เอ็ม","เอ็น","แอล","เอ","บี","ซี","ดี","อี","จี","ไอ","เจ","เค","โอ","พี"];
 
-  var COORD_LATIN = /[a-p]\s*-?\s*(30|[12][0-9]|[1-9])/i;
-  var COORD_THAI  = new RegExp("(" + THAI_LETTERS.join("|") + ")\\s*-?\\s*[0-9๐-๙]");
+  /* ต้องยึดหัวท้าย (^...$) ไม่งั้น covid19 iphone12 formula1 จะโดนหาว่าเป็นพิกัด
+     และต้องเทียบกับคำที่ลบช่องว่างออกแล้วด้วย ไม่งั้นพิมพ์ "เอ 1" เว้นวรรคก็เล็ดลอดไปได้ */
+  var COORD_LATIN = /^[a-p]-?(30|[12][0-9]|[1-9])$/i;
+  var COORD_THAI  = new RegExp("^(" + THAI_LETTERS.join("|") + ")-?[0-9๐-๙]+$");
+
+  function looksLikeCoord(str) {
+    var glued = String(str).toLowerCase().replace(/\s+/g, "");
+    return COORD_LATIN.test(glued) || COORD_THAI.test(glued);
+  }
 
   /* ===========================================================
      กระดานสี — คำนวณจากสูตร ไม่สุ่ม ไม่ hardcode
@@ -609,11 +623,15 @@
         }
       }
     }
+    /* เช็คทีละคำ และเช็คทั้งก้อนที่ลบช่องว่างแล้วด้วย
+       กันคนเขียน "เอ 1" แยกเป็นสองคำเพื่อบอกพิกัดตรงๆ */
     for (j = 0; j < words.length; j++) {
-      var lw = words[j].toLowerCase();
-      if (COORD_LATIN.test(lw) || COORD_THAI.test(lw)) {
+      if (looksLikeCoord(words[j])) {
         return { ok: false, msg: "ใช้ “" + words[j] + "” ไม่ได้ เพราะเป็นพิกัดบนกระดาน" };
       }
+    }
+    if (words.length > 1 && looksLikeCoord(t)) {
+      return { ok: false, msg: "ใช้ “" + t + "” ไม่ได้ เพราะเป็นพิกัดบนกระดาน" };
     }
 
     for (i = 0; i < used.length; i++) {
@@ -991,6 +1009,7 @@
       tiebreak: 0,
       only: null,          /* รอบตัดสิน เล่นเฉพาะคนที่เสมอ */
       tieRounds: 0,        /* รอบตัดสินต้องเล่นกี่รอบ = จำนวนคนที่เสมอ */
+      tiePlayed: 0,        /* เล่นรอบตัดสินไปแล้วกี่รอบทั้งหมด */
       recorded: false,
       phase: "",
       board: [], tokens: [], order: [], pass: 1, turnPos: 0,
@@ -1009,6 +1028,7 @@
   }
 
   function startRound() {
+    if (state.only) state.tiePlayed++;
     var act = activeIdxs();
 
     /* คนใบ้วนไปตามลำดับในกลุ่มที่กำลังเล่น */
@@ -1062,6 +1082,10 @@
 
   function toPass(kicker, who, hint, btn, next) {
     paintScores($("scores-pass"), -1);
+    if (state.only) {
+      var who2 = state.only.map(function (i) { return state.players[i].name; }).join(" กับ ");
+      hint = "รอบตัดสิน เล่นเฉพาะ " + who2 + " · " + hint;
+    }
     $("pass-kicker").textContent = kicker;
     $("pass-who").textContent = who;
     $("pass-hint").textContent = hint;
@@ -1078,7 +1102,7 @@
     state.secret = null;
 
     $("secret-step").textContent = state.only
-      ? "รอบตัดสินที่ " + state.tiebreak
+      ? "รอบตัดสินที่ " + state.tiebreak + " · รอบ " + (state.roundIdx + 1) + "/" + (state.tieRounds || 1)
       : "รอบที่ " + (state.roundIdx + 1) + " / " + state.totalRounds;
 
     var host = $("cards");
@@ -1179,8 +1203,10 @@
     paintScores($("scores-guess"), state.order[state.turnPos]);
     var pi = state.order[state.turnPos];
     $("turn-dot").style.background = TOKEN_COLORS[pi % TOKEN_COLORS.length];
+    var left = state.order.length - state.turnPos - 1;
     $("turn-text").textContent = "ตาของ " + state.players[pi].name +
-      " · ทายรอบที่ " + state.pass + " (เหลืออีก " + (state.order.length - state.turnPos - 1) + " คน)";
+      " · ทายรอบที่ " + state.pass +
+      (left > 0 ? " (เหลืออีก " + left + " คน)" : " · คนสุดท้าย");
   }
 
   function endGuessPass() {
@@ -1259,7 +1285,7 @@
     $("reveal-c1").textContent = state.clue1;
     $("reveal-c2").textContent = state.clue2 ? "คำใบ้ที่ 2 · " + state.clue2 : "ไม่มีคำใบ้ที่ 2";
     $("reveal-step").textContent = state.only
-      ? "รอบตัดสินที่ " + state.tiebreak
+      ? "รอบตัดสินที่ " + state.tiebreak + " · รอบ " + (state.roundIdx + 1) + "/" + (state.tieRounds || 1)
       : "รอบที่ " + (state.roundIdx + 1) + " / " + state.totalRounds;
 
     moveBoardTo("reveal-host");
@@ -1324,7 +1350,16 @@
     var last = state.only
       ? (state.roundIdx + 1 >= (state.tieRounds || 1))
       : (state.roundIdx + 1 >= state.totalRounds);
-    $("btn-next-round").textContent = last ? "ดูผลรวม" : "รอบต่อไป";
+
+    /* ถ้ารอบนี้จบแล้วยังเสมอกันอยู่ ปุ่มต้องไม่บอกว่า "ดูผลรวม"
+       เพราะกดแล้วจะเข้ารอบตัดสิน ไม่ใช่หน้าสรุป */
+    var pool = [];
+    for (var pi = 0; pi < state.players.length; pi++) pool.push(pi);
+    var tiedNow = leaders(state.only || pool).length > 1;
+    var willTiebreak = last && tiedNow && state.tiebreak < MAX_TIEBREAK;
+
+    $("btn-next-round").textContent = !last ? "รอบต่อไป"
+      : (willTiebreak ? "ไปรอบตัดสิน" : "ดูผลรวม");
   }
 
   function tallyRow(playerIdx, why, pts) {
@@ -1423,8 +1458,8 @@
       ? state.players[winners[0]].name + " ชนะ"
       : "เสมอกัน " + winners.length + " คน";
 
-    $("over-sub").textContent = state.tiebreak
-      ? "ตัดสินด้วยรอบพิเศษ " + state.tiebreak + " รอบ"
+    $("over-sub").textContent = state.tiePlayed
+      ? "ตัดสินด้วยรอบพิเศษ " + state.tiePlayed + " รอบ"
       : "";
 
     /* เรียงอันดับ */
@@ -1489,7 +1524,9 @@
     host.innerHTML = "";
     for (var i = 0; i < state.players.length; i++) {
       var d = document.createElement("div");
-      d.className = "score" + (i === highlightIdx ? " is-turn" : "");
+      /* รอบตัดสิน คนที่ไม่ได้เล่นต้องดูออกว่าตกรอบแล้ว ไม่ใช่นั่งรอเก้อ */
+      var out = state.only && state.only.indexOf(i) === -1;
+      d.className = "score" + (i === highlightIdx ? " is-turn" : "") + (out ? " is-out" : "");
 
       var b = document.createElement("b");
       b.textContent = state.totals[i];
