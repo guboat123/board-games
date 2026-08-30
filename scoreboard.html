@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>กระดานคะแนน · ก๊วนบอร์ดเกม</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 4px;
+  }
+  .back { font-size: .9rem; color: var(--ink-blue); text-decoration: none; font-weight: 600; }
+
+  /* ---- ตารางอันดับ ---- */
+  .board { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  .board th, .board td { padding: 11px 8px; text-align: right; }
+  .board th:nth-child(1), .board td:nth-child(1),
+  .board th:nth-child(2), .board td:nth-child(2) { text-align: left; }
+
+  .board thead th {
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    letter-spacing: .08em;
+    color: #6C7472;
+    font-weight: 600;
+    border-bottom: var(--stroke) solid var(--ink);
+    white-space: nowrap;
+  }
+  .board tbody tr { border-bottom: 2px dashed var(--board-deep); }
+  .board tbody td { font-family: var(--font-mono); font-size: 1.05rem; }
+  .board tbody td.nm { font-family: var(--font-body); font-weight: 600; overflow-wrap: anywhere; }
+  .board td.rk { font-family: var(--font-mono); color: #6C7472; width: 2.4em; }
+
+  /* อันดับ 1 */
+  .board tr.is-first { background: var(--ink-orange); }
+  .board tr.is-first td { color: var(--ink); }
+  .board tr.is-first td.rk { color: var(--ink); font-weight: 700; }
+
+  .gone { font-size: .74rem; color: #6C7472; font-weight: 400; }
+
+  /* ---- ประวัติ ---- */
+  .hist { list-style: none; padding: 0; margin: 4px 0 0; }
+  .hist li { padding: 12px 0; border-bottom: 2px dashed var(--board-deep); }
+  .hist .row1 { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .hist .when { font-family: var(--font-mono); font-size: .76rem; color: #6C7472; white-space: nowrap; }
+  .hist .game { font-weight: 600; }
+  .hist .row2 { margin-top: 5px; font-size: .92rem; }
+  .hist .won { color: var(--ink-green); font-weight: 600; }
+  .hist .pts { font-family: var(--font-mono); }
+  .hist .none { color: var(--ink-red); }
+
+  /* ---- ว่างเปล่า ---- */
+  .empty { text-align: center; padding: 30px 18px; }
+  .empty h2 { margin-bottom: 8px; }
+  .empty p { color: #6C7472; margin: 0 0 20px; }
+
+  .danger { margin-top: 26px; }
+  .danger .btn--wipe { background: var(--paper); color: var(--ink-red); border-color: var(--ink-red); }
+  .ask { border-color: var(--ink-red); background: #FFF3F2; }
+  .ask p { margin: 0 0 14px; font-weight: 600; color: var(--ink-red); }
+  .ask .two { display: flex; gap: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <a class="back" href="index.html">← ทุกเกม</a>
+    <span class="eyebrow">กระดานคะแนน</span>
+  </div>
+
+  <h1>กระดานคะแนน</h1>
+  <div class="rule"></div>
+
+  <!-- ยังไม่มีข้อมูล -->
+  <section class="card empty" id="s-empty" style="display:none">
+    <h2>ยังไม่มีคะแนน</h2>
+    <p>ต้องเล่นให้จบสักเกมก่อน แล้วผลจะมาโผล่ตรงนี้เอง</p>
+    <a class="btn" href="index.html" style="text-decoration:none">ไปเลือกเกม</a>
+  </section>
+
+  <!-- มีข้อมูล -->
+  <section id="s-data" style="display:none">
+
+    <div class="card">
+      <h2>อันดับรวม</h2>
+      <table class="board">
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">ชื่อ</th>
+            <th scope="col">เล่นไป</th>
+            <th scope="col">ชนะ</th>
+            <th scope="col">แต้มรวม</th>
+          </tr>
+        </thead>
+        <tbody id="board-body"></tbody>
+      </table>
+    </div>
+
+    <div class="card" style="margin-top:22px">
+      <h2>20 เกมล่าสุด</h2>
+      <ul class="hist" id="hist"></ul>
+    </div>
+
+    <div class="danger" id="danger">
+      <button class="btn btn--wipe" id="btn-wipe">ล้างประวัติทั้งหมด</button>
+    </div>
+
+  </section>
+
+</div>
+
+<script src="assets/players.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  function $(id) { return document.getElementById(id); }
+
+  var MONTHS = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.",
+                "ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+
+  /* วันที่แบบไทย เช่น 30 ส.ค. 14:05 */
+  function when(ts) {
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    function two(n) { return (n < 10 ? "0" : "") + n; }
+    return d.getDate() + " " + MONTHS[d.getMonth()] + " " +
+           two(d.getHours()) + ":" + two(d.getMinutes());
+  }
+
+  function cell(row, text, cls) {
+    var td = document.createElement("td");
+    if (cls) td.className = cls;
+    td.textContent = text;
+    row.appendChild(td);
+    return td;
+  }
+
+  /* ---------- ตารางอันดับ ---------- */
+
+  function paintBoard(stats) {
+    var body = $("board-body");
+    body.innerHTML = "";
+
+    for (var i = 0; i < stats.length; i++) {
+      var s = stats[i];
+      var tr = document.createElement("tr");
+
+      /* อันดับ 1 เน้นสีส้ม เฉพาะตอนที่มีคนเคยชนะจริง */
+      if (i === 0 && (s.wins > 0 || s.points > 0)) tr.className = "is-first";
+
+      cell(tr, String(i + 1), "rk");
+
+      var nm = cell(tr, s.name, "nm");
+      /* คนที่ถูกลบออกจากทะเบียนแล้ว แต่ยังมีผลเก่าค้างอยู่ */
+      if (s.id === null) {
+        var tag = document.createElement("span");
+        tag.className = "gone";
+        tag.textContent = " (ลบชื่อแล้ว)";
+        nm.appendChild(tag);
+      }
+
+      cell(tr, String(s.games));
+      cell(tr, String(s.wins));
+      cell(tr, String(s.points));
+
+      body.appendChild(tr);
+    }
+  }
+
+  /* ---------- ประวัติ ---------- */
+
+  function paintHistory(list) {
+    var ul = $("hist");
+    ul.innerHTML = "";
+
+    for (var i = 0; i < list.length; i++) {
+      var rec = list[i];
+      var li = document.createElement("li");
+
+      var row1 = document.createElement("div");
+      row1.className = "row1";
+      var g = document.createElement("span");
+      g.className = "game";
+      g.textContent = rec.gameLabel || rec.game || "เกม";
+      var w = document.createElement("span");
+      w.className = "when";
+      w.textContent = when(rec.playedAt);
+      row1.appendChild(g);
+      row1.appendChild(w);
+      li.appendChild(row1);
+
+      /* ใครชนะ ได้กี่แต้ม */
+      var winners = [];
+      var top = 0;
+      var j;
+      for (j = 0; j < rec.results.length; j++) {
+        if (rec.results[j].won) {
+          winners.push(rec.results[j].name);
+          if (rec.results[j].score > top) top = rec.results[j].score;
+        }
+      }
+
+      var row2 = document.createElement("div");
+      row2.className = "row2";
+
+      if (winners.length) {
+        var who = document.createElement("span");
+        who.className = "won";
+        who.textContent = "ชนะ: " + winners.join(", ");
+        row2.appendChild(who);
+
+        var pts = document.createElement("span");
+        pts.className = "pts";
+        pts.textContent = "  ·  " + top + " แต้ม";
+        row2.appendChild(pts);
+      } else {
+        var none = document.createElement("span");
+        none.className = "none";
+        none.textContent = "จบกลางคัน ไม่มีผู้ชนะ";
+        row2.appendChild(none);
+      }
+
+      li.appendChild(row2);
+      ul.appendChild(li);
+    }
+  }
+
+  /* ---------- ล้างประวัติ ---------- */
+
+  function wipeAsk() {
+    var host = $("danger");
+    host.innerHTML = "";
+
+    var box = document.createElement("div");
+    box.className = "card ask";
+
+    var p = document.createElement("p");
+    p.textContent = "ล้างประวัติทั้งหมดจริงไหม กู้คืนไม่ได้นะ";
+    box.appendChild(p);
+
+    var two = document.createElement("div");
+    two.className = "two";
+
+    var yes = document.createElement("button");
+    yes.type = "button";
+    yes.className = "btn btn--skip";
+    yes.textContent = "ล้างเลย";
+    yes.addEventListener("click", function () {
+      Players.clearHistory();
+      render();
+    });
+
+    var no = document.createElement("button");
+    no.type = "button";
+    no.className = "btn btn--ghost";
+    no.textContent = "ไม่ล้าง";
+    no.addEventListener("click", function () {
+      resetDanger();
+      $("btn-wipe").focus();
+    });
+
+    two.appendChild(yes);
+    two.appendChild(no);
+    box.appendChild(two);
+    host.appendChild(box);
+    yes.focus();
+  }
+
+  function resetDanger() {
+    var host = $("danger");
+    host.innerHTML = "";
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn btn--wipe";
+    b.id = "btn-wipe";
+    b.textContent = "ล้างประวัติทั้งหมด";
+    b.addEventListener("click", wipeAsk);
+    host.appendChild(b);
+  }
+
+  /* ---------- วาดหน้า ---------- */
+
+  function render() {
+    var hist = Players.history(20);
+    var stats = Players.stats();
+
+    /* ยังไม่เคยเล่นจบสักเกม ถึงจะมีชื่อในทะเบียนแล้วก็ตาม */
+    var hasPlayed = false;
+    for (var i = 0; i < stats.length; i++) {
+      if (stats[i].games > 0) { hasPlayed = true; break; }
+    }
+
+    if (!hist.length && !hasPlayed) {
+      $("s-empty").style.display = "block";
+      $("s-data").style.display = "none";
+      return;
+    }
+
+    $("s-empty").style.display = "none";
+    $("s-data").style.display = "block";
+
+    paintBoard(stats);
+    paintHistory(hist);
+    resetDanger();
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
