@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>เดาสีจากคำใบ้ · ก๊วนบอร์ดเกม</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<style>
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 4px;
+  }
+  .back { font-size: .9rem; color: var(--ink-blue); text-decoration: none; font-weight: 600; }
+
+  .leaderline {
+    font-family: var(--font-mono); font-size: .74rem; color: #6C7472;
+    margin: 2px 0 10px; overflow-wrap: anywhere;
+  }
+  .leaderline b { color: var(--ink); }
+  .leaderline[hidden] { display: none; }
+
+  .screen { display: none; }
+  .screen.is-on { display: block; }
+
+  .hint { font-size: .85rem; color: #6C7472; margin: 6px 0 0; }
+  .note { font-size: .88rem; margin: 10px 0 0; min-height: 1.4em; }
+  .note--bad { color: var(--ink-red); font-weight: 600; }
+  .note--ok  { color: var(--ink-green); font-weight: 600; }
+
+  /* ---- แถบคะแนนสะสม ---- */
+  .scores { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 16px; }
+  .score {
+    flex: 1 1 0; min-width: 62px; text-align: center;
+    padding: 8px 4px;
+    background: var(--paper);
+    border: var(--stroke) solid var(--ink);
+    border-radius: var(--radius);
+  }
+  .score.is-turn { background: var(--ink-orange); }
+  .score b { display: block; font-family: var(--font-mono); font-size: 1.25rem; line-height: 1.1; }
+  .score span { font-size: .7rem; overflow-wrap: anywhere; display: block; }
+  .score i { display: block; width: 12px; height: 12px; margin: 3px auto 0; border-radius: 99px; border: 2px solid var(--ink); }
+
+  /* ---- ชิปผู้เล่น ---- */
+  .plist { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; padding: 0; list-style: none; }
+  .pchip {
+    padding: 9px 15px;
+    font-family: var(--font-body); font-weight: 600; font-size: .92rem;
+    background: var(--paper); color: var(--ink);
+    border: var(--stroke) solid var(--ink); border-radius: 99px;
+    cursor: pointer; max-width: 100%; overflow-wrap: anywhere;
+  }
+  .pchip[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .pchip:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 3px; }
+  .pchip[disabled] { opacity: .38; cursor: not-allowed; }
+
+  .addrow { display: flex; gap: 9px; margin-top: 14px; }
+  .addrow input {
+    flex: 1 1 auto; min-width: 0;
+    padding: 12px 14px;
+    font-family: var(--font-body); font-size: 1rem;
+    color: var(--ink); background: var(--paper);
+    border: var(--stroke) solid var(--ink); border-radius: var(--radius);
+  }
+  .addrow input:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 3px; }
+  .addrow .btn { flex: 0 0 auto; }
+
+  .empty {
+    margin-top: 14px; padding: 18px; text-align: center;
+    color: #6C7472; font-size: .92rem;
+    border: 2px dashed var(--smudge); border-radius: var(--radius);
+  }
+  .count { font-family: var(--font-mono); font-size: .82rem; color: var(--ink-blue); }
+
+  /* ---- หน้าส่งเครื่อง ---- */
+  .pass { text-align: center; padding: 34px 0 14px; }
+  .pass .who { font-family: var(--font-display); font-size: 2.2rem; font-weight: 700; margin: 8px 0 4px; overflow-wrap: anywhere; }
+
+  /* ---- การ์ด 4 สี ---- */
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+  .colorcard {
+    padding: 0; overflow: hidden;
+    background: var(--paper);
+    border: var(--stroke) solid var(--ink);
+    border-radius: var(--radius);
+    cursor: pointer;
+    box-shadow: 3px 4px 0 var(--smudge);
+  }
+  .colorcard[aria-pressed="true"] { box-shadow: 0 0 0 var(--smudge); transform: translate(3px, 4px); border-color: var(--ink-blue); }
+  .colorcard:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 3px; }
+  .colorcard .swatch { display: block; height: 84px; width: 100%; }
+  .colorcard .co {
+    display: block; padding: 7px 4px;
+    font-family: var(--font-mono); font-size: .78rem;
+    border-top: var(--stroke) solid var(--ink);
+  }
+  .colorcard[aria-pressed="true"] .co { background: var(--ink-blue); color: var(--paper); }
+
+  /* ---- กระดานสี ---- */
+  .boardwrap { margin: 14px 0 10px; }
+  .boardgrid { display: grid; grid-template-columns: 14px 1fr; gap: 3px; }
+
+  .lab { font-family: var(--font-mono); font-size: .5rem; color: #6C7472; line-height: 1; }
+  .collabs { display: grid; grid-template-columns: repeat(30, 1fr); align-items: end; }
+  .collabs span { text-align: center; }
+  .rowlabs { display: grid; grid-template-rows: repeat(16, 1fr); }
+  .rowlabs span { display: flex; align-items: center; justify-content: flex-end; padding-right: 2px; }
+
+  .cells {
+    display: grid;
+    grid-template-columns: repeat(30, 1fr);
+    border: 2px solid var(--ink);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .cell {
+    aspect-ratio: 1 / 1;
+    position: relative;
+    padding: 0; margin: 0;
+    border: 0;
+    cursor: pointer;
+    display: block;
+    width: 100%;
+  }
+  .cell:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; z-index: 4; }
+
+  /* หมาก วงกลมขอบขาวหนา ให้เห็นชัดแม้ช่องเล็ก */
+  .cell .tok {
+    position: absolute; left: 50%; top: 50%;
+    width: 82%; height: 82%;
+    transform: translate(-50%, -50%);
+    border-radius: 99px;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.55);
+    pointer-events: none;
+  }
+
+  /* กรอบตอนเฉลย */
+  .cell.ring1 { box-shadow: inset 0 0 0 1px var(--ink); z-index: 2; }
+  .cell.ring2 { box-shadow: inset 0 0 0 1px rgba(23,24,26,.45); z-index: 1; }
+  .cell.bull  { box-shadow: inset 0 0 0 2px var(--ink); z-index: 3; }
+  .cell.bull::after {
+    content: ""; position: absolute; inset: 0;
+    border: 1px dashed #FFFFFF;
+    pointer-events: none;
+  }
+
+  .cell.is-sel { box-shadow: inset 0 0 0 2px var(--ink-blue); z-index: 5; }
+
+  /* ---- แผงยืนยันช่อง ---- */
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: var(--paper);
+    border-top: var(--stroke) solid var(--ink);
+    padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
+    display: none;
+    z-index: 20;
+  }
+  .sheet.is-on { display: block; }
+  .sheet__in { max-width: 640px; margin: 0 auto; }
+  .sheet__top { display: flex; align-items: center; gap: 12px; }
+  .sheet__sw {
+    flex: 0 0 auto; width: 62px; height: 62px;
+    border: var(--stroke) solid var(--ink); border-radius: var(--radius);
+  }
+  .sheet__co { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; }
+  .sheet__two { display: flex; gap: 10px; margin-top: 12px; }
+  .sheet .warn { color: var(--ink-red); font-weight: 600; font-size: .9rem; margin: 0; }
+
+  /* กันแผงบังกระดาน */
+  .padbottom { height: 150px; }
+
+  /* ---- คำใบ้ ---- */
+  .cluebar {
+    background: var(--paper);
+    border: var(--stroke) solid var(--ink);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+  .cluebar .c1 { font-family: var(--font-display); font-weight: 700; font-size: 1.7rem; line-height: 1.2; overflow-wrap: anywhere; }
+  .cluebar .c2 { font-size: 1rem; margin-top: 4px; overflow-wrap: anywhere; }
+  .cluebar .lb { font-family: var(--font-mono); font-size: .68rem; letter-spacing: .1em; color: var(--ink-blue); }
+
+  .turnline {
+    display: flex; align-items: center; gap: 9px;
+    font-weight: 600; margin-bottom: 10px;
+  }
+  .turnline i { width: 18px; height: 18px; border-radius: 99px; border: 2px solid var(--ink); flex: 0 0 auto; }
+
+  /* ---- ตารางแต้ม ---- */
+  .tally { list-style: none; padding: 0; margin: 12px 0 0; }
+  .tally li {
+    display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+    padding: 9px 0; border-bottom: 2px dashed var(--board-deep);
+  }
+  .tally .nm { font-weight: 600; display: flex; align-items: center; gap: 7px; overflow-wrap: anywhere; }
+  .tally .nm i { width: 14px; height: 14px; border-radius: 99px; border: 2px solid var(--ink); flex: 0 0 auto; }
+  .tally .rt { text-align: right; white-space: nowrap; }
+  .tally .pt { font-family: var(--font-mono); font-weight: 600; }
+  .tally .why { display: block; font-size: .76rem; color: #6C7472; }
+  .tally .p3 { color: var(--ink-green); }
+  .tally .p0 { color: #8B9391; }
+
+  /* ---- อันดับจบเกม ---- */
+  .rank { list-style: none; padding: 0; margin: 12px 0 0; }
+  .rank li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 12px; margin-bottom: 8px;
+    background: var(--paper);
+    border: var(--stroke) solid var(--ink);
+    border-radius: var(--radius);
+  }
+  .rank li.is-first { background: var(--ink-orange); }
+  .rank .no { font-family: var(--font-mono); font-size: .9rem; width: 1.6em; }
+  .rank .nm { font-weight: 600; flex: 1 1 auto; overflow-wrap: anywhere; }
+  .rank .pt { font-family: var(--font-mono); font-size: 1.3rem; font-weight: 600; }
+  .rank i { width: 16px; height: 16px; border-radius: 99px; border: 2px solid var(--ink); flex: 0 0 auto; }
+
+  .steps { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .1em; color: var(--ink-blue); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <a class="back" href="../../index.html">← ทุกเกม</a>
+    <span class="eyebrow">เกม 02</span>
+  </div>
+
+  <p class="leaderline" id="leaderline" hidden>หัวหน้าห้อง <b id="leadername"></b></p>
+
+  <!-- ============ 1. ใครเล่นบ้าง ============ -->
+  <section id="s-players" class="screen is-on">
+    <h1>เดาสีจากคำใบ้</h1>
+    <p class="hint">เกมนี้แนะนำ 3 ถึง 10 คน ใช้เครื่องเดียววางกลางโต๊ะแล้วส่งกันเล่น</p>
+    <div class="rule"></div>
+
+    <div class="field">
+      <label>รอบนี้เล่นกี่คน</label>
+      <div class="chips" id="opt-headcount"></div>
+      <p class="hint" id="rounds-info"></p>
+    </div>
+
+    <div class="field">
+      <label>ใครเล่นบ้าง <span class="count" id="pick-count"></span></label>
+      <ul class="plist" id="pick-list"></ul>
+      <div class="empty" id="pick-empty">ยังไม่มีใครในทะเบียน พิมพ์ชื่อด้านล่างเพื่อเพิ่มคนแรก</div>
+      <p class="note" id="pick-note" role="status" aria-live="polite"></p>
+
+      <div class="addrow">
+        <label class="sr-only" for="new-name">เพิ่มชื่อใหม่</label>
+        <input id="new-name" type="text" placeholder="เพิ่มชื่อใหม่" autocomplete="off" maxlength="24">
+        <button class="btn btn--sm" id="btn-add">เพิ่มชื่อ</button>
+      </div>
+    </div>
+
+    <div class="field" id="f-leader">
+      <label>หัวหน้าห้อง</label>
+      <p class="hint" style="margin:0 0 8px">คนที่ถือเครื่องและกดปุ่มให้ทุกคนตลอดเกม</p>
+      <div class="chips" id="opt-leader"></div>
+      <div class="empty" id="leader-empty">เลือกคนเล่นให้ครบก่อน แล้วค่อยเลือกหัวหน้าห้อง</div>
+    </div>
+
+    <details class="kit" open>
+      <summary>อุปกรณ์ที่ต้องเตรียม</summary>
+      <ul class="kit__list">
+        <li><span class="thing">แท็บเล็ตหรือโน้ตบุ๊ก</span><span class="qty">1 เครื่อง</span></li>
+      </ul>
+      <div class="kit__note">
+        <p>แนะนำจอ 10 นิ้วขึ้นไป มือถือเล่นได้แต่ช่องสีจะเล็กมาก</p>
+        <p>ตั้งความสว่างจอให้คงที่ และปิดโหมดถนอมสายตาหรือ night shift เพราะสีจะเพี้ยน แล้วคนใบ้กับคนทายจะเห็นสีไม่ตรงกัน</p>
+      </div>
+      <p class="kit__foot muted">นอกจากเครื่องแล้วไม่ต้องเตรียมอะไรอีก กระดานสี หมาก และแต้ม อยู่บนจอทั้งหมด</p>
+    </details>
+
+    <button class="btn" id="btn-start">เริ่มเล่น</button>
+  </section>
+
+  <!-- ============ 2. ส่งเครื่อง ============ -->
+  <section id="s-pass" class="screen">
+    <div class="scores" id="scores-pass"></div>
+    <div class="card pass">
+      <span class="eyebrow" id="pass-kicker">ส่งเครื่องให้</span>
+      <div class="who" id="pass-who">—</div>
+      <p class="muted" id="pass-hint">คนอื่นอย่าดูจอนะ</p>
+      <button class="btn" id="btn-pass-go">พร้อมแล้ว</button>
+    </div>
+  </section>
+
+  <!-- ============ 3. เลือกสีลับ + คำใบ้ที่ 1 ============ -->
+  <section id="s-secret" class="screen">
+    <span class="steps" id="secret-step">รอบที่ 1</span>
+    <h1>เลือกสีลับ</h1>
+    <p class="hint">เลือก 1 ใบ แล้วให้คำใบ้ 1 คำ ห้ามบอกชื่อสีหรือความอ่อนเข้ม</p>
+
+    <div class="cards" id="cards"></div>
+
+    <div class="field" style="margin-top:20px">
+      <label for="clue1">คำใบ้ที่ 1 (1 คำ)</label>
+      <div class="addrow" style="margin-top:0">
+        <input id="clue1" type="text" placeholder="พิมพ์คำใบ้" autocomplete="off" maxlength="40">
+      </div>
+      <p class="note" id="clue1-note" role="status" aria-live="polite"></p>
+    </div>
+
+    <button class="btn" id="btn-clue1">ส่งต่อให้คนทาย</button>
+  </section>
+
+  <!-- ============ 4. ทาย ============ -->
+  <section id="s-guess" class="screen">
+    <div class="scores" id="scores-guess"></div>
+
+    <div class="cluebar">
+      <span class="lb">คำใบ้ที่ 1</span>
+      <div class="c1" id="show-c1">—</div>
+      <div class="c2" id="show-c2"></div>
+    </div>
+
+    <div class="turnline">
+      <i id="turn-dot"></i>
+      <span id="turn-text">ตาของ —</span>
+    </div>
+
+    <div class="boardwrap" id="board-host"></div>
+    <p class="note" id="guess-note" role="status" aria-live="polite"></p>
+    <div class="padbottom"></div>
+  </section>
+
+  <!-- ============ 5. คำใบ้ที่ 2 ============ -->
+  <section id="s-clue2" class="screen">
+    <span class="steps">คำใบ้ที่ 2</span>
+    <h1>ใบ้อีกทีไหม</h1>
+    <p class="hint">คำใบ้ที่ 2 ยาวได้ไม่เกิน 2 คำ หรือจะไม่ใบ้ต่อก็ได้</p>
+
+    <div class="card" style="margin-top:14px">
+      <span class="lb eyebrow">สีลับของคุณ</span>
+      <div style="display:flex; align-items:center; gap:12px; margin-top:8px">
+        <span id="c2-swatch" style="flex:0 0 auto; width:56px; height:56px; border:var(--stroke) solid var(--ink); border-radius:var(--radius)"></span>
+        <span class="sheet__co" id="c2-coord">—</span>
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:18px">
+      <label for="clue2">คำใบ้ที่ 2 (ไม่เกิน 2 คำ)</label>
+      <div class="addrow" style="margin-top:0">
+        <input id="clue2" type="text" placeholder="พิมพ์คำใบ้" autocomplete="off" maxlength="60">
+      </div>
+      <p class="note" id="clue2-note" role="status" aria-live="polite"></p>
+    </div>
+
+    <button class="btn" id="btn-clue2">ส่งต่อให้คนทาย</button>
+    <p style="margin-top:12px"><button class="btn btn--ghost btn--sm" id="btn-noclue">ไม่ใบ้ต่อ</button></p>
+  </section>
+
+  <!-- ============ 6. เฉลย ============ -->
+  <section id="s-reveal" class="screen">
+    <span class="steps" id="reveal-step">เฉลย</span>
+    <h1>สีลับคือ <span id="reveal-coord"></span></h1>
+
+    <div class="cluebar">
+      <span class="lb">คำใบ้</span>
+      <div class="c1" id="reveal-c1">—</div>
+      <div class="c2" id="reveal-c2"></div>
+    </div>
+
+    <div class="boardwrap" id="reveal-host"></div>
+
+    <div class="card" style="margin-top:14px">
+      <h3>แต้มรอบนี้</h3>
+      <ul class="tally" id="reveal-tally"></ul>
+    </div>
+
+    <p style="margin-top:20px"><button class="btn" id="btn-next-round">รอบต่อไป</button></p>
+  </section>
+
+  <!-- ============ 7. จบเกม ============ -->
+  <section id="s-over" class="screen">
+    <span class="eyebrow">จบเกม</span>
+    <h1 id="over-title">—</h1>
+    <p class="hint" id="over-sub"></p>
+    <ul class="rank" id="rank"></ul>
+    <button class="btn" id="btn-again">เล่นอีกรอบ</button>
+    <p style="margin-top:12px"><a class="back" href="../../scoreboard.html">ดูกระดานคะแนน →</a></p>
+    <p style="margin-top:6px"><a class="back" href="../../index.html">← กลับไปเลือกเกมอื่น</a></p>
+  </section>
+
+</div>
+
+<!-- แผงยืนยันช่อง -->
+<div class="sheet" id="sheet">
+  <div class="sheet__in">
+    <div class="sheet__top">
+      <span class="sheet__sw" id="sheet-sw"></span>
+      <div>
+        <div class="sheet__co" id="sheet-co">A-1</div>
+        <p class="hint" id="sheet-hint" style="margin:0">ช่องนี้ใช่ไหม</p>
+      </div>
+    </div>
+    <div class="sheet__two">
+      <button class="btn btn--ghost" id="sheet-cancel">เลือกใหม่</button>
+      <button class="btn btn--good" id="sheet-ok">วางตรงนี้</button>
+    </div>
+  </div>
+</div>
+
+<script src="../../assets/players.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===========================================================
+     ค่าคงที่
+     =========================================================== */
+
+  var COLS = 30;                 /* คอลัมน์ 1..30 */
+  var ROWS = 16;                 /* แถว A..P */
+  var MIN_PLAYERS = 3;
+  var MAX_PLAYERS = 10;
+  var MAX_TIEBREAK = 3;          /* รอบตัดสินสูงสุด กันวนไม่จบ */
+
+  /* สีหมากผู้เล่น กำหนดไว้ในโค้ด ไม่เอาสีจากกระดาน จะได้ไม่กลืน */
+  var TOKEN_COLORS = [
+    "#E23B32", "#1B4FD8", "#1E9E5A", "#F08A24", "#8E24AA",
+    "#00897B", "#D81B60", "#5D4037", "#3949AB", "#455A64"
+  ];
+
+  /* คำต้องห้ามในคำใบ้ */
+  var BANNED_COLOR = [
+    "แดง","ส้ม","เหลือง","เขียว","ฟ้า","น้ำเงิน","คราม","ม่วง","ชมพู","น้ำตาล","เทา","ดำ","ขาว",
+    "red","orange","yellow","green","blue","purple","pink","brown","grey","gray",
+    "black","white","violet","indigo","cyan","magenta","teal","navy"
+  ];
+  var BANNED_SHADE = [
+    "อ่อน","เข้ม","สว่าง","มืด","จาง","แก่",
+    "light","dark","pale","deep"
+  ];
+  /* ชื่อเรียกตัวอักษรแถวแบบไทย ใช้ตรวจพิกัดอย่าง พี12 */
+  var THAI_LETTERS = ["เอฟ","เอช","เอ็ม","เอ็น","แอล","เอ","บี","ซี","ดี","อี","จี","ไอ","เจ","เค","โอ","พี"];
+
+  var COORD_LATIN = /[a-p]\s*-?\s*(30|[12][0-9]|[1-9])/i;
+  var COORD_THAI  = new RegExp("(" + THAI_LETTERS.join("|") + ")\\s*-?\\s*[0-9๐-๙]");
+
+  /* ===========================================================
+     กระดานสี — คำนวณจากสูตร ไม่สุ่ม ไม่ hardcode
+     =========================================================== */
+
+  /* col 1..30 · rowIndex 0..15 (A..P) */
+  function cellColor(col, rowIndex) {
+    var hue = (col - 1) / 30 * 360;
+    var lightness = 92 - rowIndex * 5;
+    var saturation = 32 + Math.sin(rowIndex / 15 * Math.PI) * 56;
+    return "hsl(" + hue + ", " + saturation + "%, " + lightness + "%)";
+  }
+
+  function rowLetter(rowIndex) { return String.fromCharCode(65 + rowIndex); }
+  function coordText(col, rowIndex) { return rowLetter(rowIndex) + "-" + col; }
+  function cellIndex(col, rowIndex) { return rowIndex * COLS + (col - 1); }
+
+  /* ระยะแบบเชบีเชฟ ใช้ตัดสินกรอบ 3x3 กับวงถัดไป */
+  function cheb(aCol, aRow, bCol, bRow) {
+    return Math.max(Math.abs(aCol - bCol), Math.abs(aRow - bRow));
+  }
+
+  function pointsFor(dist) {
+    if (dist === 0) return 3;
+    if (dist === 1) return 2;
+    if (dist === 2) return 1;
+    return 0;
+  }
+
+  function whyText(dist) {
+    if (dist === 0) return "ตรงเป๊ะ";
+    if (dist === 1) return "อยู่ในกรอบ 3x3";
+    if (dist === 2) return "อยู่วงถัดออกไป";
+    return "ไกลเกินไป";
+  }
+
+  /* ===========================================================
+     ตัวช่วย
+     =========================================================== */
+
+  function $(id) { return document.getElementById(id); }
+
+  function show(id) {
+    var all = document.querySelectorAll(".screen");
+    for (var i = 0; i < all.length; i++) all[i].classList.remove("is-on");
+    $(id).classList.add("is-on");
+    closeSheet();
+    window.scrollTo(0, 0);
+  }
+
+  function setNote(el, msg, kind) {
+    el.textContent = msg || "";
+    el.className = "note" + (kind ? " note--" + kind : "");
+  }
+
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+
+  function chip(label, value, pressed) {
+    var b = document.createElement("button");
+    b.className = "chip";
+    b.type = "button";
+    b.textContent = label;
+    b.dataset.value = value;
+    b.setAttribute("aria-pressed", pressed ? "true" : "false");
+    return b;
+  }
+
+  function buildSingle(host, items, current, onPick) {
+    host.innerHTML = "";
+    items.forEach(function (it) {
+      var b = chip(it.label, it.value, String(it.value) === String(current));
+      b.addEventListener("click", function () {
+        onPick(it.value);
+        var kids = host.children;
+        for (var i = 0; i < kids.length; i++) {
+          kids[i].setAttribute("aria-pressed", kids[i] === b ? "true" : "false");
+        }
+      });
+      host.appendChild(b);
+    });
+  }
+
+  /* จำนวนรอบตามจำนวนคน */
+  function roundsFor(n) { return n <= 6 ? n * 2 : n; }
+
+  /* ===========================================================
+     ตรวจคำใบ้
+     =========================================================== */
+
+  function tidy(s) {
+    return String(s == null ? "" : s).replace(/\s+/g, " ").replace(/^ | $/g, "");
+  }
+
+  /* คืน { ok, msg } */
+  function checkClue(text, maxWords, used) {
+    var t = tidy(text);
+    if (!t) return { ok: false, msg: "ยังไม่ได้พิมพ์คำใบ้" };
+
+    var words = t.split(" ");
+    if (words.length > maxWords) {
+      return { ok: false, msg: "ยาวได้ไม่เกิน " + maxWords + " คำ ตอนนี้ " + words.length + " คำ" };
+    }
+
+    var low = t.toLowerCase();
+    var i, j;
+
+    /* เทียบทีละคำ ไม่ใช่หาคำย่อยกลางคำ
+       ไม่งั้น "มะม่วง" จะโดนบล็อกเพราะมี "ม่วง" อยู่ข้างใน
+       กติกาคือ ถ้าคำนั้น "ขึ้นต้นด้วย" ชื่อสี ถือว่าใช้ไม่ได้
+       ตัดคำว่า "สี" ข้างหน้าออกก่อน จะได้จับ "สีแดง" ด้วย */
+    var toks = [];
+    for (i = 0; i < words.length; i++) {
+      toks.push(words[i].toLowerCase().replace(/^สี/, ""));
+    }
+
+    for (i = 0; i < BANNED_COLOR.length; i++) {
+      var cw = BANNED_COLOR[i];
+      for (j = 0; j < toks.length; j++) {
+        var hitColor = /^[a-z]+$/.test(cw)
+          ? new RegExp("\\b" + cw + "\\b").test(toks[j])   /* อังกฤษ เทียบเป็นคำเต็ม */
+          : toks[j].indexOf(cw) === 0;                      /* ไทย เทียบว่าขึ้นต้นด้วยชื่อสี */
+        if (hitColor) {
+          return { ok: false, msg: "ใช้ “" + cw + "” ไม่ได้ เพราะเป็นชื่อสี" };
+        }
+      }
+    }
+
+    for (i = 0; i < BANNED_SHADE.length; i++) {
+      var sw = BANNED_SHADE[i];
+      for (j = 0; j < toks.length; j++) {
+        var hitShade = /^[a-z]+$/.test(sw)
+          ? new RegExp("\\b" + sw + "\\b").test(toks[j])
+          : toks[j].indexOf(sw) === 0;
+        if (hitShade) {
+          return { ok: false, msg: "ใช้ “" + sw + "” ไม่ได้ เพราะบอกความอ่อนเข้ม" };
+        }
+      }
+    }
+    if (COORD_LATIN.test(low) || COORD_THAI.test(low)) {
+      return { ok: false, msg: "ใช้พิกัดเป็นคำใบ้ไม่ได้" };
+    }
+
+    for (i = 0; i < used.length; i++) {
+      if (used[i] === low) return { ok: false, msg: "คำใบ้นี้ใช้ไปแล้วในเกมนี้" };
+    }
+
+    return { ok: true, msg: "ใช้ได้" };
+  }
+
+  /* ===========================================================
+     สถานะ
+     =========================================================== */
+
+  var headcount = 4;
+  var picked = [];
+  var leaderId = null;   /* หัวหน้าห้อง คนที่ถือเครื่อง */
+  var state = null;
+
+  var cellEls = [];      /* ปุ่มช่องทั้ง 480 สร้างครั้งเดียว */
+  var boardBuilt = false;
+  var pendingCell = null;
+
+  /* ===========================================================
+     หน้าจอ 1 — ใครเล่นบ้าง
+     =========================================================== */
+
+  function renderHeadcount() {
+    var items = [];
+    for (var n = MIN_PLAYERS; n <= MAX_PLAYERS; n++) items.push({ label: n + " คน", value: n });
+    buildSingle($("opt-headcount"), items, headcount, function (v) {
+      headcount = Number(v);
+      if (picked.length > headcount) {
+        picked = picked.slice(0, headcount);
+        setNote($("pick-note"), "ลดเหลือ " + headcount + " คน ตัดคนที่เลือกไว้ท้ายสุดออก");
+      } else {
+        setNote($("pick-note"), "");
+      }
+      renderPickList();
+    });
+  }
+
+  function renderPickList() {
+    var all = Players.all();
+    var host = $("pick-list");
+    host.innerHTML = "";
+
+    $("pick-empty").style.display = all.length ? "none" : "block";
+    $("pick-count").textContent = "เลือกแล้ว " + picked.length + " / " + headcount;
+    $("rounds-info").textContent = "เล่น " + headcount + " คน จะได้ " + roundsFor(headcount) +
+      " รอบ (ทุกคนได้เป็นคนใบ้ " + (headcount <= 6 ? 2 : 1) + " รอบ)";
+
+    all.forEach(function (p) {
+      var on = picked.indexOf(p.id) !== -1;
+      var full = !on && picked.length >= headcount;
+
+      var li = document.createElement("li");
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "pchip";
+      b.textContent = p.name;
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      if (full) b.disabled = true;
+
+      b.addEventListener("click", function () {
+        var at = picked.indexOf(p.id);
+        if (at === -1) {
+          if (picked.length >= headcount) {
+            setNote($("pick-note"), "เลือกครบ " + headcount + " คนแล้ว ถ้าจะเพิ่มคนนี้ ให้เอาคนอื่นออกก่อน หรือเพิ่มจำนวนคนด้านบน", "bad");
+            return;
+          }
+          picked.push(p.id);
+        } else {
+          picked.splice(at, 1);
+        }
+        setNote($("pick-note"), "");
+        renderPickList();
+      });
+
+      li.appendChild(b);
+      host.appendChild(li);
+    });
+
+    var ready = picked.length === headcount;
+    renderLeader();
+    refreshReady();
+
+    if (!$("pick-note").textContent) {
+      if (ready) setNote($("pick-note"), leaderId ? "ครบแล้ว กดเริ่มเล่นได้เลย" : "เลือกหัวหน้าห้องอีก 1 คน", leaderId ? "ok" : "");
+      else if (all.length) setNote($("pick-note"), "เลือกอีก " + (headcount - picked.length) + " คน");
+    }
+  }
+
+  /* เลือกหัวหน้าห้องจากคนที่เลือกมาเล่นแล้วเท่านั้น */
+  function renderLeader() {
+    var people = pickedPlayers();
+    var host = $("opt-leader");
+    host.innerHTML = "";
+
+    if (leaderId) {
+      var still = false;
+      for (var k = 0; k < people.length; k++) {
+        if (people[k].id === leaderId) { still = true; break; }
+      }
+      if (!still) leaderId = null;
+    }
+
+    $("leader-empty").style.display = people.length ? "none" : "block";
+
+    people.forEach(function (p) {
+      var b = chip(p.name, p.id, p.id === leaderId);
+      b.addEventListener("click", function () {
+        leaderId = p.id;
+        var kids = host.children;
+        for (var i = 0; i < kids.length; i++) {
+          kids[i].setAttribute("aria-pressed", kids[i] === b ? "true" : "false");
+        }
+        paintLeaderLine();
+        refreshReady();
+      });
+      host.appendChild(b);
+    });
+
+    paintLeaderLine();
+  }
+
+  function paintLeaderLine() {
+    var line = $("leaderline");
+    var p = leaderId ? Players.get(leaderId) : null;
+    if (p) {
+      $("leadername").textContent = p.name;
+      line.hidden = false;
+    } else {
+      line.hidden = true;
+    }
+  }
+
+  function refreshReady() {
+    $("btn-start").disabled = !(picked.length === headcount && leaderId);
+  }
+
+  function addName() {
+    var input = $("new-name");
+    var raw = input.value;
+
+    if (!raw.replace(/\s/g, "")) {
+      setNote($("pick-note"), "ยังไม่ได้พิมพ์ชื่อ", "bad");
+      input.focus();
+      return;
+    }
+
+    var p = Players.add(raw);
+
+    if (!p) {
+      var key = tidy(raw).toLowerCase();
+      var all = Players.all();
+      var found = null;
+      for (var i = 0; i < all.length; i++) {
+        if (all[i].name.toLowerCase() === key) { found = all[i]; break; }
+      }
+      if (found && picked.indexOf(found.id) === -1 && picked.length < headcount) {
+        picked.push(found.id);
+        input.value = "";
+        renderPickList();
+        setNote($("pick-note"), "มี " + found.name + " อยู่แล้ว เลือกให้เรียบร้อย");
+      } else {
+        setNote($("pick-note"), "มีชื่อนี้อยู่แล้ว", "bad");
+        input.select();
+      }
+      return;
+    }
+
+    if (picked.length < headcount) picked.push(p.id);
+    input.value = "";
+    renderPickList();
+    input.focus();
+  }
+
+  /* ===========================================================
+     กระดาน — สร้าง DOM ครั้งเดียว
+     =========================================================== */
+
+  function buildBoard() {
+    if (boardBuilt) return;
+
+    var grid = document.createElement("div");
+    grid.className = "boardgrid";
+
+    /* มุมว่าง */
+    grid.appendChild(document.createElement("span"));
+
+    /* ป้ายคอลัมน์ โชว์ทุกๆ 5 ช่อง เพราะช่องเล็กมาก */
+    var collabs = document.createElement("div");
+    collabs.className = "collabs lab";
+    for (var c = 1; c <= COLS; c++) {
+      var s = document.createElement("span");
+      s.textContent = (c === 1 || c % 5 === 0) ? c : "";
+      collabs.appendChild(s);
+    }
+    grid.appendChild(collabs);
+
+    /* ป้ายแถว โชว์ทุกๆ 5 แถว */
+    var rowlabs = document.createElement("div");
+    rowlabs.className = "rowlabs lab";
+    for (var r = 0; r < ROWS; r++) {
+      var rs = document.createElement("span");
+      rs.textContent = (r === 0 || r % 5 === 0) ? rowLetter(r) : "";
+      rowlabs.appendChild(rs);
+    }
+    grid.appendChild(rowlabs);
+
+    /* 480 ช่อง */
+    var cells = document.createElement("div");
+    cells.className = "cells";
+    cells.id = "cells";
+
+    cellEls = new Array(COLS * ROWS);
+    for (var row = 0; row < ROWS; row++) {
+      for (var col = 1; col <= COLS; col++) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "cell";
+        b.style.background = cellColor(col, row);
+        b.dataset.col = col;
+        b.dataset.row = row;
+        b.setAttribute("aria-label", coordText(col, row));
+        cells.appendChild(b);
+        cellEls[cellIndex(col, row)] = b;
+      }
+    }
+
+    /* ผูก listener ตัวเดียวแทนการผูก 480 ตัว */
+    cells.addEventListener("click", onCellTap);
+
+    grid.appendChild(cells);
+    $("board-host").appendChild(grid);
+    boardBuilt = true;
+  }
+
+  /* ย้ายกระดานไปแปะในหน้าที่ต้องใช้ ใช้ DOM ชุดเดิมตลอด */
+  function moveBoardTo(hostId) {
+    var host = $(hostId);
+    var grid = document.querySelector(".boardgrid");
+    if (grid && grid.parentNode !== host) host.appendChild(grid);
+  }
+
+  function clearBoardMarks() {
+    for (var i = 0; i < cellEls.length; i++) {
+      var el = cellEls[i];
+      if (!el) continue;
+      el.className = "cell";
+      el.disabled = false;
+      var tok = el.firstChild;
+      if (tok) el.removeChild(tok);
+    }
+  }
+
+  function paintToken(col, row, playerIdx) {
+    var el = cellEls[cellIndex(col, row)];
+    if (!el) return;
+    var i = document.createElement("i");
+    i.className = "tok";
+    i.style.background = TOKEN_COLORS[playerIdx % TOKEN_COLORS.length];
+    el.appendChild(i);
+    el.disabled = false;   /* ยังกดได้ เพื่อบอกว่าเป็นหมากของใคร */
+  }
+
+  /* ===========================================================
+     แผงยืนยันช่อง
+     =========================================================== */
+
+  function openSheet(col, row) {
+    pendingCell = { col: col, row: row };
+
+    var el = cellEls[cellIndex(col, row)];
+    if (el) el.classList.add("is-sel");
+
+    $("sheet-sw").style.background = cellColor(col, row);
+    $("sheet-co").textContent = coordText(col, row);
+    $("sheet-hint").textContent = "ช่องนี้ใช่ไหม";
+    $("sheet-ok").disabled = false;
+    $("sheet").classList.add("is-on");
+    $("sheet-ok").focus();
+  }
+
+  function closeSheet() {
+    if (pendingCell) {
+      var el = cellEls[cellIndex(pendingCell.col, pendingCell.row)];
+      if (el) el.classList.remove("is-sel");
+    }
+    pendingCell = null;
+    $("sheet").classList.remove("is-on");
+  }
+
+  function onCellTap(e) {
+    var el = e.target;
+    while (el && el.className.indexOf("cell") === -1) el = el.parentNode;
+    if (!el || !el.dataset) return;
+    if (!state || state.phase !== "guess") return;
+
+    var col = Number(el.dataset.col);
+    var row = Number(el.dataset.row);
+    var taken = state.board[cellIndex(col, row)];
+
+    if (taken) {
+      /* ช่องที่มีหมากแล้ว วางซ้ำไม่ได้ ต้องบอกว่าเป็นของใคร */
+      setNote($("guess-note"), "ช่อง " + coordText(col, row) + " มีหมากของ " +
+              state.players[taken.playerIdx].name + " อยู่แล้ว เลือกช่องอื่นนะ", "bad");
+      closeSheet();
+      return;
+    }
+
+    setNote($("guess-note"), "");
+    closeSheet();
+    openSheet(col, row);
+  }
+
+  function confirmPlace() {
+    if (!pendingCell || !state || state.phase !== "guess") return;
+
+    var col = pendingCell.col, row = pendingCell.row;
+    var idx = cellIndex(col, row);
+
+    if (state.board[idx]) { closeSheet(); return; }
+
+    var playerIdx = state.order[state.turnPos];
+    state.board[idx] = { playerIdx: playerIdx, pass: state.pass };
+    state.tokens.push({ playerIdx: playerIdx, col: col, row: row, pass: state.pass });
+
+    paintToken(col, row, playerIdx);
+    closeSheet();
+
+    state.turnPos++;
+    if (state.turnPos >= state.order.length) endGuessPass();
+    else paintTurn();
+  }
+
+  /* ===========================================================
+     วงจรเกม
+     =========================================================== */
+
+  function pickedPlayers() {
+    var out = [];
+    for (var i = 0; i < picked.length; i++) {
+      var p = Players.get(picked[i]);
+      if (p) out.push(p);
+    }
+    return out;
+  }
+
+  function startGame() {
+    var people = pickedPlayers();
+    if (people.length < MIN_PLAYERS || !leaderId) return;
+
+    var totals = [];
+    for (var i = 0; i < people.length; i++) totals.push(0);
+
+    state = {
+      players: people,
+      totals: totals,
+      roundIdx: 0,
+      totalRounds: roundsFor(people.length),
+      giver: 0,
+      usedClues: [],
+      tiebreak: 0,
+      only: null,          /* รอบตัดสิน เล่นเฉพาะคนที่เสมอ */
+      recorded: false,
+      phase: "",
+      board: [], tokens: [], order: [], pass: 1, turnPos: 0,
+      secret: null, cards: [], clue1: "", clue2: ""
+    };
+
+    buildBoard();
+    startRound();
+  }
+
+  function activeIdxs() {
+    if (state.only) return state.only.slice();
+    var out = [];
+    for (var i = 0; i < state.players.length; i++) out.push(i);
+    return out;
+  }
+
+  function startRound() {
+    var act = activeIdxs();
+
+    /* คนใบ้วนไปตามลำดับในกลุ่มที่กำลังเล่น */
+    state.giver = act[state.roundIdx % act.length];
+
+    state.board = new Array(COLS * ROWS);
+    state.tokens = [];
+    state.pass = 1;
+    state.turnPos = 0;
+    state.clue1 = "";
+    state.clue2 = "";
+    state.secret = null;
+    state.cards = pickCards();
+
+    clearBoardMarks();
+    toPass("ส่งเครื่องให้", state.players[state.giver].name,
+           "คนอื่นอย่าดูจอตอนนี้", "ฉันคือ " + state.players[state.giver].name + " เปิดการ์ด",
+           toSecret);
+  }
+
+  /* สุ่มการ์ด 4 สี ไม่ซ้ำและอยู่ห่างกันพอสมควร */
+  function pickCards() {
+    var out = [];
+    var guard = 0;
+    while (out.length < 4 && guard < 800) {
+      guard++;
+      var col = 1 + Math.floor(Math.random() * COLS);
+      var row = Math.floor(Math.random() * ROWS);
+      var far = true;
+      for (var i = 0; i < out.length; i++) {
+        if (cheb(col, row, out[i].col, out[i].row) < 6) { far = false; break; }
+      }
+      if (far) out.push({ col: col, row: row });
+    }
+    /* เผื่อสุ่มไม่ครบ เติมช่องที่ยังไม่ซ้ำให้พอ 4 ใบ */
+    while (out.length < 4) {
+      var c2 = 1 + Math.floor(Math.random() * COLS);
+      var r2 = Math.floor(Math.random() * ROWS);
+      var dup = false;
+      for (var j = 0; j < out.length; j++) {
+        if (out[j].col === c2 && out[j].row === r2) { dup = true; break; }
+      }
+      if (!dup) out.push({ col: c2, row: r2 });
+    }
+    return out;
+  }
+
+  /* ---------- หน้าส่งเครื่อง ---------- */
+
+  var passNext = null;
+
+  function toPass(kicker, who, hint, btn, next) {
+    paintScores($("scores-pass"), -1);
+    $("pass-kicker").textContent = kicker;
+    $("pass-who").textContent = who;
+    $("pass-hint").textContent = hint;
+    $("btn-pass-go").textContent = btn;
+    passNext = next;
+    state.phase = "pass";
+    show("s-pass");
+  }
+
+  /* ---------- เลือกสีลับ ---------- */
+
+  function toSecret() {
+    state.phase = "secret";
+    state.secret = null;
+
+    $("secret-step").textContent = state.only
+      ? "รอบตัดสินที่ " + state.tiebreak
+      : "รอบที่ " + (state.roundIdx + 1) + " / " + state.totalRounds;
+
+    var host = $("cards");
+    host.innerHTML = "";
+
+    state.cards.forEach(function (c) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "colorcard";
+      b.setAttribute("aria-pressed", "false");
+
+      var sw = document.createElement("span");
+      sw.className = "swatch";
+      sw.style.background = cellColor(c.col, c.row);
+      b.appendChild(sw);
+
+      var co = document.createElement("span");
+      co.className = "co";
+      co.textContent = coordText(c.col, c.row);
+      b.appendChild(co);
+
+      b.addEventListener("click", function () {
+        state.secret = { col: c.col, row: c.row };
+        var kids = host.children;
+        for (var i = 0; i < kids.length; i++) {
+          kids[i].setAttribute("aria-pressed", kids[i] === b ? "true" : "false");
+        }
+        validateClue1();
+      });
+
+      host.appendChild(b);
+    });
+
+    $("clue1").value = "";
+    setNote($("clue1-note"), "");
+    $("btn-clue1").disabled = true;
+    show("s-secret");
+  }
+
+  function validateClue1() {
+    var v = $("clue1").value;
+    var el = $("clue1-note");
+
+    if (!state.secret) {
+      setNote(el, "เลือกสีลับก่อน 1 ใบ", "bad");
+      $("btn-clue1").disabled = true;
+      return;
+    }
+    if (!tidy(v)) {
+      setNote(el, "");
+      $("btn-clue1").disabled = true;
+      return;
+    }
+
+    var r = checkClue(v, 1, state.usedClues);
+    setNote(el, r.msg, r.ok ? "ok" : "bad");
+    $("btn-clue1").disabled = !r.ok;
+  }
+
+  function submitClue1() {
+    var r = checkClue($("clue1").value, 1, state.usedClues);
+    if (!state.secret || !r.ok) return;
+
+    state.clue1 = tidy($("clue1").value);
+    state.usedClues.push(state.clue1.toLowerCase());
+
+    toPass("ส่งเครื่องให้คนทาย", "คนทายทุกคน",
+           "คนใบ้เก็บสีลับไว้ในใจ ห้ามบอกใบ้เพิ่มนอกจากคำใบ้บนจอ", "เริ่มทาย",
+           function () { startGuessPass(1); });
+  }
+
+  /* ---------- ทาย ---------- */
+
+  function startGuessPass(pass) {
+    state.phase = "guess";
+    state.pass = pass;
+    state.turnPos = 0;
+
+    var act = activeIdxs();
+    var order = [];
+    for (var i = 0; i < act.length; i++) {
+      if (act[i] !== state.giver) order.push(act[i]);
+    }
+    /* รอบสองทายเรียงย้อนกลับ */
+    if (pass === 2) order.reverse();
+    state.order = order;
+
+    $("show-c1").textContent = state.clue1;
+    $("show-c2").textContent = state.clue2 ? "คำใบ้ที่ 2 · " + state.clue2 : "";
+
+    moveBoardTo("board-host");
+    setNote($("guess-note"), "");
+    paintTurn();
+    show("s-guess");
+  }
+
+  function paintTurn() {
+    paintScores($("scores-guess"), state.order[state.turnPos]);
+    var pi = state.order[state.turnPos];
+    $("turn-dot").style.background = TOKEN_COLORS[pi % TOKEN_COLORS.length];
+    $("turn-text").textContent = "ตาของ " + state.players[pi].name +
+      " · ทายรอบที่ " + state.pass + " (เหลืออีก " + (state.order.length - state.turnPos - 1) + " คน)";
+  }
+
+  function endGuessPass() {
+    if (state.pass === 1) {
+      toPass("ส่งเครื่องกลับให้", state.players[state.giver].name,
+             "คนทายอย่าดูจอตอนนี้", "ฉันคือคนใบ้", toClue2);
+    } else {
+      toReveal();
+    }
+  }
+
+  /* ---------- คำใบ้ที่ 2 ---------- */
+
+  function toClue2() {
+    state.phase = "clue2";
+    $("c2-swatch").style.background = cellColor(state.secret.col, state.secret.row);
+    $("c2-coord").textContent = coordText(state.secret.col, state.secret.row);
+    $("clue2").value = "";
+    setNote($("clue2-note"), "");
+    $("btn-clue2").disabled = true;
+    show("s-clue2");
+  }
+
+  function validateClue2() {
+    var v = $("clue2").value;
+    var el = $("clue2-note");
+
+    if (!tidy(v)) {
+      setNote(el, "");
+      $("btn-clue2").disabled = true;
+      return;
+    }
+    var r = checkClue(v, 2, state.usedClues);
+    setNote(el, r.msg, r.ok ? "ok" : "bad");
+    $("btn-clue2").disabled = !r.ok;
+  }
+
+  function submitClue2(skip) {
+    if (skip) {
+      state.clue2 = "";
+    } else {
+      var r = checkClue($("clue2").value, 2, state.usedClues);
+      if (!r.ok) return;
+      state.clue2 = tidy($("clue2").value);
+      state.usedClues.push(state.clue2.toLowerCase());
+    }
+
+    toPass("ส่งเครื่องให้คนทาย", "คนทายทุกคน",
+           state.clue2 ? "มีคำใบ้ที่ 2 แล้ว" : "คนใบ้เลือกไม่ใบ้ต่อ ทายจากคำใบ้เดิมได้เลย",
+           "ทายรอบสอง",
+           function () { startGuessPass(2); });
+  }
+
+  /* ---------- เฉลย ---------- */
+
+  function toReveal() {
+    state.phase = "reveal";
+
+    var sc = state.secret.col, sr = state.secret.row;
+
+    /* วาดกรอบ 3x3 รอบสีจริง และวงถัดออกไปด้วยเส้นประ
+       ถ้าสีจริงอยู่ริมกระดาน กรอบจะล้นออกไป ช่องที่ล้นไม่มีอยู่จริงจึงไม่มีใครได้แต้ม */
+    for (var r = sr - 2; r <= sr + 2; r++) {
+      for (var c = sc - 2; c <= sc + 2; c++) {
+        if (r < 0 || r >= ROWS || c < 1 || c > COLS) continue;
+        var el = cellEls[cellIndex(c, r)];
+        if (!el) continue;
+        var d = cheb(c, r, sc, sr);
+        if (d === 0) el.classList.add("bull");
+        else if (d === 1) el.classList.add("ring1");
+        else el.classList.add("ring2");
+      }
+    }
+
+    $("reveal-coord").textContent = coordText(sc, sr);
+    $("reveal-c1").textContent = state.clue1;
+    $("reveal-c2").textContent = state.clue2 ? "คำใบ้ที่ 2 · " + state.clue2 : "ไม่มีคำใบ้ที่ 2";
+    $("reveal-step").textContent = state.only
+      ? "รอบตัดสินที่ " + state.tiebreak
+      : "รอบที่ " + (state.roundIdx + 1) + " / " + state.totalRounds;
+
+    moveBoardTo("reveal-host");
+    scoreRound();
+    show("s-reveal");
+  }
+
+  function scoreRound() {
+    var sc = state.secret.col, sr = state.secret.row;
+    var gained = {};          /* playerIdx -> แต้มรอบนี้ */
+    var lines = [];
+    var inBox = 0;            /* จำนวนหมากที่อยู่ในกรอบ 3x3 ใช้คิดแต้มคนใบ้ */
+
+    state.tokens.forEach(function (t) {
+      var d = cheb(t.col, t.row, sc, sr);
+      var pts = pointsFor(d);
+      if (d <= 1) inBox++;
+      gained[t.playerIdx] = (gained[t.playerIdx] || 0) + pts;
+      lines.push({
+        playerIdx: t.playerIdx,
+        text: "หมากตัวที่ " + t.pass + " · " + coordText(t.col, t.row) + " · " + whyText(d),
+        pts: pts
+      });
+    });
+
+    /* คนใบ้ เล่น 3 คนได้ 2 แต้มต่อหมากในกรอบ นอกนั้น 1 แต้ม */
+    var active = activeIdxs().length;
+    var perToken = active === 3 ? 2 : 1;
+    var giverPts = inBox * perToken;
+    gained[state.giver] = (gained[state.giver] || 0) + giverPts;
+
+    /* บวกเข้าแต้มรวม */
+    for (var k in gained) {
+      if (Object.prototype.hasOwnProperty.call(gained, k)) {
+        state.totals[Number(k)] += gained[k];
+      }
+    }
+
+    /* ตารางแต้มรอบนี้ */
+    var ul = $("reveal-tally");
+    ul.innerHTML = "";
+
+    lines.forEach(function (ln) {
+      ul.appendChild(tallyRow(ln.playerIdx, ln.text, ln.pts));
+    });
+
+    ul.appendChild(tallyRow(
+      state.giver,
+      "คนใบ้ · มีหมากในกรอบ 3x3 " + inBox + " ตัว × " + perToken + " แต้ม",
+      giverPts
+    ));
+
+    if (!state.tokens.length) {
+      var li = document.createElement("li");
+      li.className = "muted";
+      li.textContent = "รอบนี้ไม่มีใครวางหมากเลย";
+      ul.appendChild(li);
+    }
+
+    /* ปุ่มถัดไป */
+    var last = state.only
+      ? true
+      : (state.roundIdx + 1 >= state.totalRounds);
+    $("btn-next-round").textContent = last ? "ดูผลรวม" : "รอบต่อไป";
+  }
+
+  function tallyRow(playerIdx, why, pts) {
+    var li = document.createElement("li");
+
+    var nm = document.createElement("span");
+    nm.className = "nm";
+    var dot = document.createElement("i");
+    dot.style.background = TOKEN_COLORS[playerIdx % TOKEN_COLORS.length];
+    nm.appendChild(dot);
+    var t = document.createElement("span");
+    t.textContent = state.players[playerIdx].name;
+    nm.appendChild(t);
+    li.appendChild(nm);
+
+    var rt = document.createElement("span");
+    rt.className = "rt";
+    var p = document.createElement("span");
+    p.className = "pt " + (pts >= 3 ? "p3" : (pts === 0 ? "p0" : ""));
+    p.textContent = "+" + pts;
+    rt.appendChild(p);
+    var w = document.createElement("span");
+    w.className = "why";
+    w.textContent = why;
+    rt.appendChild(w);
+    li.appendChild(rt);
+
+    return li;
+  }
+
+  function nextRound() {
+    if (state.only) return finishTiebreak();
+
+    state.roundIdx++;
+    if (state.roundIdx >= state.totalRounds) return decide();
+    startRound();
+  }
+
+  /* ---------- ตัดสินผล ---------- */
+
+  function leaders(idxs) {
+    var best = -Infinity, out = [];
+    idxs.forEach(function (i) {
+      if (state.totals[i] > best) { best = state.totals[i]; out = [i]; }
+      else if (state.totals[i] === best) out.push(i);
+    });
+    return out;
+  }
+
+  function decide() {
+    var all = [];
+    for (var i = 0; i < state.players.length; i++) all.push(i);
+    var top = leaders(all);
+
+    /* เสมอกัน ให้เล่นรอบตัดสินเฉพาะคนที่เสมอ */
+    if (top.length > 1 && state.tiebreak < MAX_TIEBREAK) {
+      state.tiebreak++;
+      state.only = top;
+      state.roundIdx = 0;
+      startRound();
+      return;
+    }
+    gameOver(top);
+  }
+
+  function finishTiebreak() {
+    var top = leaders(state.only);
+    if (top.length > 1 && state.tiebreak < MAX_TIEBREAK) {
+      state.tiebreak++;
+      state.only = top;
+      state.roundIdx = 0;
+      startRound();
+      return;
+    }
+    state.only = null;
+    gameOver(top);
+  }
+
+  function gameOver(winners) {
+    state.phase = "over";
+
+    var isWin = {};
+    winners.forEach(function (i) { isWin[i] = true; });
+
+    $("over-title").textContent = winners.length === 1
+      ? state.players[winners[0]].name + " ชนะ"
+      : "เสมอกัน " + winners.length + " คน";
+
+    $("over-sub").textContent = state.tiebreak
+      ? "ตัดสินด้วยรอบพิเศษ " + state.tiebreak + " รอบ"
+      : "";
+
+    /* เรียงอันดับ */
+    var order = [];
+    for (var i = 0; i < state.players.length; i++) order.push(i);
+    order.sort(function (a, b) { return state.totals[b] - state.totals[a]; });
+
+    var ul = $("rank");
+    ul.innerHTML = "";
+    order.forEach(function (idx, pos) {
+      var li = document.createElement("li");
+      if (isWin[idx]) li.className = "is-first";
+
+      var no = document.createElement("span");
+      no.className = "no";
+      no.textContent = (pos + 1) + ".";
+      li.appendChild(no);
+
+      var dot = document.createElement("i");
+      dot.style.background = TOKEN_COLORS[idx % TOKEN_COLORS.length];
+      li.appendChild(dot);
+
+      var nm = document.createElement("span");
+      nm.className = "nm";
+      nm.textContent = state.players[idx].name;
+      li.appendChild(nm);
+
+      var pt = document.createElement("span");
+      pt.className = "pt";
+      pt.textContent = state.totals[idx];
+      li.appendChild(pt);
+
+      ul.appendChild(li);
+    });
+
+    /* บันทึกผลลงกระดานคะแนนรวม */
+    if (!state.recorded) {
+      state.recorded = true;
+      var results = [];
+      for (var j = 0; j < state.players.length; j++) {
+        results.push({
+          playerId: state.players[j].id,
+          name: state.players[j].name,
+          score: state.totals[j],
+          won: !!isWin[j]
+        });
+      }
+      Players.recordGame({
+        game: "color-clues",
+        gameLabel: "เดาสีจากคำใบ้",
+        playedAt: Date.now(),
+        results: results
+      });
+    }
+
+    show("s-over");
+  }
+
+  /* ---------- แถบคะแนนสะสม ---------- */
+
+  function paintScores(host, highlightIdx) {
+    host.innerHTML = "";
+    for (var i = 0; i < state.players.length; i++) {
+      var d = document.createElement("div");
+      d.className = "score" + (i === highlightIdx ? " is-turn" : "");
+
+      var b = document.createElement("b");
+      b.textContent = state.totals[i];
+      d.appendChild(b);
+
+      var s = document.createElement("span");
+      s.textContent = state.players[i].name + (i === state.giver ? " (ใบ้)" : "");
+      d.appendChild(s);
+
+      var dot = document.createElement("i");
+      dot.style.background = TOKEN_COLORS[i % TOKEN_COLORS.length];
+      d.appendChild(dot);
+
+      host.appendChild(d);
+    }
+  }
+
+  /* ===========================================================
+     ผูกปุ่ม
+     =========================================================== */
+
+  renderHeadcount();
+  renderPickList();
+
+  $("btn-add").addEventListener("click", addName);
+  $("new-name").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); addName(); }
+  });
+
+  $("btn-start").addEventListener("click", startGame);
+  $("btn-pass-go").addEventListener("click", function () { if (passNext) passNext(); });
+
+  $("clue1").addEventListener("input", validateClue1);
+  $("clue1").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); submitClue1(); }
+  });
+  $("btn-clue1").addEventListener("click", submitClue1);
+
+  $("clue2").addEventListener("input", validateClue2);
+  $("clue2").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); submitClue2(false); }
+  });
+  $("btn-clue2").addEventListener("click", function () { submitClue2(false); });
+  $("btn-noclue").addEventListener("click", function () { submitClue2(true); });
+
+  $("sheet-ok").addEventListener("click", confirmPlace);
+  $("sheet-cancel").addEventListener("click", function () {
+    closeSheet();
+    setNote($("guess-note"), "เลือกช่องใหม่ได้เลย");
+  });
+
+  $("btn-next-round").addEventListener("click", nextRound);
+
+  $("btn-again").addEventListener("click", function () {
+    state = null;
+    renderPickList();
+    show("s-players");
+  });
+
+})();
+</script>
+</body>
+</html>
