@@ -44,6 +44,11 @@
     border-radius: var(--radius);
   }
   .score.is-turn { background: var(--ink-orange); }
+  .score__tag {
+    display: block; font-style: normal;
+    font-family: var(--font-mono); font-size: .6rem; letter-spacing: .06em;
+    margin-top: 2px; white-space: nowrap;
+  }
   .score b { display: block; font-family: var(--font-mono); font-size: 1.4rem; line-height: 1.1; }
   /* ชื่อยาวตัดที่ 2 บรรทัด ทุกช่องจะได้สูงเท่ากัน */
   .score span {
@@ -293,6 +298,10 @@
 
   .steps { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .1em; color: var(--ink-blue); }
 
+  /* เผื่อที่ใต้ปุ่มที่ติดขอบล่าง ให้เลื่อนข้อความขึ้นมาพ้นปุ่มได้
+     บนจอสูงๆ หน้านี้เลื่อนได้นิดเดียว ปุ่มเลยทับข้อความที่บอกวิธีเริ่มเกม */
+  .stickpad { height: 76px; }
+
   /* ปุ่มเดินเกมต้องอยู่ในสายตาเสมอ ไม่งั้นคนถือเครื่องต้องเลื่อนหาทุกรอบ */
   .btn--stick {
     position: sticky; bottom: 10px; z-index: 5;
@@ -358,6 +367,7 @@
 
     <p class="note" id="ready-note" role="status" aria-live="polite"></p>
     <button class="btn btn--stick" id="btn-to-setup">ตั้งค่าเกม</button>
+    <div class="stickpad"></div>
   </section>
 
   <!-- ============ 2. ตั้งค่า ============ -->
@@ -667,12 +677,17 @@
     });
   }
 
-  function buildMulti(host, items, list, onChange, whyLast) {
+  /* รับ "ชื่อคีย์ใน cfg" ไม่ใช่ตัวอาร์เรย์
+     เพราะตอนกู้เกมค้าง เราแทน cfg ทั้งก้อนด้วยของที่บันทึกไว้
+     ถ้าปุ่มจับอาร์เรย์เดิมไว้ตั้งแต่ตอนโหลดหน้า มันจะไปแก้อาร์เรย์กำพร้าที่ไม่มีใครอ่านแล้ว
+     กลายเป็นปุ่มหลอก: ชิปเปลี่ยนสีแต่เกมยังสุ่มคำจากชุดที่ปิดไปแล้ว */
+  function buildMulti(host, items, key, onChange, whyLast) {
     host.innerHTML = "";
     items.forEach(function (it) {
-      var on = list.indexOf(it.value) !== -1;
+      var on = cfg[key].indexOf(it.value) !== -1;
       var b = chip(it.label, it.value, on);
       b.addEventListener("click", function () {
+        var list = cfg[key];
         var at = list.indexOf(it.value);
         if (at === -1) list.push(it.value);
         else if (list.length > 1) list.splice(at, 1);
@@ -682,7 +697,7 @@
           if (whyLast) setNote($(whyLast.where), whyLast.msg, "bad");
           return;
         }
-        b.setAttribute("aria-pressed", list.indexOf(it.value) !== -1 ? "true" : "false");
+        b.setAttribute("aria-pressed", cfg[key].indexOf(it.value) !== -1 ? "true" : "false");
         onChange();
       });
       host.appendChild(b);
@@ -838,10 +853,12 @@
       b.className = "pchip";
       b.textContent = p.name;
       b.setAttribute("aria-pressed", on ? "true" : "false");
-      /* ไม่ disable จริง เพราะต้องให้กดแล้วมีข้อความบอกว่าทำไมเพิ่มไม่ได้ */
+      /* ไม่ disable จริง เพราะต้องให้กดแล้วมีข้อความบอกว่าทำไมเพิ่มไม่ได้
+         และห้ามใส่ aria-disabled ด้วย ไม่งั้นโปรแกรมอ่านจอจะบอกว่ากดไม่ได้
+         แล้วคนตาบอดจะไม่มีวันได้ยินเหตุผลนั้นเลย */
       if (full) {
         b.className += " is-full";
-        b.setAttribute("aria-disabled", "true");
+        b.setAttribute("aria-label", p.name + " · เลือกครบแล้ว แตะเพื่อดูว่าต้องทำอะไรก่อน");
       }
 
       b.addEventListener("click", function () {
@@ -1287,13 +1304,26 @@
     return false;
   }
 
+  /* กันกดซ้ำแล้วเงียบ ทำให้คนไม่แน่ใจว่ากดติดไหม แล้วรัวแตะต่อ
+     ใช้ที่เดียวกับที่ปุ่มคว้าคิวใช้ จะได้พฤติกรรมเหมือนกันทั้งเกม */
+  function sayGuessNote(msg) {
+    var el = $("guess-note");
+    if (!el) return;
+    el.textContent = msg;
+    clearTimeout(guessNoteTimer);
+    guessNoteTimer = setTimeout(function () {
+      if ($("s-guess").classList.contains("is-on")) el.textContent = "";
+    }, 1400);
+  }
+  var guessNoteTimer = 0;
+
   function guessRight() {
-    if (advancedTooFast()) return;
+    if (advancedTooFast()) { sayGuessNote("กดอีกครั้งได้เลย"); return; }
     endRound(state.qpos);
   }
 
   function guessWrong() {
-    if (advancedTooFast()) return;
+    if (advancedTooFast()) { sayGuessNote("กดอีกครั้งได้เลย"); return; }
     state.qpos++;
     if (state.qpos >= state.queue.length) return endRound(-1);
     paintGuess();
@@ -1543,7 +1573,15 @@
       d.appendChild(b);
 
       var s = document.createElement("span");
-      s.textContent = state.players[i].name + (i === state.guesser ? " (ทาย)" : "");
+      /* "(ทาย)" ต้องอยู่นอกกล่องที่ตัด 2 บรรทัด
+         ไม่งั้นชื่อยาวจะกินมันหาย เหลือพื้นสีส้มเป็นตัวบอกอย่างเดียว คนตาบอดสีแยกไม่ออก */
+      s.textContent = state.players[i].name;
+      if (i === state.guesser) {
+        var tag = document.createElement("i");
+        tag.className = "score__tag";
+        tag.textContent = "คนทาย";
+        d.appendChild(tag);
+      }
       d.appendChild(s);
 
       host.appendChild(d);
@@ -1554,13 +1592,28 @@
      ผูกปุ่ม
      =========================================================== */
 
+  /* วาดชิปชุดคำ/ความยาก/จำนวนรอบใหม่จาก cfg ปัจจุบัน เรียกซ้ำได้ */
+  function paintCfgChips() {
+    buildMulti($("opt-packs"),
+      Object.keys(PACKS).map(function (k) { return { label: PACKS[k].label, value: k }; }),
+      "packs", renderCats, { where: "packs-note", msg: "ต้องเหลือชุดคำอย่างน้อย 1 ชุด" });
+
+    buildMulti($("opt-levels"),
+      [{label:"ง่าย",value:1},{label:"กลาง",value:2},{label:"ยาก",value:3}],
+      "levels", refreshSetupInfo, { where: "levels-note", msg: "ต้องเหลือความยากอย่างน้อย 1 ระดับ" });
+
+    buildSingle($("opt-rounds"),
+      [{label:"1 รอบ",value:1},{label:"2 รอบ",value:2},{label:"3 รอบ",value:3}],
+      cfg.roundsPer, function (v) { cfg.roundsPer = Number(v); refreshSetupInfo(); });
+  }
+
   buildMulti($("opt-packs"),
     Object.keys(PACKS).map(function (k) { return { label: PACKS[k].label, value: k }; }),
-    cfg.packs, renderCats, { where: "packs-note", msg: "ต้องเหลือชุดคำอย่างน้อย 1 ชุด" });
+    "packs", renderCats, { where: "packs-note", msg: "ต้องเหลือชุดคำอย่างน้อย 1 ชุด" });
 
   buildMulti($("opt-levels"),
     [{label:"ง่าย",value:1},{label:"กลาง",value:2},{label:"ยาก",value:3}],
-    cfg.levels, refreshSetupInfo, { where: "levels-note", msg: "ต้องเหลือความยากอย่างน้อย 1 ระดับ" });
+    "levels", refreshSetupInfo, { where: "levels-note", msg: "ต้องเหลือความยากอย่างน้อย 1 ระดับ" });
 
   buildSingle($("opt-rounds"),
     [{label:"1 รอบ",value:1},{label:"2 รอบ",value:2},{label:"3 รอบ",value:3}],
@@ -1632,6 +1685,9 @@
       leaderId = d.leaderId || picked[0] || null;
       renderHeadcount();
       renderPickList();
+      /* cfg เพิ่งถูกสลับทั้งก้อน ชิปในหน้าตั้งค่าต้องวาดใหม่ให้ตรงกับของจริง */
+      renderCats();
+      paintCfgChips();
       box.remove();
       if (state.phase === "over") { gameOver(); return; }
       /* กลับไปหน้าส่งเครื่อง ปลอดภัยสุด เพราะคำถูกซ่อนไปแล้ว */
