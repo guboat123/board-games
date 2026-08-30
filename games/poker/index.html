@@ -84,6 +84,48 @@ button { font-family: inherit; }
 .btn-main:disabled { opacity: .45; cursor: not-allowed; }
 .btn-main:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
 .hint-sm { font-size: .78rem; color: var(--muted); margin: 6px 0 0; }
+
+/* รายการโต๊ะที่เปิดอยู่ */
+.tables { margin-bottom: 16px; }
+.tables h2 { font-size: .84rem; color: var(--muted); font-weight: 500; margin: 0 0 8px; }
+.tbl {
+  width: 100%; text-align: left;
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 13px; margin-bottom: 7px;
+  background: #14301f; color: var(--text);
+  border: 1px solid #2f5540; border-radius: 11px; cursor: pointer;
+}
+.tbl:hover { border-color: var(--gold); }
+.tbl:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+.tbl.is-on { border-color: var(--gold); background: #1c3f28; }
+.tbl__code { font-family: var(--mono); font-weight: 700; font-size: 1rem; color: var(--gold); }
+.tbl__meta { flex: 1 1 auto; min-width: 0; }
+.tbl__who { font-size: .78rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tbl__n {
+  flex: 0 0 auto; font-family: var(--mono); font-size: .78rem;
+  padding: 3px 9px; border-radius: 99px;
+  background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.14);
+}
+.tbl__live { color: var(--live); }
+/* เลือกที่นั่ง */
+.seatpick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 8px; }
+.sp {
+  padding: 9px 4px; text-align: center;
+  font-family: var(--mono); font-size: .8rem;
+  color: var(--text); background: #14301f;
+  border: 1px solid #2c4a3a; border-radius: 9px; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sp small { display: block; font-family: var(--font); font-size: .68rem; color: var(--muted); }
+.sp.is-on { background: var(--gold); border-color: var(--gold); color: #06170f; }
+.sp.is-on small { color: #06170f; opacity: .75; }
+.sp.is-taken { opacity: .4; cursor: not-allowed; }
+.sp.is-away { border-color: var(--live); }
+.sp:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+.tables .none {
+  padding: 12px; text-align: center; font-size: .82rem; color: var(--muted);
+  border: 1px dashed #2c4a3a; border-radius: 11px;
+}
 .qbtn.is-on { background: var(--gold); color: #06170f; border-color: var(--gold); font-weight: 700; }
 .join .err { color: #ff8f84; font-size: .85rem; min-height: 1.2em; margin: 8px 0 0; }
 .join .back { display: block; text-align: center; margin-top: 14px; color: var(--muted); font-size: .85rem; }
@@ -336,9 +378,20 @@ button { font-family: inherit; }
       <input id="f-name" type="text" maxlength="16" placeholder="พิมพ์ชื่อ" autocomplete="off">
     </div>
 
+    <div class="tables" id="tables">
+      <h2>โต๊ะที่เปิดอยู่ตอนนี้</h2>
+      <div id="tables-list"></div>
+    </div>
+
     <div class="fld">
-      <label for="f-room">รหัสห้อง (ทุกคนต้องใส่เหมือนกัน)</label>
+      <label for="f-room">หรือพิมพ์รหัสห้องเอง (ตั้งใหม่ = เปิดโต๊ะใหม่)</label>
       <input id="f-room" type="text" maxlength="8" value="HOME" autocomplete="off">
+    </div>
+
+    <div class="fld">
+      <label>ที่นั่ง</label>
+      <div class="seatpick" id="seatpick"></div>
+      <p class="hint-sm" id="seat-hint">ไม่เลือกก็ได้ ระบบจะหาที่ว่างให้เอง</p>
     </div>
 
     <div class="fld">
@@ -507,6 +560,148 @@ button { font-family: inherit; }
 
   if (location.hash.length > 1) $("f-room").value = decodeURIComponent(location.hash.slice(1)).toUpperCase();
 
+  /* ---------- รายการโต๊ะที่เปิดอยู่ ---------- */
+
+  var lobbyWs = null;
+
+  function paintTables(rooms) {
+    var host = $("tables-list");
+    host.innerHTML = "";
+
+    if (!rooms || !rooms.length) {
+      var none = document.createElement("div");
+      none.className = "none";
+      none.textContent = "ยังไม่มีใครเปิดโต๊ะ คุณเป็นคนแรกได้เลย";
+      host.appendChild(none);
+      return;
+    }
+
+    rooms.forEach(function (r) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "tbl" + ($("f-room").value.toUpperCase() === r.code ? " is-on" : "");
+
+      var code = document.createElement("span");
+      code.className = "tbl__code";
+      code.textContent = r.code;
+      b.appendChild(code);
+
+      var meta = document.createElement("span");
+      meta.className = "tbl__meta";
+      var who = document.createElement("span");
+      who.className = "tbl__who";
+      var bits = [r.blinds];
+      if (r.limit) bits.push(r.limit);
+      bits.push(r.phase === "waiting" ? "รอเริ่ม" : "มือที่ " + r.handNo);
+      who.textContent = bits.join(" · ") + (r.names.length ? " — " + r.names.join(", ") : "");
+      meta.appendChild(who);
+      b.appendChild(meta);
+
+      var n = document.createElement("span");
+      n.className = "tbl__n" + (r.online ? " tbl__live" : "");
+      n.textContent = r.full ? "เต็ม" : r.online + "/9";
+      b.appendChild(n);
+
+      b.addEventListener("click", function () {
+        $("f-room").value = r.code;
+        /* ถ้าเคยนั่งโต๊ะนี้แล้วหลุดไป เติมชื่อเดิมให้เลย */
+        if (r.away && r.away.length === 1 && !$("f-name").value.trim()) {
+          $("f-name").value = r.away[0];
+        }
+        paintTables(window.__rooms || []);
+        paintSeats();
+        $("f-name").focus();
+      });
+
+      host.appendChild(b);
+    });
+  }
+
+  /* ---------- เลือกที่นั่ง ---------- */
+
+  var wantSeat = null;   /* null = ที่ไหนก็ได้ */
+
+  function currentRoom() {
+    var code = ($("f-room").value || "").toUpperCase();
+    return (window.__rooms || []).filter(function (r) { return r.code === code; })[0] || null;
+  }
+
+  function paintSeats() {
+    var host = $("seatpick");
+    host.innerHTML = "";
+    var room = currentRoom();
+    var seats = room ? room.seats : new Array(9).fill(null);
+
+    /* ที่นั่งที่เลือกไว้ดันมีคนมานั่งแล้ว ให้ล้างค่า */
+    if (wantSeat !== null && seats[wantSeat] && seats[wantSeat].connected) wantSeat = null;
+
+    var any = document.createElement("button");
+    any.type = "button";
+    any.className = "sp" + (wantSeat === null ? " is-on" : "");
+    any.innerHTML = "ที่ไหนก็ได้";
+    any.addEventListener("click", function () { wantSeat = null; paintSeats(); });
+    host.appendChild(any);
+
+    for (var i = 0; i < 9; i++) {
+      (function (idx) {
+        var s = seats[idx];
+        var b = document.createElement("button");
+        b.type = "button";
+        var cls = "sp";
+        if (s && s.connected) cls += " is-taken";
+        else if (s && !s.connected) cls += " is-away";
+        if (wantSeat === idx) cls += " is-on";
+        b.className = cls;
+
+        if (s) {
+          b.innerHTML = (idx + 1) + "<small>" + s.name + (s.connected ? "" : " (หลุด)") + "</small>";
+        } else {
+          b.innerHTML = (idx + 1) + "<small>ว่าง</small>";
+        }
+
+        if (s && s.connected) {
+          b.disabled = true;
+        } else {
+          b.addEventListener("click", function () {
+            wantSeat = idx;
+            /* ที่นั่งของคนที่หลุดไป กดแล้วเติมชื่อเดิมให้ จะได้ชิปคืน */
+            if (s && !s.connected && !$("f-name").value.trim()) $("f-name").value = s.name;
+            paintSeats();
+          });
+        }
+        host.appendChild(b);
+      })(i);
+    }
+
+    var room2 = currentRoom();
+    $("seat-hint").textContent = room2
+      ? "โต๊ะ " + room2.code + " · เลือกช่องว่างได้ ช่องที่ขึ้นว่าหลุดคือกลับเข้าที่เดิมพร้อมชิปเดิม"
+      : "โต๊ะใหม่ยังไม่มีใครนั่ง เลือกช่องไหนก็ได้";
+  }
+
+  $("f-room").addEventListener("input", function () { paintSeats(); paintTables(window.__rooms || []); });
+
+  function openLobby() {
+    var proto = location.protocol === "https:" ? "wss://" : "ws://";
+    try { lobbyWs = new WebSocket(proto + location.host); } catch (e) { return; }
+
+    lobbyWs.onopen = function () { lobbyWs.send(JSON.stringify({ type: "lobby" })); };
+    lobbyWs.onmessage = function (ev) {
+      var msg;
+      try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      if (msg.type === "rooms") { window.__rooms = msg.rooms; paintTables(msg.rooms); paintSeats(); }
+    };
+    lobbyWs.onerror = function () { $("tables-list").innerHTML = ""; $("join-err").innerHTML = hostedHint(); };
+    lobbyWs.onclose = function () { lobbyWs = null; };
+  }
+
+  function closeLobby() {
+    if (lobbyWs) { try { lobbyWs.close(); } catch (e) {} lobbyWs = null; }
+  }
+
+  openLobby();
+  paintSeats();
+
   $("btn-join").addEventListener("click", join);
   $("f-name").addEventListener("keydown", function (e) { if (e.key === "Enter") join(); });
 
@@ -525,13 +720,15 @@ button { font-family: inherit; }
     roomCode = room;
     $("join-err").textContent = "กำลังต่อ...";
     $("btn-join").disabled = true;
+    closeLobby();
 
     var proto = location.protocol === "https:" ? "wss://" : "ws://";
     ws = new WebSocket(proto + location.host);
 
     ws.onopen = function () {
       ws.send(JSON.stringify({
-        type: "join", room: room, name: name, buyIn: chips
+        type: "join", room: room, name: name, buyIn: chips,
+        seatId: wantSeat === null ? undefined : wantSeat
       }));
       /* คนแรกที่เข้าเป็นคนตั้งบอด ถ้าโต๊ะยังว่าง ฝั่งเซิร์ฟเวอร์จะรับไว้ */
       ws.send(JSON.stringify({

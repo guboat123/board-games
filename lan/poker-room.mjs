@@ -542,5 +542,24 @@ export function createTable(opts = {}) {
   /* มีใครยังต่ออยู่ไหม ใช้ตัดสินว่าจะเก็บห้องทิ้งได้หรือยัง */
   function anyConnected() { return seated().some(s => s.connected); }
 
-  return { sit, disconnect, action, viewFor, openSeats, anyConnected, _state: st, _cfg: cfg };
+  /* ข้อมูลย่อสำหรับหน้าเลือกโต๊ะ */
+  function summary() {
+    const all = seated();
+    return {
+      players: all.length,
+      online: all.filter(s => s.connected).length,
+      away: all.filter(s => !s.connected).map(s => s.name),
+      names: all.map(s => s.name),
+      /* ที่นั่งทั้ง 9 ช่อง: null = ว่าง · มีชื่อ = มีคนจองอยู่ */
+      seats: st.seats.map(s => s ? { name: s.name, connected: s.connected, stack: s.stack } : null),
+      blinds: cfg.smallBlind + "/" + cfg.bigBlind,
+      phase: st.phase,
+      handNo: st.handNo,
+      full: all.length >= MAX_SEATS,
+      limit: cfg.limitType === "none" ? null
+             : (cfg.limitType === "hands" ? cfg.limitValue + " ตา" : cfg.limitValue + " นาที")
+    };
+  }
+
+  return { sit, disconnect, action, viewFor, openSeats, anyConnected, summary, _state: st, _cfg: cfg };
 }

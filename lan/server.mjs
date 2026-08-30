@@ -140,6 +140,22 @@ function decodeFrames(buf, onMessage, onClose) {
 let nextId = 1;
 const rooms = new Map();   /* code -> { code, table, clients:Set, reaper } */
 const ROOM_GRACE_MIN = 10; /* ไม่มีใครต่ออยู่กี่นาทีถึงจะปิดห้อง */
+const lobby = new Set();   /* เครื่องที่ยังไม่ได้นั่งโต๊ะ รอดูรายการโต๊ะ */
+
+/* รายการโต๊ะที่เปิดอยู่ ส่งให้หน้าเลือกโต๊ะ */
+function roomList() {
+  const out = [];
+  for (const [code, room] of rooms) {
+    const sum = room.table.summary();
+    if (sum.players > 0) out.push({ code, ...sum });
+  }
+  return out.sort((a, b) => b.online - a.online);
+}
+
+function pushLobby() {
+  const list = roomList();
+  for (const c of lobby) send(c, { type: "rooms", rooms: list });
+}
 
 function getRoom(code) {
   let r = rooms.get(code);
@@ -177,9 +193,11 @@ server.on("upgrade", (req, socket) => {
   socket.setNoDelay(true);
 
   const client = { id: nextId++, socket, room: null, seatId: null };
+  lobby.add(client);
   let buf = Buffer.alloc(0);
 
   function cleanup() {
+    lobby.delete(client);
     if (client.room) {
       client.room.clients.delete(client);
       client.room.table.disconnect(client.seatId);
@@ -199,6 +217,7 @@ server.on("upgrade", (req, socket) => {
       }
       client.room = null;
     }
+    pushLobby();
     socket.destroy();
   }
 
@@ -214,6 +233,12 @@ server.on("upgrade", (req, socket) => {
     let msg;
     try { msg = JSON.parse(text); } catch (e) { return; }
 
+    /* หน้าเลือกโต๊ะขอรายการโต๊ะที่เปิดอยู่ */
+    if (msg.type === "lobby") {
+      send(client, { type: "rooms", rooms: roomList() });
+      return;
+    }
+
     if (msg.type === "join") {
       const code = String(msg.room || "").toUpperCase().slice(0, 8) || "HOME";
       const room = getRoom(code);
@@ -227,7 +252,9 @@ server.on("upgrade", (req, socket) => {
       client.seatId = r.seatId;
       send(client, { type: "joined", seatId: r.seatId, room: code, stack: r.stack });
       log("เข้าห้อง", code, "->", r.name, "(ที่นั่ง " + r.seatId + ")");
+      lobby.delete(client);
       broadcastState(room);
+      pushLobby();
       return;
     }
 
