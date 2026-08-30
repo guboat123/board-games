@@ -110,8 +110,14 @@ head("ออกกลางมือ ต้องถือว่าหมอบ 
   t.action(a.seatId, { type: "start" });
   const turn = t._state.current;
   const other = [0, 1, 2].filter(x => x !== turn);
+  const before = t._state.seats[turn];
   t.leave(turn);
-  ok(t._state.seats[turn] === null, "ที่นั่งของคนที่ออกกลางมือต้องว่าง", t._state.seats[turn]);
+  const after = t._state.seats[turn];
+  /* ถ้าเขายังไม่ได้ลงเงิน ที่นั่งว่างทันที
+     ถ้าลงกองไปแล้ว ต้องคาที่นั่งไว้จนจบมือ ไม่งั้นเงินในกองจะหาย */
+  ok(before.committed > 0 ? (after && after.leaving === true) : after === null,
+     "ที่นั่งคนที่ออกกลางมือ: ไม่มีเงินในกอง=ว่างทันที · มีเงิน=คาไว้จนจบมือ",
+     { committed: before.committed, after: after ? "leaving" : null });
   ok(t._state.current !== turn, "ตาต้องไม่ค้างอยู่ที่คนที่ออกไปแล้ว", t._state.current);
   const chips = other.reduce((n, i) => n + (t._state.seats[i] ? t._state.seats[i].stack : 0), 0);
   ok(chips > 0, "คนที่เหลือยังมีชิปอยู่ เกมเดินต่อได้", chips);
@@ -134,6 +140,55 @@ head("ที่นั่งร้างนานเกินไป ต้อง�
   ok(t.summary().full === false, "ร้างนานแล้ว ต้องไม่ขึ้นว่าเต็ม", t.summary().full);
   const nw = t.sit("คนใหม่", undefined, 500, "new1");
   ok(nw.ok && nw.seatId === 3 && nw.stack === 500, "คนใหม่ได้ที่นั่งที่ร้างนานแล้ว", nw);
+}
+
+/* ---------------------------------------------------------------
+   6) ลุกกลางมือ เงินที่ลงกองไปแล้วต้องอยู่ในกอง ห้ามหายไปกับตัว
+   (เคยพังจริง: ชิปหายจากโต๊ะทุกครั้งที่มีคนกดออกกลางมือ)
+   --------------------------------------------------------------- */
+head("ลุกกลางมือ เงินในโต๊ะต้องไม่หาย");
+{
+  const t = createTable({ smallBlind: 10, bigBlind: 20, minBuyIn: 1, maxBuyIn: 100000 });
+  const a = t.sit("เอ", 0, 1000, "a");
+  t.sit("บี", 1, 1000, "b");
+  t.sit("ซี", 2, 1000, "c");
+  const st = t._state;
+  const boughtIn = 3000;
+
+  t.action(a.seatId, { type: "start" });
+
+  const onTable = () => st.seats.filter(Boolean).reduce((n, s) => n + s.stack, 0);
+  const inPot = () => st.seats.filter(Boolean).reduce((n, s) => n + s.committed, 0);
+
+  ok(onTable() + inPot() === boughtIn,
+     "ก่อนใครออก ชิปครบ", onTable() + inPot());
+
+  /* คนที่ลงกองไปแล้ว (บลายด์) ลุกกลางมือ */
+  const leaver = st.seats.find(s => s && s.committed > 0);
+  const cashedOut = leaver.stack;
+  const putIn = leaver.committed;
+  t.leave(leaver.seatId);
+
+  /* ที่นั่งของคนที่ลุกยังคาไว้จนกว่ามือจะจบ ชิปกับเงินที่ลงกองจึงยังนับอยู่ในโต๊ะ */
+  ok(onTable() + inPot() === boughtIn,
+     "ออกกลางมือ เงินที่ลงกอง " + putIn + " ต้องยังอยู่ในโต๊ะ",
+     { onTable: onTable(), inPot: inPot(), รวม: onTable() + inPot() });
+  ok(inPot() >= putIn, "เงินของคนที่ลุกไป ยังอยู่ในกองครบ", { inPot: inPot(), putIn });
+
+  /* เล่นมือนั้นจนจบ แล้วเช็คว่าเงินยังครบ และที่นั่งถูกเก็บกวาดแล้ว */
+  let guard = 0;
+  while (st.phase !== "showdown" && st.phase !== "waiting" && guard++ < 60) {
+    const cur = st.current;
+    if (cur < 0 || !st.seats[cur]) break;
+    const r = t.action(cur, { type: "act", action: "call" });
+    if (r && r.error) { t.action(cur, { type: "act", action: "check" }); }
+  }
+
+  ok(st.seats[leaver.seatId] === null,
+     "จบมือแล้ว ที่นั่งคนที่ลุกไปต้องว่าง", st.seats[leaver.seatId]);
+  ok(onTable() + cashedOut === boughtIn,
+     "จบมือแล้ว ชิบนโต๊ะ + ที่ถือออกไป = ที่ซื้อเข้ามาทั้งหมด",
+     { onTable: onTable(), cashedOut, รวม: onTable() + cashedOut, ควรเป็น: boughtIn });
 }
 
 console.log(fail === 0 ? "\n=== ผ่านทั้งหมด ===" : "\n=== พัง " + fail + " ข้อ ===");

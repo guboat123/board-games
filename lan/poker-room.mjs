@@ -161,15 +161,43 @@ export function createTable(opts = {}) {
   function leave(seatId) {
     const s = st.seats[seatId];
     if (!s) return;
-    if (s.inHand && !s.folded) {
+
+    const wasInHand = s.inHand && !s.folded;
+    if (wasInHand) {
       s.folded = true;
       s.lastAction = "หมอบ (ออกจากโต๊ะ)";
-      checkRoundEnd(seatId);
     }
     note(s.name + " ออกจากโต๊ะ");
+    s.connected = false;
+    s.sitOut = true;
+
+    /* ต้องเดินตาต่อก่อนเสมอ ไม่งั้นถ้าคนที่ลุกคือคนที่ถึงตาพอดี
+       โต๊ะจะค้างรอคนที่เดินออกไปแล้ว */
+    if (wasInHand || st.current === seatId) checkRoundEnd(seatId);
+
+    /* เงินที่ลงกองไปแล้วเป็นของกอง ไม่ใช่ของเขาอีกต่อไป
+       ถ้าลบที่นั่งทิ้งทันที เงินก้อนนั้นจะหายไปจากโต๊ะ (ยอดรวมไม่ตรงกับที่ซื้อเข้ามา)
+       จึงต้องคาที่นั่งไว้จนจบมือก่อน แล้วค่อยเก็บกวาดใน finishHand */
+    if (s.committed > 0) {
+      s.leaving = true;
+      if (!seated().some(x => x.connected)) st.phase = "waiting";
+      return;
+    }
+
     st.seats[seatId] = null;
     if (st.hostSeat === seatId) st.hostSeat = null;
     if (!seated().some(x => x.connected)) st.phase = "waiting";
+  }
+
+  /* เก็บที่นั่งของคนที่ลุกไประหว่างมือ หลังจ่ายเงินเรียบร้อยแล้ว */
+  function sweepLeavers() {
+    for (let i = 0; i < MAX_SEATS; i++) {
+      const s = st.seats[i];
+      if (s && s.leaving) {
+        st.seats[i] = null;
+        if (st.hostSeat === i) st.hostSeat = null;
+      }
+    }
   }
 
   function disconnect(seatId) {
@@ -462,6 +490,9 @@ export function createTable(opts = {}) {
     /* ล้าง committed ด้วย ไม่งั้นหน้าจอยังโชว์กองกลางทั้งที่จ่ายไปแล้ว
        (ชิปจะดูเหมือนมีสองเท่า) */
     for (const s of seated()) { s.inHand = false; s.bet = 0; s.committed = 0; }
+
+    /* จ่ายเงินเสร็จแล้ว ค่อยปล่อยที่นั่งของคนที่ลุกไประหว่างมือ */
+    sweepLeavers();
 
     /* เช็คหลังจบตาเสมอ ไม่ตัดกลางตา */
     if (limitReached()) closeSession();

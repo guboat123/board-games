@@ -104,7 +104,9 @@ button { font-family: inherit; }
 .tbl.is-on { border-color: var(--gold); background: #1c3f28; }
 .tbl__code { font-family: var(--mono); font-weight: 700; font-size: 1rem; color: var(--gold); }
 .tbl__meta { flex: 1 1 auto; min-width: 0; }
-.tbl__who { font-size: .78rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ต้องเป็น block ไม่งั้น overflow/ellipsis ไม่มีผลกับ inline box
+   แล้วรายชื่อยาวๆ จะลอดไปทับป้ายจำนวนคนด้านขวา */
+.tbl__who { display: block; min-width: 0; font-size: .78rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tbl__n {
   flex: 0 0 auto; font-family: var(--mono); font-size: .78rem;
   padding: 3px 9px; border-radius: 99px;
@@ -198,10 +200,6 @@ button { font-family: inherit; }
   text-align: center;
   z-index: 2;
 }
-@media (max-width: 380px) {
-  .seat__cards { height: 25px; }
-  .seat__cards .pc--sm { width: 17px; font-size: 3.9px; }
-}
 .seat__box {
   background: linear-gradient(#16321f, #0e2417);
   border: 1px solid #2f5540; border-radius: 9px;
@@ -217,23 +215,6 @@ button { font-family: inherit; }
 }
 .seat__stack { font-family: var(--mono); font-size: .8rem; color: var(--gold); }
 .seat__box { max-width: 100%; }
-/* จอเตี้ย (360x640) วงที่นั่งบีบกันในแนวตั้ง ต้องลดความสูงของแต่ละที่นั่ง
-   ไม่งั้นไพ่ของคนหนึ่งจะไปทับกล่องชื่อของอีกคน */
-/* จอเตี้ย วงที่นั่งบีบกันทั้งแนวตั้งและแนวนอน ต้องย่อที่นั่งทั้งก้อน
-   ไม่ใช่ย่อแค่ไพ่ ไม่งั้นกล่องที่นั่งจะไปทับไพ่กลางและทับที่นั่งข้างเคียง */
-@media (max-height: 700px) {
-  .seat { width: clamp(52px, 13.5vw, 76px); }
-  .seat__cards { height: 17px; margin-bottom: 2px; }
-  .seat__cards .pc--sm { width: 12px; font-size: 2.7px; }
-  .seat__box { padding: 2px 4px; border-radius: 7px; }
-  .seat__name { font-size: .64rem; }
-  .seat__stack { font-size: .66rem; }
-  .dealer { width: 15px; height: 15px; font-size: .54rem; line-height: 15px; right: -5px; top: -5px; }
-  .bet { bottom: -15px; }
-  .bet-chip { font-size: .58rem; padding: 0 5px; }
-  /* ไพ่กลางก็ต้องเล็กลงตาม เพราะช่องว่างระหว่างที่นั่งซ้าย-ขวาแคบลงด้วย */
-  .board .pc--md { width: min(40px, 8.6vw); font-size: min(6.5px, 1.4vw); }
-}
 .seat__cards { display: flex; gap: 2px; justify-content: center; margin-bottom: 3px; height: 30px; }
 /* ไพ่ต้องพอดีกับกล่อง ไม่งั้นล้นออกไปทับที่นั่งข้างเคียง
    pc--sm กว้าง 24px จะสูง 33.6px (อัตราส่วน 5/7) ซึ่งเกินกล่อง 30px ไป 3.6px */
@@ -263,6 +244,29 @@ button { font-family: inherit; }
 .bet::before {
   content: ""; width: 9px; height: 9px; border-radius: 50%;
   background: var(--chip); box-shadow: 0 0 0 1.5px #8a6d0d;
+}
+
+/* ⚠️ media query ต้องอยู่ "หลัง" กฎพื้นฐานที่ selector เหมือนกันเป๊ะ
+   เพราะ media query ไม่เพิ่ม specificity กฎที่อยู่ทีหลังจะชนะเสมอ
+   เคยวางไว้ข้างบนแล้วการย่อไพ่/ชิปบนจอเตี้ยถูกลบทิ้งทั้งชุดโดยไม่มีใครรู้ */
+@media (max-width: 380px) {
+  .seat__cards { height: 25px; }
+  .seat__cards .pc--sm { width: 17px; font-size: 3.9px; }
+}
+/* จอเตี้ย วงที่นั่งบีบกันทั้งแนวตั้งและแนวนอน ต้องย่อที่นั่งทั้งก้อน
+   ไม่ใช่ย่อแค่ไพ่ ไม่งั้นกล่องที่นั่งจะไปทับไพ่กลางและทับที่นั่งข้างเคียง */
+@media (max-height: 700px) {
+  .seat { width: clamp(52px, 13.5vw, 76px); }
+  .seat__cards { height: 17px; margin-bottom: 2px; }
+  .seat__cards .pc--sm { width: 12px; font-size: 2.7px; }
+  .seat__box { padding: 2px 4px; border-radius: 7px; }
+  .seat__name { font-size: .64rem; }
+  .seat__stack { font-size: .66rem; }
+  .dealer { width: 15px; height: 15px; font-size: .54rem; line-height: 15px; right: -5px; top: -5px; }
+  .bet { bottom: -15px; }
+  .bet { font-size: .58rem; }
+  /* ไพ่กลางก็ต้องเล็กลงตาม เพราะช่องว่างระหว่างที่นั่งซ้าย-ขวาแคบลงด้วย */
+  .board .pc--md { width: min(40px, 8.6vw); font-size: min(6.5px, 1.4vw); }
 }
 
 /* ---------- แถบไพ่ในมือ + แง้มดู ---------- */
@@ -297,6 +301,15 @@ button { font-family: inherit; }
    ซึ่งเป็นจังหวะเดียวที่ต้องอ่านไพ่ให้ชัดที่สุด (นิ้วก็บังอีกชั้นอยู่แล้ว) */
 .hole.is-peek .pc:nth-child(1) { transform: rotate(-11deg) translateY(-34px); }
 .hole.is-peek .pc:nth-child(2) { transform: rotate(7deg) translateY(-34px); }
+/* ตอนแง้ม นิ้วกดค้างอยู่บนปุ่มอยู่แล้ว ไม่ต้องเห็นปุ่มชัดอีก
+   จึงหรี่ปุ่มลงและยุบลงไป เปิดทางให้อ่านไพ่ได้เต็มใบ
+   (ยกไพ่สูงกว่านี้ไม่ได้ ไพ่จะโผล่ออกนอกแถบไพ่ในมือ) */
+.peek-knob { transition: opacity .14s ease, transform .14s ease; }
+.hand-area.is-peek .peek-knob {
+  opacity: .16;
+  transform: translateX(-50%) translateY(16px) scale(.8);
+  pointer-events: auto;
+}
 
 .peek-knob {
   position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
@@ -400,20 +413,23 @@ button { font-family: inherit; }
   background: rgba(6,22,15,.96); border: 1px solid var(--gold);
   border-radius: 14px; padding: 16px; text-align: center;
   box-shadow: 0 20px 50px rgba(0,0,0,.6);
+  /* ⚠️ ประกาศ display ที่เดียวในบล็อกนี้เท่านั้น
+     เคยประกาศ none แล้วประกาศ flex ทับทีหลัง ตัวหลังชนะ กล่องผลจึงไม่มีวันซ่อน
+     ค้างทับโต๊ะตลอดมือถัดไป */
   display: none;
-  /* แถวผลมีได้ถึง 9 แถว ต้องเลื่อนในกล่องตัวเอง
-     ไม่ใช่ยืดขึ้นไปเรื่อยๆ จนทับกองกลางกับไพ่กลาง */
-  /* ต้องต่ำกว่าตัวเลขกองกลาง (อยู่ราว 47% ของโต๊ะ) เสมอ
+  /* แถวผลมีได้ถึง 9 แถว ต้องเลื่อนในกล่องตัวเอง ไม่ใช่ยืดขึ้นไปทับกองกลาง
+     ต้องต่ำกว่าตัวเลขกองกลาง (อยู่ราว 47% ของโต๊ะ) เสมอ
      ตอนจบมือคือจังหวะที่ทุกคนอยากเช็คว่ากองเท่าไหร่ ใครได้เท่าไหร่ ห้ามบังกันเอง */
   max-height: 33%;
-  display: flex; flex-direction: column;
 }
 /* แถวผลเลื่อนในตัวเอง ส่วนหัวกับปุ่มอยู่กับที่ ไม่งั้นปุ่ม "เริ่มรอบเล่นใหม่"
    จะจมอยู่ใต้ขอบล่างของกล่อง โดยไม่มีอะไรบอกว่าเลื่อนได้ */
 .result h3 { flex: 0 0 auto; }
 .result .rows { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .result .foot { flex: 0 0 auto; padding-top: 8px; }
-.result.is-on { display: block; }
+/* ต้องเป็น flex ไม่ใช่ block ไม่งั้น flex ของลูกไม่ทำงาน
+   แถวอันดับจะยืดเต็มเนื้อหา แล้วดันปุ่ม "เริ่มรอบเล่นใหม่" ตกออกนอกจอ */
+.result.is-on { display: flex; flex-direction: column; }
 .result h3 { margin: 0 0 4px; font-size: 1.1rem; color: var(--gold); }
 .result .row { display: flex; justify-content: space-between; gap: 10px; font-size: .85rem; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
 .result .row b { font-family: var(--mono); color: var(--good); }
@@ -716,6 +732,7 @@ button { font-family: inherit; }
   /* ---------- เลือกที่นั่ง ---------- */
 
   var wantSeat = null;   /* null = ที่ไหนก็ได้ */
+  var rejoinSeat = -1;   /* ที่นั่งของคนชื่อเดียวกันที่หลุดอยู่ ใช้ถามยืนยันตอนกดนั่งโต๊ะ */
 
   function currentRoom() {
     var code = ($("f-room").value || "").toUpperCase();
@@ -794,13 +811,11 @@ button { font-family: inherit; }
         if (s && !s.connected && s.name === name) { back = true; backSeat = i; break; }
       }
     }
-    /* ถ้าจะสัญญาว่าได้ชิปเดิมคืน ก็ต้องขอที่นั่งนั้นให้จริงด้วย
-       เครื่องคนละเครื่อง (token ไม่ตรง) ถ้าไม่ระบุที่นั่ง ตัวกลางจะให้เป็นคนใหม่
-       แล้วชิปเดิมจะค้างอยู่ในที่นั่งที่ตัวเองเข้าไม่ได้อีก */
-    if (back && backSeat >= 0 && wantSeat === null) {
-      wantSeat = backSeat;
-      paintSeatPicker();
-    }
+    /* ห้ามเลือกที่นั่งให้เงียบๆ ตรงนี้
+       ตัวกลางยอมให้ "เจาะจงที่นั่ง" ผ่าน เพราะเชื่อว่าหน้าเว็บถามยืนยันตัวตนไปแล้ว
+       ถ้าเราเลือกให้เองโดยไม่ถาม ข้อสมมตินั้นก็ไม่จริง ใครพิมพ์ชื่อคนที่หลุดก็ได้ชิปไปเลย
+       จึงเก็บไว้ไปถามตอนกด "นั่งโต๊ะ" แทน */
+    rejoinSeat = back ? backSeat : -1;
     $("fld-chips").style.display = back ? "none" : "";
     $("rejoin-note").style.display = back ? "" : "none";
     $("rejoin-note").textContent = back
@@ -857,8 +872,13 @@ button { font-family: inherit; }
     ws = null;
   }
 
-  /* ปิดแท็บ / ย้อนกลับ / สลับแอปจนแท็บถูกพัก ก็ต้องปล่อยที่นั่งเหมือนกัน */
-  window.addEventListener("pagehide", leaveTable);
+  /* ปิดแท็บ / ย้อนกลับ / รีโหลด: ปิดโซเก็ตอย่างเดียวพอ ห้ามส่ง leave
+     เพราะ leave = ปล่อยที่นั่งทิ้ง ชิปที่ชนะมาจะหายกลายเป็นค่าในช่องซื้อชิป
+     แค่ปิดโซเก็ตก็พอให้ตัวกลางรู้ว่าหลุด (ที่นั่งกับชิปยังอยู่ให้กลับเข้ามาได้)
+     ส่วนโต๊ะก็ไม่ค้าง เพราะคนที่หลุดถูกหมอบให้อัตโนมัติอยู่แล้ว */
+  window.addEventListener("pagehide", function () {
+    try { if (ws) ws.close(); } catch (e) {}
+  });
 
   $("btn-leave").addEventListener("click", function (e) {
     if (view && view.phase !== "waiting" && view.phase !== "showdown") {
@@ -883,6 +903,14 @@ button { font-family: inherit; }
       localStorage.setItem("bg.poker.v1", JSON.stringify({ name: name, room: room, chips: chips }));
     } catch (e) { /* ข้ามไป */ }
 
+    /* จะไปนั่งที่ของคนที่หลุดซึ่งมีชิปค้างอยู่ ต้องยืนยันตัวตนก่อนเสมอ */
+    var seatWanted = wantSeat;
+    if (seatWanted === null && rejoinSeat >= 0) {
+      if (!confirm("ที่นั่งช่องที่ " + (rejoinSeat + 1) + " เป็นของ " + name + " ที่หลุดไป · " +
+                   "กดตกลงถ้าคุณคือ " + name + " จะได้ชิปเดิมคืน")) return;
+      seatWanted = rejoinSeat;
+    }
+
     roomCode = room;
     $("join-err").textContent = "กำลังต่อ...";
     $("btn-join").disabled = true;
@@ -894,7 +922,7 @@ button { font-family: inherit; }
     ws.onopen = function () {
       ws.send(JSON.stringify({
         type: "join", room: room, name: name, buyIn: chips, token: myToken(),
-        seatId: wantSeat === null ? undefined : wantSeat
+        seatId: seatWanted === null ? undefined : seatWanted
       }));
       /* คนแรกที่เข้าเป็นคนตั้งบอด ถ้าโต๊ะยังว่าง ฝั่งเซิร์ฟเวอร์จะรับไว้ */
       /* ตั้งค่าโต๊ะเฉพาะตอนเปิดโต๊ะใหม่เท่านั้น
@@ -964,6 +992,9 @@ button { font-family: inherit; }
     peeking = on;
     var hole = $("t-hole");
     hole.classList.toggle("is-peek", on);
+    /* ใส่ที่แถบไพ่ด้วย เพราะปุ่มทองเป็นพี่น้องกับ .hole ไม่ใช่ลูก
+       CSS จะได้หรี่ปุ่มตอนแง้มได้ */
+    hole.parentNode.classList.toggle("is-peek", on);
     paintHole();
   }
 
