@@ -219,10 +219,20 @@ button { font-family: inherit; }
 .seat__box { max-width: 100%; }
 /* จอเตี้ย (360x640) วงที่นั่งบีบกันในแนวตั้ง ต้องลดความสูงของแต่ละที่นั่ง
    ไม่งั้นไพ่ของคนหนึ่งจะไปทับกล่องชื่อของอีกคน */
+/* จอเตี้ย วงที่นั่งบีบกันทั้งแนวตั้งและแนวนอน ต้องย่อที่นั่งทั้งก้อน
+   ไม่ใช่ย่อแค่ไพ่ ไม่งั้นกล่องที่นั่งจะไปทับไพ่กลางและทับที่นั่งข้างเคียง */
 @media (max-height: 700px) {
-  .seat__cards { height: 21px; }
-  .seat__cards .pc--sm { width: 15px; font-size: 3.4px; }
-  .seat__box { padding: 3px 5px; }
+  .seat { width: clamp(52px, 13.5vw, 76px); }
+  .seat__cards { height: 17px; margin-bottom: 2px; }
+  .seat__cards .pc--sm { width: 12px; font-size: 2.7px; }
+  .seat__box { padding: 2px 4px; border-radius: 7px; }
+  .seat__name { font-size: .64rem; }
+  .seat__stack { font-size: .66rem; }
+  .dealer { width: 15px; height: 15px; font-size: .54rem; line-height: 15px; right: -5px; top: -5px; }
+  .bet { bottom: -15px; }
+  .bet-chip { font-size: .58rem; padding: 0 5px; }
+  /* ไพ่กลางก็ต้องเล็กลงตาม เพราะช่องว่างระหว่างที่นั่งซ้าย-ขวาแคบลงด้วย */
+  .board .pc--md { width: min(40px, 8.6vw); font-size: min(6.5px, 1.4vw); }
 }
 .seat__cards { display: flex; gap: 2px; justify-content: center; margin-bottom: 3px; height: 30px; }
 /* ไพ่ต้องพอดีกับกล่อง ไม่งั้นล้นออกไปทับที่นั่งข้างเคียง
@@ -264,10 +274,17 @@ button { font-family: inherit; }
   display: flex; align-items: center; justify-content: center;
   touch-action: none;
 }
+/* คำสั่งสอนวิธีดูไพ่ ต้องอ่านออกเสมอ เป็นกลไกหลักของเกม
+   วางไว้เหนือแถบไพ่ ไม่ใช่ทับกันกับไพ่ ไม่งั้นบนจอเตี้ยจะเหลือแค่เศษตัวอักษรระหว่างไพ่ */
 .hand-hint {
-  position: absolute; top: 8px; left: 0; right: 0;
-  text-align: center; font-size: .74rem; color: rgba(255,255,255,.45);
+  position: absolute; top: 4px; left: 0; right: 0; z-index: 3;
+  text-align: center; font-size: .74rem; color: rgba(255,255,255,.6);
+  text-shadow: 0 1px 3px #06170f, 0 0 6px #06170f;
   pointer-events: none;
+}
+@media (max-height: 700px) {
+  .hand-area { height: 108px; }
+  .hand-hint { font-size: .68rem; }
 }
 .hole { position: relative; display: flex; gap: 8px; }
 .hole .pc {
@@ -276,8 +293,10 @@ button { font-family: inherit; }
   box-shadow: 0 6px 16px rgba(0,0,0,.5);
 }
 /* ปกติไพ่คว่ำและกดจมอยู่ พอแง้มถึงเงยขึ้นมาเป็นมุม */
-.hole.is-peek .pc:nth-child(1) { transform: rotate(-11deg) translateY(-16px); }
-.hole.is-peek .pc:nth-child(2) { transform: rotate(7deg) translateY(-16px); }
+/* ตอนแง้มต้องยกไพ่ให้พ้นปุ่มทอง ไม่งั้นปุ่มบังกลางไพ่ทั้งสองใบ
+   ซึ่งเป็นจังหวะเดียวที่ต้องอ่านไพ่ให้ชัดที่สุด (นิ้วก็บังอีกชั้นอยู่แล้ว) */
+.hole.is-peek .pc:nth-child(1) { transform: rotate(-11deg) translateY(-34px); }
+.hole.is-peek .pc:nth-child(2) { transform: rotate(7deg) translateY(-34px); }
 
 .peek-knob {
   position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
@@ -384,9 +403,16 @@ button { font-family: inherit; }
   display: none;
   /* แถวผลมีได้ถึง 9 แถว ต้องเลื่อนในกล่องตัวเอง
      ไม่ใช่ยืดขึ้นไปเรื่อยๆ จนทับกองกลางกับไพ่กลาง */
-  max-height: 44%;
-  overflow-y: auto;
+  /* ต้องต่ำกว่าตัวเลขกองกลาง (อยู่ราว 47% ของโต๊ะ) เสมอ
+     ตอนจบมือคือจังหวะที่ทุกคนอยากเช็คว่ากองเท่าไหร่ ใครได้เท่าไหร่ ห้ามบังกันเอง */
+  max-height: 36%;
+  display: flex; flex-direction: column;
 }
+/* แถวผลเลื่อนในตัวเอง ส่วนหัวกับปุ่มอยู่กับที่ ไม่งั้นปุ่ม "เริ่มรอบเล่นใหม่"
+   จะจมอยู่ใต้ขอบล่างของกล่อง โดยไม่มีอะไรบอกว่าเลื่อนได้ */
+.result h3 { flex: 0 0 auto; }
+.result .rows { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+.result .foot { flex: 0 0 auto; padding-top: 8px; }
 .result.is-on { display: block; }
 .result h3 { margin: 0 0 4px; font-size: 1.1rem; color: var(--gold); }
 .result .row { display: flex; justify-content: space-between; gap: 10px; font-size: .85rem; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
@@ -437,7 +463,7 @@ button { font-family: inherit; }
     <p class="hint-sm" id="rejoin-note" style="display:none"></p>
 
     <div class="fld">
-      <label>รอบเล่นนี้จบเมื่อไหร่</label>
+      <label for="f-limit">รอบเล่นนี้จบเมื่อไหร่</label>
       <div class="chips-row" id="limit-kind" style="margin:0 0 8px"></div>
       <input id="f-limit" type="number" min="1" step="1" value="20" style="display:none">
       <p class="hint-sm" id="limit-hint">เล่นไปเรื่อยๆ จนกดเลิกเอง</p>
@@ -618,8 +644,22 @@ button { font-family: inherit; }
     catch (e) { return ""; }
   }
 
+  var lastTablesSig = null;
+
   function paintTables(rooms) {
     var host = $("tables-list");
+
+    /* วาดใหม่เฉพาะตอนข้อมูลเปลี่ยนจริง
+       ของเดิมสร้างปุ่มใหม่ทั้งแถบทุกครั้งที่มีคนลงมือในโต๊ะไหนก็ตาม (~ทุก 1.2 วิ)
+       ปุ่มที่กำลังจะถูกกดเลยหายไปกลางคัน กดยังไงก็ไม่ติด */
+    var sig = JSON.stringify((rooms || []).map(function (r) {
+      return [r.code, r.online, r.full, r.phase, r.handNo, r.blinds, r.limit,
+              (r.names || []).join(","), (r.away || []).join(","),
+              (r.seats || []).map(function (x) { return x ? x.name + ":" + (x.connected ? 1 : 0) : ""; }).join("|")];
+    }));
+    if (sig === lastTablesSig && host.childNodes.length) return;
+    lastTablesSig = sig;
+
     host.innerHTML = "";
 
     if (!rooms || !rooms.length) {
@@ -747,17 +787,24 @@ button { font-family: inherit; }
   function refreshBuyIn() {
     var room = currentRoom();
     var name = ($("f-name").value || "").trim();
-    var back = false;
+    var back = false, backSeat = -1;
     if (room && name && room.seats) {
       for (var i = 0; i < room.seats.length; i++) {
         var s = room.seats[i];
-        if (s && !s.connected && s.name === name) { back = true; break; }
+        if (s && !s.connected && s.name === name) { back = true; backSeat = i; break; }
       }
+    }
+    /* ถ้าจะสัญญาว่าได้ชิปเดิมคืน ก็ต้องขอที่นั่งนั้นให้จริงด้วย
+       เครื่องคนละเครื่อง (token ไม่ตรง) ถ้าไม่ระบุที่นั่ง ตัวกลางจะให้เป็นคนใหม่
+       แล้วชิปเดิมจะค้างอยู่ในที่นั่งที่ตัวเองเข้าไม่ได้อีก */
+    if (back && backSeat >= 0 && wantSeat === null) {
+      wantSeat = backSeat;
+      paintSeatPicker();
     }
     $("fld-chips").style.display = back ? "none" : "";
     $("rejoin-note").style.display = back ? "" : "none";
     $("rejoin-note").textContent = back
-      ? "กลับเข้าที่เดิมของ " + name + " · ได้ชิปเดิมที่ค้างไว้คืน ไม่ต้องซื้อใหม่"
+      ? "กลับเข้าที่เดิมของ " + name + " (ช่องที่ " + (backSeat + 1) + ") · ได้ชิปเดิมที่ค้างไว้คืน ไม่ต้องซื้อใหม่"
       : "";
   }
 
@@ -801,12 +848,26 @@ button { font-family: inherit; }
   $("btn-join").addEventListener("click", join);
 
   /* ออกจากโต๊ะกลางมือ = หมอบและเสียเงินในกอง ต้องถามก่อน */
+  function leaveTable() {
+    /* ต้องบอกตัวกลางว่าลุกจริง แล้วปิดโซเก็ตด้วย
+       ถ้าแค่เปลี่ยนหน้า เบราว์เซอร์อาจพักแท็บไว้ใน bfcache ทั้งโซเก็ต
+       ตัวกลางจะยังนับว่าเรานั่งอยู่ แล้วคนที่เหลือรอตาเราตลอดกาล */
+    try { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "leave" })); } catch (e) {}
+    try { if (ws) ws.close(); } catch (e) {}
+    ws = null;
+  }
+
+  /* ปิดแท็บ / ย้อนกลับ / สลับแอปจนแท็บถูกพัก ก็ต้องปล่อยที่นั่งเหมือนกัน */
+  window.addEventListener("pagehide", leaveTable);
+
   $("btn-leave").addEventListener("click", function (e) {
     if (view && view.phase !== "waiting" && view.phase !== "showdown") {
       if (!confirm("ยังเล่นมือนี้อยู่ ออกตอนนี้จะถือว่าหมอบและเสียเงินในกอง ออกเลยไหม")) {
         e.preventDefault();
+        return;
       }
     }
+    leaveTable();
   });
   $("f-name").addEventListener("keydown", function (e) { if (e.key === "Enter") join(); });
 
@@ -1222,13 +1283,18 @@ button { font-family: inherit; }
     quick.innerHTML = "";
     /* ขนาดกองตามหลักโป๊กเกอร์: ตามก่อน แล้วเพิ่มเท่ากองหลังตามแล้ว
        เช่น กอง 30 ต้องตาม 20 -> เพิ่มเป็น 20 + (30+20) = 70 */
-    var potAfterCall = view.pot + view.toCall;
+    /* คิดจากกองส่วนที่มีคนตามแล้ว ไม่ใช่เงินที่ยังไม่มีใครตาม */
+    var potBase = (typeof view.potForBet === "number" ? view.potForBet : view.pot);
+    var potAfterCall = potBase + view.toCall;
     [
       { label: "ต่ำสุด", value: minTarget },
       { label: "½ กอง", value: view.currentBet + Math.round(potAfterCall / 2) },
       { label: "กอง",   value: view.currentBet + potAfterCall },
       { label: "หมดตัก", value: maxTarget }
     ].forEach(function (q) {
+      /* ปุ่มลัดต้องกดแล้วใช้ได้จริง ถ้าคำนวณออกมาต่ำกว่าขั้นต่ำก็ดันขึ้นเป็นขั้นต่ำ
+         ถ้าเกินหน้าตักก็หยุดที่หมดตัก ไม่งั้นกดแล้วเลขแดง ปุ่มตกลงกดไม่ได้ */
+      q.value = Math.max(minTarget, Math.min(maxTarget, q.value));
       var b = document.createElement("button");
       b.type = "button";
       b.className = "qbtn";
@@ -1358,6 +1424,10 @@ button { font-family: inherit; }
       : "ครบ " + view.limit.value + " นาทีแล้ว";
     box.appendChild(sub);
 
+    /* อันดับ 9 คนเลื่อนในกล่องของมันเอง ส่วนปุ่มอยู่กับที่เสมอ
+       ของเดิมปุ่มจมอยู่ใต้ขอบล่าง คนอันดับ 6-9 ก็ไม่เห็นผลตัวเอง */
+    var rows = document.createElement("div");
+    rows.className = "rows";
     view.standings.forEach(function (p, i) {
       var row = document.createElement("div");
       row.className = "row";
@@ -1368,16 +1438,19 @@ button { font-family: inherit; }
       right.style.color = p.net > 0 ? "var(--good)" : (p.net < 0 ? "#ff8f84" : "var(--muted)");
       row.appendChild(left);
       row.appendChild(right);
-      box.appendChild(row);
+      rows.appendChild(row);
     });
+    box.appendChild(rows);
 
+    var foot = document.createElement("div");
+    foot.className = "foot";
     var again = document.createElement("button");
     again.type = "button";
     again.className = "btn-main";
-    again.style.marginTop = "12px";
     again.textContent = "เริ่มรอบเล่นใหม่";
     again.addEventListener("click", function () { send({ type: "newsession" }); });
-    box.appendChild(again);
+    foot.appendChild(again);
+    box.appendChild(foot);
 
     box.classList.add("is-on");
   }

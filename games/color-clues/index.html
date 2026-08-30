@@ -306,7 +306,7 @@
   <section id="s-secret" class="screen">
     <span class="steps" id="secret-step">รอบที่ 1</span>
     <h1>เลือกสีลับ</h1>
-    <p class="hint">เลือก 1 ใบ แล้วให้คำใบ้ 1 คำ ห้ามบอกชื่อสีหรือความอ่อนเข้ม</p>
+    <p class="hint">เลือก 1 ใบ แล้วให้คำใบ้ 1 คำ ห้ามบอกชื่อสีหรือความอ่อนเข้ม · ต้องเป็นคำ ไม่ใช่ประโยค</p>
 
     <div class="cards" id="cards"></div>
 
@@ -345,7 +345,7 @@
   <section id="s-clue2" class="screen">
     <span class="steps">คำใบ้ที่ 2</span>
     <h1>ใบ้อีกทีไหม</h1>
-    <p class="hint">คำใบ้ที่ 2 ยาวได้ไม่เกิน 2 คำ หรือจะไม่ใบ้ต่อก็ได้</p>
+    <p class="hint">คำใบ้ที่ 2 ยาวได้ไม่เกิน 2 คำ (ต้องเป็นคำ ไม่ใช่ประโยค) หรือจะไม่ใบ้ต่อก็ได้</p>
 
     <div class="card" style="margin-top:14px">
       <span class="lb eyebrow">สีลับของคุณ</span>
@@ -388,6 +388,9 @@
     <div class="scores" id="scores-reveal" style="margin-top:14px"></div>
 
     <p style="margin-top:20px"><button class="btn" id="btn-next-round">รอบต่อไป</button></p>
+    <p id="tie-quit-wrap" style="margin-top:10px; display:none">
+      <button class="btn btn--ghost btn--sm" id="btn-tie-quit">พอแล้ว จบแบบเสมอ</button>
+    </p>
   </section>
 
   <!-- ============ 7. จบเกม ============ -->
@@ -455,8 +458,11 @@
      คนพิมพ์ทั้งประโยคมาก็ยังผ่านเป็น "1 คำ" ต้องมีเพดานความยาวช่วยอีกชั้น
      นับเฉพาะอักษรฐาน ตัดสระบน/ล่าง/วรรณยุกต์ออก ไม่งั้น "ก๋วยเตี๋ยว" (8 ฐาน) จะโดนบล็อกผิดๆ */
   var THAI_MARKS = /[\u0e31\u0e34-\u0e3a\u0e47-\u0e4e]/g;
-  var MAX_BASE_1 = 12;   /* คำใบ้ที่ 1 หนึ่งคำ */
-  var MAX_BASE_2 = 22;   /* คำใบ้ที่ 2 ไม่เกินสองคำ */
+  /* จำกัด "ต่อคำ" ไม่ใช่ความยาวรวม
+     ไทยเขียนติดกัน ทั้งประโยคจึงถูกนับเป็น 1 คำ แล้วลอดด่านนับคำไปได้
+     แต่คำนามไทยคำเดียวก็ยาวได้จริง (เครื่องปรับอากาศ / สนามบินสุวรรณภูมิ = 13 อักษรฐาน)
+     16 จึงเป็นเส้นที่ปล่อยคำเดียวยาวๆ ผ่าน แต่กันประโยค (17+) ไว้ */
+  var MAX_BASE_WORD = 16;
 
   function baseLen(str) {
     return String(str).replace(THAI_MARKS, "").replace(/\s+/g, "").length;
@@ -630,12 +636,12 @@
       return { ok: false, msg: "ยาวได้ไม่เกิน " + maxWords + " คำ ตอนนี้ " + words.length + " คำ" };
     }
 
-    /* ด่านที่สอง กันพิมพ์ทั้งประโยคติดกันแบบไทย ซึ่งด่านนับคำจับไม่ได้ */
-    var cap = maxWords > 1 ? MAX_BASE_2 : MAX_BASE_1;
-    if (baseLen(t) > cap) {
-      return { ok: false, msg: maxWords > 1
-        ? "ยาวเกินไป คำใบ้ที่ 2 ให้ได้ไม่เกิน 2 คำสั้นๆ"
-        : "ยาวเกินไป คำใบ้ที่ 1 ให้ได้คำเดียวสั้นๆ" };
+    /* ด่านที่สอง กันพิมพ์ทั้งประโยคติดกันแบบไทย ซึ่งด่านนับคำจับไม่ได้
+       เทียบทีละคำ ไม่ใช่ความยาวรวม ไม่งั้นสองคำสั้นๆ ที่ถูกกติกาจะโดนบล็อกไปด้วย */
+    for (j = 0; j < words.length; j++) {
+      if (baseLen(words[j]) > MAX_BASE_WORD) {
+        return { ok: false, msg: "“" + words[j] + "” ยาวเกินไป ต้องเป็นคำ ไม่ใช่ทั้งประโยค" };
+      }
     }
 
     var low = t.toLowerCase();
@@ -1374,6 +1380,8 @@
     /* ต้องวาดหลัง scoreRound เพื่อให้เห็นแต้มที่บวกของรอบนี้เข้าไปแล้ว
        หน้านี้คือจุดเดียวที่ทุกคนล้อมดูจอพร้อมกัน แต่กลับเป็นหน้าเดียวที่ไม่บอกว่าใครนำ */
     paintScores($("scores-reveal"), -1);
+    /* ทางออกจากรอบตัดสิน โผล่เฉพาะตอนอยู่ในรอบตัดสินจริงๆ */
+    $("tie-quit-wrap").style.display = state.only ? "" : "none";
     show("s-reveal");
   }
 
@@ -1645,26 +1653,66 @@
     var box = document.createElement("div");
     box.className = "card";
     box.style.cssText = "margin-bottom:18px; border-color:var(--ink-orange)";
+    /* หน้าเฉลย = รอบนั้นคิดแต้มไปแล้ว แต่ roundIdx ยังไม่ขยับ (ขยับตอนกด "รอบต่อไป")
+       ถ้ากู้แล้วเริ่มรอบเดิมใหม่ แต้มของรอบนั้นจะถูกบวกซ้ำ และคนใบ้ได้ใบ้เกินโควตา
+       จึงต้องเดินหน้าต่อ ไม่ใช่เริ่มใหม่ */
+    var doneRound = (d.state.phase === "reveal");
+    var inTie = !!(d.state.only && d.state.only.length);
+    var head, what, label;
+
+    if (inTie) {
+      var tr = d.state.tieRounds || 1;
+      var cur = d.state.roundIdx + 1 + (doneRound ? 1 : 0);
+      if (doneRound && cur > tr) {
+        head = "รอบตัดสินที่ " + d.state.tiebreak + " · เล่นครบแล้ว";
+        what = "รอบตัดสินนี้เล่นครบแล้ว กดเพื่อไปต่อ";
+        label = "เล่นต่อ";
+      } else {
+        head = "รอบตัดสินที่ " + d.state.tiebreak + " · รอบ " + Math.min(cur, tr) + " จาก " + tr;
+        what = doneRound
+          ? "รอบที่แล้วจบไปแล้ว จะเริ่มรอบถัดไปของรอบตัดสิน คนใบ้จับการ์ดใหม่"
+          : "รอบที่ค้างอยู่จะเริ่มใหม่ คนใบ้จับการ์ดใหม่ หมากที่วางไว้ในรอบนั้นจะถูกล้าง";
+        label = doneRound ? "เล่นต่อ (รอบถัดไป)" : "เล่นต่อ (เริ่มรอบนี้ใหม่)";
+      }
+    } else {
+      var cur2 = d.state.roundIdx + 1 + (doneRound ? 1 : 0);
+      if (doneRound && cur2 > d.state.totalRounds) {
+        head = "เล่นครบทุกรอบแล้ว";
+        what = "เล่นครบ " + d.state.totalRounds + " รอบแล้ว กดเพื่อดูผลรวม";
+        label = "ดูผลรวม";
+      } else {
+        head = "รอบที่ " + cur2 + " จาก " + d.state.totalRounds;
+        what = doneRound
+          ? "รอบที่ " + (d.state.roundIdx + 1) + " จบไปแล้ว จะเริ่มรอบที่ " + cur2 + " คนใบ้จับการ์ดใหม่"
+          : "รอบที่ค้างอยู่จะเริ่มใหม่ คนใบ้จับการ์ดใหม่ หมากที่วางไว้ในรอบนั้นจะถูกล้าง";
+        label = doneRound ? "เล่นต่อ (รอบที่ " + cur2 + ")" : "เล่นต่อ (เริ่มรอบนี้ใหม่)";
+      }
+    }
+
     box.innerHTML = "<b>มีเกมที่เล่นค้างไว้</b>" +
-      "<p class='hint' style='margin:4px 0 4px'>รอบที่ " + (d.state.roundIdx + 1) +
-      " จาก " + d.state.totalRounds + " · " + d.state.players.length + " คน · แต้มยังอยู่ครบ</p>" +
-      "<p class='hint' style='margin:0 0 12px'>รอบที่ค้างอยู่จะเริ่มใหม่ คนใบ้จับการ์ดใหม่ " +
-      "หมากที่วางไว้ในรอบนั้นจะถูกล้าง</p>";
+      "<p class='hint' style='margin:4px 0 4px'>" + head +
+      " · " + d.state.players.length + " คน · แต้มยังอยู่ครบ</p>" +
+      "<p class='hint' style='margin:0 0 12px'>" + what + "</p>";
 
     var go = document.createElement("button");
     go.type = "button"; go.className = "btn";
-    go.textContent = "เล่นต่อ (เริ่มรอบนี้ใหม่)";
+    go.textContent = label;
     go.addEventListener("click", function () {
       state = d.state;
       headcount = d.headcount || state.players.length;
       leaderId = d.leaderId || null;
       picked = [];
       for (var i = 0; i < state.players.length; i++) picked.push(state.players[i].id);
-      /* รอบที่ค้างถูกนับไปแล้วตอนเริ่มครั้งแรก จะเริ่มใหม่จึงต้องถอยกลับ ไม่งั้นนับซ้ำ */
-      if (state.only && state.tiePlayed > 0) state.tiePlayed--;
       box.remove();
       buildBoard();
-      startRound();
+      if (doneRound) {
+        /* รอบนั้นจบและคิดแต้มไปแล้ว เดินหน้าต่อ ห้ามเริ่มรอบเดิมซ้ำ */
+        nextRound();
+      } else {
+        /* รอบที่ค้างถูกนับไปแล้วตอนเริ่มครั้งแรก จะเริ่มใหม่จึงต้องถอยกลับ ไม่งั้นนับซ้ำ */
+        if (state.only && state.tiePlayed > 0) state.tiePlayed--;
+        startRound();
+      }
     });
     box.appendChild(go);
 
@@ -1706,6 +1754,16 @@
   });
 
   $("btn-next-round").addEventListener("click", nextRound);
+
+  /* รอบตัดสินยืดได้ถึง (จำนวนคนที่เสมอ × 3) รอบ ซึ่งนานเกินกว่าที่วงจะทนไหว
+     ต้องมีทางออกให้ยอมรับผลเสมอเองได้ ไม่ใช่บังคับเล่นจนสุดเพดานหรือเลิกกลางคันแบบไม่มีผล */
+  $("btn-tie-quit").addEventListener("click", function () {
+    if (!state || !state.only) return;
+    if (!confirm("จบเกมแบบเสมอเลยไหม คนที่แต้มสูงสุดเท่ากันจะชนะร่วมกัน")) return;
+    var top = leaders(state.only);
+    state.only = null;
+    gameOver(top);
+  });
 
   $("btn-again").addEventListener("click", function () {
     state = null;

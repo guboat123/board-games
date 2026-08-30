@@ -9,6 +9,7 @@ import {
 } from "./poker-engine.mjs";
 
 const MAX_SEATS = 9;
+const SEAT_GRACE_MIN = 5;   /* ที่นั่งของคนที่หลุด ถือครองไว้กี่นาทีก่อนคืนให้คนใหม่ */
 
 export const DEFAULTS = {
   smallBlind: 10,
@@ -96,6 +97,12 @@ export function createTable(opts = {}) {
       return { ok: true, seatId: i, name, stack: s.stack };
     }
 
+    /* ที่นั่งที่ร้างนานเกิน SEAT_GRACE_MIN ถือว่าเจ้าของไม่กลับแล้ว คืนให้คนใหม่ได้
+       ไม่งั้นโต๊ะจะขึ้นว่า "เต็ม" ทั้งที่มีคนต่ออยู่แค่ 8 แล้วไม่มีใครเข้าได้อีกเลย */
+    function expired(x) {
+      return x && !x.connected && x.awaySince && (Date.now() - x.awaySince > SEAT_GRACE_MIN * 60000);
+    }
+
     let idx = -1;
     if (Number.isInteger(preferred) && preferred >= 0 && preferred < MAX_SEATS) {
       /* ขอเจาะจงที่นั่ง ถ้าไม่ว่างต้องบอกตรงๆ ไม่ใช่ย้ายไปช่องอื่นเงียบๆ
@@ -106,6 +113,17 @@ export function createTable(opts = {}) {
       idx = preferred;
     } else {
       for (let i = 0; i < MAX_SEATS; i++) if (!st.seats[i]) { idx = i; break; }
+      /* ไม่มีช่องว่างจริงๆ ค่อยไปเอาช่องที่ร้างนานแล้ว */
+      if (idx === -1) {
+        for (let i = 0; i < MAX_SEATS; i++) {
+          if (expired(st.seats[i])) {
+            note(st.seats[i].name + " ไม่ได้กลับมานาน คืนที่นั่งให้คนใหม่");
+            st.seats[i] = null;
+            idx = i;
+            break;
+          }
+        }
+      }
     }
     if (idx === -1) return { ok: false, error: "โต๊ะเต็มแล้ว (9 ที่นั่ง)" };
 
@@ -138,10 +156,27 @@ export function createTable(opts = {}) {
     return { ok: true, seatId: idx, name: finalName, stack: chips };
   }
 
+  /* ลุกจากโต๊ะเอง ต่างจากหลุด: ปล่อยที่นั่งทันที ไม่ต้องรอหมดเวลา
+     ถ้ายังอยู่ในมือ ให้ถือว่าหมอบก่อน เงินที่ลงไปแล้วอยู่ในกองตามกติกา */
+  function leave(seatId) {
+    const s = st.seats[seatId];
+    if (!s) return;
+    if (s.inHand && !s.folded) {
+      s.folded = true;
+      s.lastAction = "หมอบ (ออกจากโต๊ะ)";
+      checkRoundEnd(seatId);
+    }
+    note(s.name + " ออกจากโต๊ะ");
+    st.seats[seatId] = null;
+    if (st.hostSeat === seatId) st.hostSeat = null;
+    if (!seated().some(x => x.connected)) st.phase = "waiting";
+  }
+
   function disconnect(seatId) {
     const s = st.seats[seatId];
     if (!s) return;
     s.connected = false;
+    s.awaySince = Date.now();   /* ใช้ตัดสินว่าที่นั่งนี้ร้างนานพอจะคืนให้คนใหม่หรือยัง */
     note(s.name + " หลุดออกจากโต๊ะ");
 
     if (s.inHand && !s.folded) {
@@ -464,6 +499,14 @@ export function createTable(opts = {}) {
 
   /* ---------- มุมมองที่ส่งให้แต่ละเครื่อง ---------- */
 
+  /* กองที่โชว์บนจอ = ชิปทั้งหมดที่อยู่บนโต๊ะจริง ตรงกับที่ตาเห็น
+     (บอด 10/20 ตอนเปิดมือ = 30 ไม่ใช่ 20) */
+  function potOnTable() {
+    return seated().reduce((a, s) => a + s.committed, 0);
+  }
+
+  /* กองที่ใช้คิดขนาดเดิมพัน = เฉพาะส่วนที่มีคนตามแล้ว
+     เงินที่ยังไม่มีใครตามเดี๋ยวก็คืนเจ้าของ ถ้าเอามาคิดด้วย ปุ่มครึ่งกอง/เต็มกองจะเพี้ยน */
   function potTotal() {
     /* เงินส่วนที่ยังไม่มีใครตาม ไม่นับเป็นกองกลาง เพราะเดี๋ยวก็คืนเจ้าของ
        (กติกาเดียวกับ returnUncalled ตอนจบมือ)
@@ -486,7 +529,8 @@ export function createTable(opts = {}) {
       button: st.button,
       current: st.current,
       board: st.board.map(cardCode),
-      pot: potTotal(),
+      pot: potOnTable(),
+      potForBet: potTotal(),
       currentBet: st.currentBet,
       minRaise: st.minRaise,
       blinds: { sb: cfg.smallBlind, bb: cfg.bigBlind },
@@ -630,11 +674,13 @@ export function createTable(opts = {}) {
       blinds: cfg.smallBlind + "/" + cfg.bigBlind,
       phase: st.phase,
       handNo: st.handNo,
-      full: all.length >= MAX_SEATS,
+      /* ที่นั่งร้างที่คืนได้แล้ว ไม่นับว่าเต็ม ไม่งั้นคนใหม่จะเห็นป้าย "เต็ม" ทั้งที่เข้าได้ */
+      full: all.filter(x => x.connected || !x.awaySince ||
+                            (Date.now() - x.awaySince <= SEAT_GRACE_MIN * 60000)).length >= MAX_SEATS,
       limit: cfg.limitType === "none" ? null
              : (cfg.limitType === "hands" ? cfg.limitValue + " ตา" : cfg.limitValue + " นาที")
     };
   }
 
-  return { sit, disconnect, action, viewFor, openSeats, anyConnected, summary, _state: st, _cfg: cfg };
+  return { sit, leave, disconnect, action, viewFor, openSeats, anyConnected, summary, _state: st, _cfg: cfg };
 }

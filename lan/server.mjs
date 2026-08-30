@@ -98,7 +98,7 @@ function encodeFrame(str) {
 }
 
 /* แกะเฟรมที่ client ส่งมา (client ต้อง mask เสมอ) */
-function decodeFrames(buf, onMessage, onClose) {
+function decodeFrames(buf, onMessage, onClose, onPong) {
   let off = 0;
   while (off + 2 <= buf.length) {
     const b0 = buf[off], b1 = buf[off + 1];
@@ -128,7 +128,7 @@ function decodeFrames(buf, onMessage, onClose) {
 
     if (opcode === 0x8) { onClose(); return buf.length; }
     if (opcode === 0x1) onMessage(data.toString("utf8"));
-    /* opcode 0x9 ping / 0xA pong: ข้ามไป ไม่ได้ใช้ */
+    if (opcode === 0xA && onPong) onPong();   /* ตอบ ping แล้ว = ยังมีชีวิตอยู่ */
 
     off = p;
   }
@@ -140,6 +140,7 @@ function decodeFrames(buf, onMessage, onClose) {
 let nextId = 1;
 const rooms = new Map();   /* code -> { code, table, clients:Set, reaper } */
 const ROOM_GRACE_MIN = 10; /* ไม่มีใครต่ออยู่กี่นาทีถึงจะปิดห้อง */
+const PING_MS = 15000;     /* เคาะถามทุกกี่มิลลิวินาที ว่าอีกฝั่งยังอยู่ไหม */
 const lobby = new Set();   /* เครื่องที่ยังไม่ได้นั่งโต๊ะ รอดูรายการโต๊ะ */
 
 /* รายการโต๊ะที่เปิดอยู่ ส่งให้หน้าเลือกโต๊ะ */
@@ -199,11 +200,24 @@ server.on("upgrade", (req, socket) => {
   );
   socket.setNoDelay(true);
 
-  const client = { id: nextId++, socket, room: null, seatId: null };
+  const client = { id: nextId++, socket, room: null, seatId: null, alive: true };
   lobby.add(client);
+
+  /* โซเก็ตที่ตายแบบไม่ส่ง FIN (ปิด WiFi / แท็บถูกพักใน bfcache) จะค้างอยู่ตลอดกาล
+     ทำให้โต๊ะรอคนที่ไม่มีวันกลับมา และห้องไม่มีวันถูกเก็บกวาด
+     จึงต้องเคาะถามเป็นระยะ ไม่ตอบสองรอบติดถือว่าตายแล้ว */
+  const ping = setInterval(() => {
+    if (!client.alive) { log("ไม่ตอบ ping ตัดการเชื่อมต่อ #" + client.id); cleanup(); return; }
+    client.alive = false;
+    try { socket.write(Buffer.from([0x89, 0x00])); } catch (e) { cleanup(); }
+  }, PING_MS);
   let buf = Buffer.alloc(0);
 
+  let cleaned = false;
   function cleanup() {
+    if (cleaned) return;   /* error + close ยิงซ้อนกันได้ */
+    cleaned = true;
+    clearInterval(ping);
     lobby.delete(client);
     if (client.room) {
       client.room.clients.delete(client);
@@ -217,6 +231,9 @@ server.on("upgrade", (req, socket) => {
           if (room.clients.size === 0) {
             rooms.delete(room.code);
             log("ห้อง", room.code, "ไม่มีใครกลับมา ปิดห้องแล้ว");
+            /* ต้องบอกหน้ารวมโต๊ะด้วย ไม่งั้นคนจะเห็นห้องที่ไม่มีอยู่แล้ว
+               กดเข้าไปได้ห้องใหม่เอี่ยม พร้อมคำสัญญาเรื่องชิปเดิมที่ไม่มีจริง */
+            pushLobby();
           }
         }, ROOM_GRACE_MIN * 60000);
       } else {
@@ -230,7 +247,7 @@ server.on("upgrade", (req, socket) => {
 
   socket.on("data", (chunk) => {
     buf = Buffer.concat([buf, chunk]);
-    const used = decodeFrames(buf, handle, cleanup);
+    const used = decodeFrames(buf, handle, cleanup, function () { client.alive = true; });
     buf = buf.subarray(used);
   });
   socket.on("error", cleanup);
@@ -277,6 +294,21 @@ server.on("upgrade", (req, socket) => {
     }
 
     if (!client.room) return;
+
+    /* ลุกจากโต๊ะเอง ต้องปล่อยที่นั่งจริง ไม่ใช่ทิ้งให้ค้างเหมือนเน็ตหลุด
+       ไม่งั้นคนที่เหลือจะรอตาของคนที่เดินออกไปแล้วตลอดกาล */
+    if (msg.type === "leave") {
+      const room = client.room;
+      room.clients.delete(client);
+      room.table.leave(client.seatId);
+      client.room = null;
+      client.seatId = null;
+      lobby.add(client);
+      broadcastState(room);
+      pushLobby();
+      send(client, { type: "left" });
+      return;
+    }
 
     const out = client.room.table.action(client.seatId, msg);
     if (out && out.error) send(client, { type: "error", message: out.error });
