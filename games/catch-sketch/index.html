@@ -115,7 +115,12 @@
     margin-bottom: 18px;
   }
   /* คำที่ต้องวาด ตัวใหญ่สุดในเกม ถ้ามีวรรณยุกต์ซ้อนจะไปทับป้าย "คำของคุณ" ข้างบน */
-  .word__main { font-family: var(--font-display); font-weight: 700; font-size: 2.5rem; line-height: 1.5; overflow-wrap: anywhere; }
+  /* padding-top ให้คำจองที่รับวรรณยุกต์ซ้อนของตัวเอง (เกี๊ยว ปลั๊กไฟ ผีเสื้อ)
+     line-height อย่างเดียวไม่พอ เพราะมันเพิ่มทั้งบนและล่าง แล้วกินที่ของรายชื่อไปด้วย */
+  .word__main {
+    font-family: var(--font-display); font-weight: 700; font-size: 2.5rem;
+    line-height: 1.5; padding-top: .2em; overflow-wrap: anywhere;
+  }
   .word__sub  { font-size: .95rem; color: #6C7472; margin-top: 8px; }
   .word__lv   { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .12em; color: var(--ink-blue); margin-bottom: 10px; }
 
@@ -1148,7 +1153,7 @@
     /* ต้องเช็คก่อน tap-guard ไม่งั้นคนที่กดเร็ว (ปกติคน double tap ที่ 150-250ms)
        จะโดน tap-guard ตัดตั้งแต่ต้นทาง แล้วเจอความเงียบโดยไม่มีอะไรบอก */
     if (state.justBack[i] && Date.now() - state.justBack[i] < 900) {
-      $("claim-status").textContent = "แตะชื่ออีกครั้งเพื่อคว้าคิว";
+      sayStatus("แตะชื่ออีกครั้งเพื่อคว้าคิว");
       return;
     }
     if (tappedTooFast(i)) return;
@@ -1167,7 +1172,12 @@
   }
 
   function unGiveUp(i) {
-    if (tappedTooFast(i)) return;
+    /* กดยอมแพ้พลาดแล้วรีบกดยกเลิกทันที เป็น reflex ปกติของคน (150-250ms)
+       ถ้าเงียบ คนจะคิดว่ายกเลิกไม่ได้แล้ว แล้วยอมแพ้จริงทั้งที่ไม่ได้ตั้งใจ */
+    if (tappedTooFast(i)) {
+      sayStatus("แตะชื่ออีกครั้งเพื่อกลับเข้าเกม");
+      return;
+    }
     var at = state.gaveUp.indexOf(i);
     if (at === -1) return;
     state.gaveUp.splice(at, 1);
@@ -1177,7 +1187,21 @@
     renderClaims();
   }
 
+  /* ข้อความชั่วคราวบนแถบสถานะ ต้องคืนค่าเดิมเองด้วย
+     ไม่งั้นตัวนับ "รออีก N คน" หายไปจนกว่าจะมีใครกดสำเร็จ ซึ่งเป็นข้อมูลที่คนถือเครื่องใช้ตัดสินใจ */
+  var statusTimer = 0;
+
+  function sayStatus(msg) {
+    $("claim-status").textContent = msg;
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(function () {
+      /* คืนค่าเฉพาะตอนยังอยู่หน้าคว้าคิว ไม่งั้นไปเขียนทับหน้าอื่น */
+      if (state && $("s-word").classList.contains("is-on")) refreshAllDone();
+    }, 1400);
+  }
+
   function refreshAllDone() {
+    clearTimeout(statusTimer);
     refreshClaimsCue();
     var drawers = drawerIdxs().length;
     var settled = state.queue.length + state.gaveUp.length;
@@ -1349,6 +1373,26 @@
       o.textContent = "ยอมแพ้";
       li3.appendChild(o);
       ql.appendChild(li3);
+    });
+
+    /* หัวหน้าห้องปิดรอบได้ตอนที่ยังมีคนวาดอยู่ คนพวกนั้นต้องมีชื่อในสรุปด้วย
+       ไม่งั้นจะหายไปเงียบๆ แล้วแยกไม่ออกว่า "ปิดรอบก่อนเวลา" กับ "ทุกคนกดครบแล้ว" ต่างกันยังไง */
+    drawerIdxs().forEach(function (pi) {
+      if (state.queue.indexOf(pi) !== -1) return;
+      if (state.gaveUp.indexOf(pi) !== -1) return;
+      var li4 = document.createElement("li");
+      var no3 = document.createElement("span");
+      no3.className = "n";
+      no3.textContent = "—";
+      li4.appendChild(no3);
+      var nm3 = document.createElement("span");
+      nm3.textContent = state.players[pi].name;
+      li4.appendChild(nm3);
+      var o2 = document.createElement("span");
+      o2.className = "out";
+      o2.textContent = "ยังวาดไม่เสร็จ";
+      li4.appendChild(o2);
+      ql.appendChild(li4);
     });
 
     var last = (state.roundIdx + 1 >= state.totalRounds);
@@ -1643,6 +1687,15 @@
   $("btn-all-done").addEventListener("click", allDone);
   /* เลื่อนแล้วต้องอัปเดตคำบอกใบ้ด้วย ไม่งั้นเลื่อนถึงล่างสุดแล้วยังขึ้นว่ามีต่อ */
   $("claims").addEventListener("scroll", refreshClaimsCue);
+
+  /* ความสูงกล่องผูกกับ 100dvh ซึ่งเปลี่ยนเองตลอดบนมือถือเวลาแถบ URL ยุบ/กาง
+     ถ้าไม่วัดใหม่ คำใบ้ "เลื่อนดูชื่อที่เหลือ" จะค้างเป็นค่าเก่า
+     แล้วคนวาดคนสุดท้ายจะหาชื่อตัวเองไม่เจอ ตอนที่ทุกคนกำลังแย่งคว้าคิวพอดี */
+  window.addEventListener("resize", refreshClaimsCue);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", refreshClaimsCue);
+    window.visualViewport.addEventListener("scroll", refreshClaimsCue);
+  }
   $("btn-ready-guess").addEventListener("click", toGuess);
   $("btn-right").addEventListener("click", guessRight);
   $("btn-wrong").addEventListener("click", guessWrong);
