@@ -240,6 +240,7 @@
       <p class="kit__foot muted">นาฬิกาจับเวลา เบอร์คิว และกระดาษนับแต้ม ไม่ต้องเตรียม โปรแกรมจัดการให้หมดแล้ว</p>
     </details>
 
+    <p class="note" id="ready-note" role="status" aria-live="polite"></p>
     <button class="btn" id="btn-to-setup">ตั้งค่าเกม</button>
   </section>
 
@@ -560,14 +561,9 @@
       host.appendChild(li);
     });
 
-    var ready = picked.length === headcount;
     renderLeader();
     refreshReady();
 
-    if (!$("pick-note").textContent) {
-      if (ready) setNote($("pick-note"), leaderId ? "ครบแล้ว กดตั้งค่าเกมได้เลย" : "เลือกหัวหน้าห้องอีก 1 คน", leaderId ? "ok" : "");
-      else if (all.length) setNote($("pick-note"), "เลือกอีก " + (headcount - picked.length) + " คน");
-    }
   }
 
   /* เลือกหัวหน้าห้องจากคนที่เลือกมาเล่นแล้วเท่านั้น */
@@ -617,7 +613,21 @@
 
   /* กดตั้งค่าเกมได้เมื่อเลือกคนครบและมีหัวหน้าห้องแล้ว */
   function refreshReady() {
-    $("btn-to-setup").disabled = !(picked.length === headcount && leaderId);
+    var ok = (picked.length === headcount && !!leaderId);
+    $("btn-to-setup").disabled = !ok;
+
+    /* ปุ่มเทาเฉยๆ โดยไม่บอกเหตุผล ทำให้คนติดตรงนี้ ต้องบอกเสมอว่าขาดอะไร */
+    var why;
+    if (!Players.all().length) {
+      why = "ยังไม่มีชื่อในทะเบียน พิมพ์ชื่อเพื่อนในช่องด้านบนแล้วกดเพิ่มชื่อก่อน";
+    } else if (picked.length < headcount) {
+      why = "เลือกคนเล่นอีก " + (headcount - picked.length) + " คน (ต้องครบ " + headcount + " คน)";
+    } else if (!leaderId) {
+      why = "เหลืออีกขั้นเดียว เลือกหัวหน้าห้อง 1 คน";
+    } else {
+      why = "พร้อมแล้ว กดตั้งค่าเกม ได้เลย";
+    }
+    setNote($("ready-note"), why, ok ? "ok" : "bad");
   }
 
   function addName() {
