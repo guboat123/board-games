@@ -302,6 +302,17 @@
      บนจอสูงๆ หน้านี้เลื่อนได้นิดเดียว ปุ่มเลยทับข้อความที่บอกวิธีเริ่มเกม */
   .stickpad { height: 76px; }
 
+  /* ข้อความที่บอกว่าทำไมกดไม่ได้ ต้องเดินทางไปกับปุ่ม ไม่ใช่ถูกปุ่มทับ
+     คนเปิดเกมครั้งแรกมีแค่บรรทัดนี้ที่บอกว่าต้องทำอะไรก่อน จะมารู้ตอนเลื่อนเจอไม่ได้ */
+  .stickwrap {
+    position: sticky; bottom: 10px; z-index: 5;
+    background: var(--board);
+    padding-top: 8px;
+    box-shadow: 0 -10px 16px var(--board);
+  }
+  .stickwrap .note,
+  .stickwrap .hint { margin-top: 0; }
+
   /* ปุ่มเดินเกมต้องอยู่ในสายตาเสมอ ไม่งั้นคนถือเครื่องต้องเลื่อนหาทุกรอบ */
   .btn--stick {
     position: sticky; bottom: 10px; z-index: 5;
@@ -365,8 +376,10 @@
       <p class="kit__foot muted">นาฬิกาจับเวลา เบอร์คิว และกระดาษนับแต้ม ไม่ต้องเตรียม โปรแกรมจัดการให้หมดแล้ว</p>
     </details>
 
-    <p class="note" id="ready-note" role="status" aria-live="polite"></p>
-    <button class="btn btn--stick" id="btn-to-setup">ตั้งค่าเกม</button>
+    <div class="stickwrap">
+      <p class="note" id="ready-note" role="status" aria-live="polite"></p>
+      <button class="btn" id="btn-to-setup">ตั้งค่าเกม</button>
+    </div>
     <div class="stickpad"></div>
   </section>
 
@@ -403,10 +416,12 @@
       <div class="chips" id="opt-rounds"></div>
     </div>
 
-    <p class="hint" id="pool-info"></p>
-    <p class="hint" id="rounds-info"></p>
-
-    <button class="btn btn--stick" id="btn-start">เริ่มเล่น</button>
+    <div class="stickwrap">
+      <p class="hint" id="pool-info"></p>
+      <p class="hint" id="rounds-info"></p>
+      <button class="btn" id="btn-start">เริ่มเล่น</button>
+    </div>
+    <div class="stickpad"></div>
     <p style="margin-top:12px"><button class="btn btn--ghost btn--sm" id="btn-back-players">← เปลี่ยนคนเล่น</button></p>
   </section>
 
@@ -466,6 +481,7 @@
       <button class="btn btn--skip" id="btn-wrong">ทายผิด ไปคิวถัดไป</button>
       <button class="btn btn--good" id="btn-right">ทายถูก</button>
     </div>
+    <p class="note" id="guess-note" role="status" aria-live="polite" style="text-align:center"></p>
     <p style="margin-top:12px; text-align:center">
       <button class="btn btn--ghost btn--sm" id="btn-back-q" style="display:none">← กลับไปคิวก่อนหน้า</button>
     </p>
@@ -1281,6 +1297,9 @@
   }
 
   function paintGuess() {
+    /* ล้างข้อความชั่วคราวของคิวก่อน ไม่งั้นมันค้างข้ามคิวมา */
+    clearTimeout(guessNoteTimer);
+    $("guess-note").textContent = "";
     paintScores($("scores-guess"));
     $("btn-back-q").style.display = state.qpos > 0 ? "inline-flex" : "none";
     var pi = state.queue[state.qpos];
