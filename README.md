@@ -65,10 +65,13 @@ board-games/
 └─ games/
    ├─ catch-sketch/               เกม 01 วาดให้ทาย
    │  ├─ index.html
-   │  └─ words/
-   │     ├─ general.js            คำทั่วไป
-   │     ├─ characters.js         ตัวละครดัง
-   │     └─ thai.js               คำหมวดไทย
+   │  └─ words/                    รวม 1,147 คำ
+   │     ├─ general.js            คำทั่วไป ชุดที่ 1
+   │     ├─ general-2.js          คำทั่วไป ชุดที่ 2 (ต่อท้าย)
+   │     ├─ characters.js         ตัวละครดัง ชุดที่ 1
+   │     ├─ characters-2.js       ตัวละครดัง ชุดที่ 2 (ต่อท้าย)
+   │     ├─ thai.js               คำหมวดไทย ชุดที่ 1
+   │     └─ thai-2.js             คำหมวดไทย ชุดที่ 2 (ต่อท้าย)
    └─ color-clues/                เกม 02 เดาสีจากคำใบ้
       └─ index.html
 ```
@@ -76,6 +79,9 @@ board-games/
 ## อยากเพิ่มคำ
 
 เปิดไฟล์ใน `games/catch-sketch/words/` แล้วต่อท้ายบรรทัดสุดท้ายของหมวดที่ตรงที่สุด
+
+ไฟล์ลงท้าย `-2.js` เป็นชุดต่อท้าย ใช้ `(window.WORDS_X || []).concat([...])` จึงไม่ทับชุดแรก
+ถ้าจะเพิ่มชุดใหม่ ทำแบบเดียวกันแล้วเพิ่ม `<script src>` ต่อท้ายใน `index.html` ของเกม
 
 ```js
 { w: "จักรยานยนต์พ่วงข้าง", en: "sidecar", cat: "vehicle", lv: 3 },
