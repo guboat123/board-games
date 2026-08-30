@@ -12,6 +12,13 @@
   }
   .back { font-size: .9rem; color: var(--ink-blue); text-decoration: none; font-weight: 600; }
 
+  .leaderline {
+    font-family: var(--font-mono); font-size: .74rem; color: #6C7472;
+    margin: 2px 0 10px; overflow-wrap: anywhere;
+  }
+  .leaderline b { color: var(--ink); }
+  .leaderline[hidden] { display: none; }
+
   .screen { display: none; }
   .screen.is-on { display: block; }
 
@@ -20,80 +27,27 @@
   .note--bad { color: var(--ink-red); font-weight: 600; }
   .note--ok  { color: var(--ink-green); font-weight: 600; }
 
-  /* ---- แถบคะแนน ---- */
-  .scores { display: flex; gap: 9px; flex-wrap: wrap; margin-bottom: 18px; }
+  /* ---- แถบคะแนนสะสม (รายคน) ---- */
+  .scores { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
   .score {
-    flex: 1 1 0; min-width: 74px; text-align: center;
-    padding: 10px 6px;
+    flex: 1 1 0; min-width: 70px; text-align: center;
+    padding: 9px 5px;
     background: var(--paper);
     border: var(--stroke) solid var(--ink);
     border-radius: var(--radius);
   }
   .score.is-turn { background: var(--ink-orange); }
-  .score b { display: block; font-family: var(--font-mono); font-size: 1.5rem; line-height: 1.1; }
-  .score span { font-size: .78rem; overflow-wrap: anywhere; }
+  .score b { display: block; font-family: var(--font-mono); font-size: 1.4rem; line-height: 1.1; }
+  .score span { font-size: .74rem; display: block; overflow-wrap: anywhere; }
 
-  /* ---- หน้าพร้อมเล่น ---- */
-  .ready { text-align: center; padding: 30px 0 10px; }
-  .ready .who { font-family: var(--font-display); font-size: 2.1rem; font-weight: 700; margin: 6px 0 2px; }
-
-  /* ---- หน้าเล่น ---- */
-  .timer {
-    height: 14px; background: var(--paper);
-    border: var(--stroke) solid var(--ink);
-    border-radius: 99px; overflow: hidden; margin-bottom: 6px;
-  }
-  .timer i { display: block; height: 100%; background: var(--ink-green); width: 100%; }
-  .timer.is-low i { background: var(--ink-red); }
-
-  .clock {
-    font-family: var(--font-mono); font-size: 1.05rem;
-    text-align: right; margin-bottom: 16px;
-  }
-
-  .word {
-    background: var(--paper);
-    border: var(--stroke) solid var(--ink);
-    border-radius: var(--radius);
-    box-shadow: 6px 7px 0 var(--smudge);
-    padding: 42px 20px;
-    text-align: center;
-    min-height: 200px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    margin-bottom: 20px;
-  }
-  .word__main { font-family: var(--font-display); font-weight: 700; font-size: 2.5rem; line-height: 1.2; overflow-wrap: anywhere; }
-  .word__sub  { font-size: .95rem; color: #6C7472; margin-top: 8px; }
-  .word__lv   { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .12em; color: var(--ink-blue); margin-bottom: 10px; }
-
-  .actions { display: flex; gap: 10px; }
-
-  /* ---- สรุปรอบ ---- */
-  .tally { list-style: none; padding: 0; margin: 14px 0 0; }
-  .tally li {
-    display: flex; justify-content: space-between; gap: 10px;
-    padding: 8px 0; border-bottom: 2px dashed var(--board-deep);
-  }
-  .tally .ok   { color: var(--ink-green); font-weight: 600; text-align: right; }
-  .tally .no   { color: var(--ink-red); }
-  .tally .w    { overflow-wrap: anywhere; }
-
-  .big-num { font-family: var(--font-mono); font-size: 3.4rem; line-height: 1; }
-
-  /* ---- ชิปผู้เล่น (เลือกคนเล่น) ---- */
+  /* ---- ชิปผู้เล่น ---- */
   .plist { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; padding: 0; list-style: none; }
   .pchip {
     padding: 9px 15px;
-    font-family: var(--font-body);
-    font-weight: 600;
-    font-size: .92rem;
-    background: var(--paper);
-    color: var(--ink);
-    border: var(--stroke) solid var(--ink);
-    border-radius: 99px;
-    cursor: pointer;
-    max-width: 100%;
-    overflow-wrap: anywhere;
+    font-family: var(--font-body); font-weight: 600; font-size: .92rem;
+    background: var(--paper); color: var(--ink);
+    border: var(--stroke) solid var(--ink); border-radius: 99px;
+    cursor: pointer; max-width: 100%; overflow-wrap: anywhere;
   }
   .pchip[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
   .pchip:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 3px; }
@@ -105,8 +59,7 @@
     padding: 12px 14px;
     font-family: var(--font-body); font-size: 1rem;
     color: var(--ink); background: var(--paper);
-    border: var(--stroke) solid var(--ink);
-    border-radius: var(--radius);
+    border: var(--stroke) solid var(--ink); border-radius: var(--radius);
   }
   .addrow input:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 3px; }
   .addrow .btn { flex: 0 0 auto; }
@@ -116,48 +69,119 @@
     color: #6C7472; font-size: .92rem;
     border: 2px dashed var(--smudge); border-radius: var(--radius);
   }
-
   .count { font-family: var(--font-mono); font-size: .82rem; color: var(--ink-blue); }
 
-  /* ---- แบ่งทีม ---- */
-  .teambox { margin-top: 12px; }
-  .team {
+  /* ---- หน้าส่งเครื่อง ---- */
+  .pass { text-align: center; padding: 30px 0 12px; }
+  .pass .who { font-family: var(--font-display); font-size: 2.2rem; font-weight: 700; margin: 6px 0 4px; overflow-wrap: anywhere; }
+  .whoare { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
+  .whoare span {
+    padding: 6px 13px; font-size: .86rem; font-weight: 600;
+    background: var(--board); border: 2px solid var(--ink); border-radius: 99px;
+    overflow-wrap: anywhere; max-width: 100%;
+  }
+
+  /* ---- หน้าคำ ---- */
+  .clock {
+    font-family: var(--font-mono); font-size: 1.05rem;
+    text-align: right; margin-bottom: 10px; color: #6C7472;
+  }
+  .word {
+    background: var(--paper);
     border: var(--stroke) solid var(--ink);
     border-radius: var(--radius);
-    background: var(--paper);
-    padding: 12px 14px;
-    margin-bottom: 10px;
+    box-shadow: 6px 7px 0 var(--smudge);
+    padding: 36px 20px;
+    text-align: center;
+    min-height: 168px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    margin-bottom: 18px;
   }
-  .team h4 { margin: 0 0 8px; font-family: var(--font-display); font-size: 1rem; }
-  .team .members { display: flex; flex-wrap: wrap; gap: 8px; }
-  .team .mem {
-    padding: 7px 13px; font-size: .88rem; font-weight: 600;
-    background: var(--board); color: var(--ink);
-    border: 2px solid var(--ink); border-radius: 99px;
-    cursor: pointer; overflow-wrap: anywhere; max-width: 100%;
-  }
-  .team .mem.is-picked { background: var(--ink-blue); border-color: var(--ink-blue); color: var(--paper); }
-  .team .mem:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 3px; }
+  .word__main { font-family: var(--font-display); font-weight: 700; font-size: 2.5rem; line-height: 1.2; overflow-wrap: anywhere; }
+  .word__sub  { font-size: .95rem; color: #6C7472; margin-top: 8px; }
+  .word__lv   { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .12em; color: var(--ink-blue); margin-bottom: 10px; }
 
-  /* ---- คิวคนทาย (โหมดเดี่ยว) ---- */
-  .queue { list-style: none; padding: 0; margin: 12px 0 0; counter-reset: q; }
-  .queue li {
-    display: flex; align-items: center; gap: 10px;
+  /* ---- ปุ่มคว้าคิว ---- */
+  .claims { list-style: none; padding: 0; margin: 0 0 16px; }
+  .claims li { display: flex; gap: 8px; margin-bottom: 10px; }
+
+  .claim {
+    flex: 1 1 auto; min-width: 0;
+    padding: 16px 14px;
+    font-family: var(--font-display); font-weight: 700; font-size: 1.1rem;
+    color: var(--ink); background: var(--paper);
+    border: var(--stroke) solid var(--ink); border-radius: var(--radius);
+    box-shadow: 3px 4px 0 var(--smudge);
+    cursor: pointer;
+    overflow-wrap: anywhere;
+  }
+  .claim:active { transform: translate(3px, 4px); box-shadow: 0 0 0 var(--smudge); }
+  .claim:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 3px; }
+  .claim.is-done { background: var(--ink-green); border-color: var(--ink-green); color: var(--paper); cursor: default; box-shadow: none; transform: none; }
+  .claim.is-out  { background: var(--board); color: #8B9391; cursor: default; box-shadow: none; transform: none; }
+
+  .giveup {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    font-family: var(--font-body); font-weight: 600; font-size: .8rem;
+    color: var(--ink-red); background: var(--paper);
+    border: 2px solid var(--ink-red); border-radius: var(--radius);
+    cursor: pointer;
+  }
+  .giveup:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 3px; }
+  .giveup[disabled] { opacity: .35; cursor: not-allowed; }
+
+  /* ---- หน้าทาย ---- */
+  .look { text-align: center; padding: 26px 0 10px; }
+  .look .qno { font-family: var(--font-mono); font-size: .78rem; letter-spacing: .12em; color: var(--ink-blue); }
+  .look .who { font-family: var(--font-display); font-size: 2.3rem; font-weight: 700; margin: 6px 0 2px; overflow-wrap: anywhere; }
+  .actions { display: flex; gap: 10px; margin-top: 18px; }
+
+  /* ---- สรุปรอบ ---- */
+  .tally { list-style: none; padding: 0; margin: 12px 0 0; }
+  .tally li {
+    display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
     padding: 9px 0; border-bottom: 2px dashed var(--board-deep);
+  }
+  .tally .nm { font-weight: 600; overflow-wrap: anywhere; }
+  .tally .rt { text-align: right; white-space: nowrap; }
+  .tally .pt { font-family: var(--font-mono); font-weight: 600; color: var(--ink-green); }
+  .tally .why { display: block; font-size: .76rem; color: #6C7472; white-space: normal; }
+
+  .qlist { list-style: none; padding: 0; margin: 12px 0 0; }
+  .qlist li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0; border-bottom: 2px dashed var(--board-deep);
     font-weight: 600;
   }
-  .queue li::before {
-    counter-increment: q; content: counter(q);
-    flex: 0 0 auto;
-    width: 26px; height: 26px;
+  .qlist .n {
+    flex: 0 0 auto; width: 26px; height: 26px;
     display: inline-flex; align-items: center; justify-content: center;
-    font-family: var(--font-mono); font-size: .8rem; font-weight: 600;
+    font-family: var(--font-mono); font-size: .8rem;
     background: var(--board); border: 2px solid var(--ink); border-radius: 99px;
   }
+  .qlist .out { color: #8B9391; font-weight: 400; font-size: .86rem; margin-left: auto; }
 
-  /* ---- เลือกว่ารูปใครทำให้ทายถูก ---- */
-  .pickwho { text-align: center; }
-  .pickwho .word__main { font-size: 1.8rem; }
+  .reveal-word {
+    font-family: var(--font-display); font-weight: 700; font-size: 2.1rem;
+    line-height: 1.2; overflow-wrap: anywhere;
+  }
+
+  /* ---- อันดับจบเกม ---- */
+  .rank { list-style: none; padding: 0; margin: 12px 0 0; }
+  .rank li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 12px; margin-bottom: 8px;
+    background: var(--paper);
+    border: var(--stroke) solid var(--ink);
+    border-radius: var(--radius);
+  }
+  .rank li.is-first { background: var(--ink-orange); }
+  .rank .no { font-family: var(--font-mono); font-size: .9rem; width: 1.6em; }
+  .rank .nm { font-weight: 600; flex: 1 1 auto; overflow-wrap: anywhere; }
+  .rank .pt { font-family: var(--font-mono); font-size: 1.3rem; font-weight: 600; }
+
+  .steps { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .1em; color: var(--ink-blue); }
 </style>
 </head>
 <body>
@@ -168,10 +192,12 @@
     <span class="eyebrow">เกม 01</span>
   </div>
 
+  <p class="leaderline" id="leaderline" hidden>หัวหน้าห้อง <b id="leadername"></b></p>
+
   <!-- ============ 1. ใครเล่นบ้าง ============ -->
   <section id="s-players" class="screen is-on">
     <h1>วาดให้ทาย</h1>
-    <p class="hint">เกมนี้แนะนำ 4 ถึง 12 คน</p>
+    <p class="hint">เกมนี้แนะนำ 3 ถึง 6 คน ทุกคนต้องมีไวท์บอร์ดกับปากกาของตัวเอง ใช้เครื่องเดียววางกลางโต๊ะ</p>
     <div class="rule"></div>
 
     <div class="field">
@@ -192,30 +218,36 @@
       </div>
     </div>
 
+    <div class="field" id="f-leader">
+      <label>หัวหน้าห้อง</label>
+      <p class="hint" style="margin:0 0 8px">คนที่ถือเครื่องและกดปุ่มให้ทุกคนตลอดเกม</p>
+      <div class="chips" id="opt-leader"></div>
+      <div class="empty" id="leader-empty">เลือกคนเล่นให้ครบก่อน แล้วค่อยเลือกหัวหน้าห้อง</div>
+    </div>
+
+    <details class="kit" open>
+      <summary>อุปกรณ์ที่ต้องเตรียม</summary>
+      <ul class="kit__list">
+        <li><span class="thing">มือถือหรือแท็บเล็ต</span><span class="qty">1 เครื่อง</span></li>
+        <li><span class="thing">ไวท์บอร์ด</span><span class="qty qty--each">คนละอัน</span></li>
+        <li><span class="thing">ปากกาไวท์บอร์ด</span><span class="qty qty--each">คนละด้าม</span></li>
+        <li><span class="thing">แปรงลบหรือผ้า</span><span class="qty qty--each">คนละอัน</span></li>
+      </ul>
+      <div class="kit__note">
+        <p>ต้องมีไวท์บอร์ดครบทุกคน ไม่ใช่อันเดียววางกลางโต๊ะ เพราะทุกคนวาดพร้อมกันแข่งกัน</p>
+        <p>ถ้าไวท์บอร์ดไม่พอ ใช้กระดาษ A4 กับปากกาเมจิกแทนได้ เตรียมไว้คนละ 15 ถึง 20 แผ่น</p>
+      </div>
+      <p class="kit__foot muted">นาฬิกาจับเวลา เบอร์คิว และกระดาษนับแต้ม ไม่ต้องเตรียม โปรแกรมจัดการให้หมดแล้ว</p>
+    </details>
+
     <button class="btn" id="btn-to-setup">ตั้งค่าเกม</button>
   </section>
 
   <!-- ============ 2. ตั้งค่า ============ -->
   <section id="s-setup" class="screen">
     <h1>ตั้งค่าเกม</h1>
-    <p class="hint" id="setup-rule"></p>
+    <p class="hint">คนวาดห้ามพูด ห้ามเขียนตัวหนังสือ ห้ามใบ้เป็นตัวเลข วาดอย่างเดียว</p>
     <div class="rule"></div>
-
-    <div class="field">
-      <label>โหมดเล่น</label>
-      <div class="chips" id="opt-mode"></div>
-      <p class="hint" id="mode-desc"></p>
-    </div>
-
-    <div class="field" id="f-teams">
-      <label>จำนวนทีม</label>
-      <div class="chips" id="opt-teams"></div>
-    </div>
-
-    <div class="field" id="f-time">
-      <label>เวลาต่อรอบ</label>
-      <div class="chips" id="opt-time"></div>
-    </div>
 
     <div class="field">
       <label>ชุดคำ</label>
@@ -228,53 +260,34 @@
     </div>
 
     <div class="field">
-      <label>เล่นถึงกี่แต้ม</label>
-      <div class="chips" id="opt-target"></div>
-    </div>
-
-    <!-- แบ่งทีม (โหมดทีม) -->
-    <div class="field" id="f-lineup">
-      <label>แบ่งทีม</label>
-      <p class="hint">กดชื่อคนแรก แล้วกดชื่อคนที่สอง เพื่อสลับที่กัน</p>
-      <div class="teambox" id="teambox"></div>
-      <button class="btn btn--ghost btn--sm" id="btn-reshuffle">สุ่มทีมใหม่</button>
-      <p class="note" id="team-note" role="status" aria-live="polite"></p>
-    </div>
-
-    <!-- คิวคนทาย (โหมดเดี่ยว) -->
-    <div class="field" id="f-queue">
-      <label>ลำดับคนทาย</label>
-      <p class="hint">ทุกคนจะได้เป็นคนทายวนไปตามลำดับนี้</p>
-      <ul class="queue" id="queue"></ul>
-      <button class="btn btn--ghost btn--sm" id="btn-requeue">สุ่มลำดับใหม่</button>
+      <label>จำนวนรอบต่อคน</label>
+      <div class="chips" id="opt-rounds"></div>
     </div>
 
     <p class="hint" id="pool-info"></p>
+    <p class="hint" id="rounds-info"></p>
+
     <button class="btn" id="btn-start">เริ่มเล่น</button>
     <p style="margin-top:12px"><button class="btn btn--ghost btn--sm" id="btn-back-players">← เปลี่ยนคนเล่น</button></p>
   </section>
 
-  <!-- ============ 3. พร้อมเล่น ============ -->
-  <section id="s-ready" class="screen">
-    <div class="scores" id="scores-ready"></div>
-    <div class="card ready">
-      <span class="eyebrow" id="ready-kicker">ส่งมือถือให้คนวาดของ</span>
-      <div class="who" id="ready-team">ทีม ก</div>
-      <p class="muted" id="ready-hint">คนอื่นอย่าแอบดูจอนะ กดเริ่มแล้วเวลาเดินทันที</p>
-      <button class="btn" id="btn-go">เริ่มรอบนี้</button>
+  <!-- ============ 3. ส่งเครื่องให้คนวาด ============ -->
+  <section id="s-pass-draw" class="screen">
+    <div class="scores" id="scores-pass"></div>
+    <div class="card pass">
+      <span class="steps" id="pd-step">รอบที่ 1</span>
+      <div style="margin-top:8px"><span class="eyebrow">รอบนี้คนทายคือ</span></div>
+      <div class="who" id="pd-guesser">—</div>
+      <p class="muted" id="pd-warn">ห้ามดูจอ ให้หันหลังหรือหลับตาไว้</p>
+      <div class="whoare" id="pd-drawers"></div>
+      <p class="hint" style="margin-top:14px">คนวาดทุกคนดูคำพร้อมกัน แล้วรีบวาดแข่งกัน</p>
+      <button class="btn" id="btn-open-word" style="margin-top:14px">คนทายหันหลังแล้ว เปิดคำ</button>
     </div>
-    <p style="margin-top:14px"><button class="btn btn--ghost btn--sm" id="btn-quit">จบเกม</button></p>
   </section>
 
-  <!-- ============ 4. กำลังเล่น ============ -->
-  <section id="s-play" class="screen">
-    <div id="timer-wrap">
-      <div class="timer" id="timer"><i id="timer-fill"></i></div>
-      <div class="clock"><span id="clock">60</span> วิ &nbsp;·&nbsp; ได้ <span id="run-score">0</span> คำ</div>
-    </div>
-    <div class="clock" id="notimer-line" style="display:none">ได้ <span id="run-score2">0</span> คำ</div>
-
-    <p class="hint" id="play-who" style="text-align:center; margin-bottom:10px"></p>
+  <!-- ============ 4. คำ ============ -->
+  <section id="s-word" class="screen">
+    <div class="clock">เวลาที่ผ่านไป <span id="clock">0:00</span></div>
 
     <div class="word">
       <div class="word__lv" id="w-lv"></div>
@@ -282,48 +295,62 @@
       <div class="word__sub" id="w-sub"></div>
     </div>
 
+    <p class="hint" style="margin-bottom:10px">วาดเสร็จแล้วแตะชื่อตัวเองเพื่อคว้าคิว</p>
+    <ul class="claims" id="claims"></ul>
+
+    <button class="btn" id="btn-all-done" disabled>ทุกคนเสร็จแล้ว</button>
+  </section>
+
+  <!-- ============ 5. ส่งเครื่องกลับให้คนทาย ============ -->
+  <section id="s-pass-guess" class="screen">
+    <div class="card pass">
+      <span class="eyebrow">ส่งเครื่องกลับให้</span>
+      <div class="who" id="pg-guesser">—</div>
+      <p class="muted">คำหายไปจากจอแล้ว เปิดดูได้เลย</p>
+      <button class="btn" id="btn-ready-guess">พร้อมทาย</button>
+    </div>
+  </section>
+
+  <!-- ============ 6. ทาย ============ -->
+  <section id="s-guess" class="screen">
+    <div class="scores" id="scores-guess"></div>
+    <div class="card look">
+      <span class="qno" id="g-qno">คิวที่ 1</span>
+      <div style="margin-top:6px"><span class="eyebrow">ดูรูปของ</span></div>
+      <div class="who" id="g-who">—</div>
+      <p class="muted" id="g-left"></p>
+    </div>
     <div class="actions">
-      <button class="btn btn--skip" id="btn-skip">ข้าม</button>
-      <button class="btn btn--good" id="btn-ok">ทายถูก!</button>
-    </div>
-
-    <p style="margin-top:12px; display:none" id="endround-wrap">
-      <button class="btn btn--ghost btn--sm" id="btn-endround">จบรอบนี้</button>
-    </p>
-  </section>
-
-  <!-- ============ 5. รูปใครทำให้ทายถูก (โหมดเดี่ยว) ============ -->
-  <section id="s-pick" class="screen">
-    <div class="card pickwho">
-      <span class="eyebrow">ทายถูก</span>
-      <div class="word__main" id="pick-word">—</div>
-      <p class="muted">รูปของใครที่ทำให้ทายถูก คนนั้นได้แต้มด้วย</p>
-      <ul class="plist" id="pick-drawers" style="justify-content:center"></ul>
-      <p style="margin-top:16px">
-        <button class="btn btn--ghost btn--sm" id="btn-nobody">ไม่ระบุ ให้แต้มคนทายคนเดียว</button>
-      </p>
+      <button class="btn btn--skip" id="btn-wrong">ทายผิด ไปคิวถัดไป</button>
+      <button class="btn btn--good" id="btn-right">ทายถูก</button>
     </div>
   </section>
 
-  <!-- ============ 6. สรุปรอบ ============ -->
+  <!-- ============ 7. สรุปรอบ ============ -->
   <section id="s-round" class="screen">
-    <span class="eyebrow" id="round-kicker">หมดเวลา</span>
-    <h1 id="round-team">ทีม ก</h1>
-    <p><span class="big-num" id="round-score">0</span> <span class="muted">คำ</span></p>
+    <span class="steps" id="rd-step">สรุปรอบ</span>
+    <p class="eyebrow" style="margin-top:10px">คำคือ</p>
+    <div class="reveal-word" id="rd-word">—</div>
+    <p class="hint" id="rd-sub"></p>
 
-    <div class="card">
-      <h3>คำที่ผ่านไป</h3>
-      <ul class="tally" id="round-list"></ul>
+    <div class="card" style="margin-top:16px">
+      <h3>แต้มรอบนี้</h3>
+      <ul class="tally" id="rd-tally"></ul>
     </div>
 
-    <p style="margin-top:20px"><button class="btn" id="btn-next">ต่อไป</button></p>
+    <div class="card" style="margin-top:16px">
+      <h3>ลำดับคิว</h3>
+      <ul class="qlist" id="rd-queue"></ul>
+    </div>
+
+    <p style="margin-top:20px"><button class="btn" id="btn-next-round">รอบต่อไป</button></p>
   </section>
 
-  <!-- ============ 7. จบเกม ============ -->
+  <!-- ============ 8. จบเกม ============ -->
   <section id="s-over" class="screen">
     <span class="eyebrow">จบเกม</span>
-    <h1 id="over-title">ทีม ก ชนะ</h1>
-    <div class="scores" id="scores-over" style="margin-top:18px"></div>
+    <h1 id="over-title">—</h1>
+    <ul class="rank" id="rank"></ul>
     <button class="btn" id="btn-again">เล่นอีกรอบ</button>
     <p style="margin-top:12px"><a class="back" href="../../scoreboard.html">ดูกระดานคะแนน →</a></p>
     <p style="margin-top:6px"><a class="back" href="../../index.html">← กลับไปเลือกเกมอื่น</a></p>
@@ -339,6 +366,18 @@
 (function () {
   "use strict";
 
+  /* ===========================================================
+     กติกาบ้าน — แก้ตัวเลขแต้มได้ที่บล็อกนี้จุดเดียว
+     =========================================================== */
+
+  var SCORE_DRAWER      = 2;   /* คนวาดที่รูปถูกทายถูก */
+  var SCORE_FIRST_BONUS = 1;   /* บวกเพิ่มถ้าคนนั้นได้คิวที่ 1 */
+  var SCORE_GUESSER     = 2;   /* คนทาย ถ้าทายถูกไม่ว่าคิวไหน */
+
+  /* ===========================================================
+     ค่าคงที่อื่น
+     =========================================================== */
+
   var PACKS = {
     general:    { label: "ทั่วไป",     data: window.WORDS_GENERAL    || [] },
     characters: { label: "ตัวละครดัง", data: window.WORDS_CHARACTERS || [] },
@@ -346,30 +385,26 @@
   };
 
   var LV_LABEL = { 1: "ง่าย", 2: "กลาง", 3: "ยาก" };
-  var TEAM_NAMES = ["ทีม ก", "ทีม ข", "ทีม ค", "ทีม ง"];
 
-  var MIN_PLAYERS = 4;
-  var MAX_PLAYERS = 12;
+  var MIN_PLAYERS = 3;
+  var MAX_PLAYERS = 6;
+  var TAP_GUARD_MS = 300;      /* กันกดซ้ำปุ่มเดิมรัวๆ */
 
   var cfg = {
-    mode: "team",        /* team = คนวาดคนเดียว · solo = คนทายคนเดียว */
-    teams: 2,
-    seconds: 60,         /* 0 = ไม่จับเวลา */
     packs: ["general", "characters", "thai"],
     levels: [1, 2, 3],
-    target: 15
+    roundsPer: 2               /* ทุกคนได้เป็นคนทายกี่รอบ */
   };
 
-  var headcount = 6;     /* จะเล่นกี่คนรอบนี้ */
-  var picked = [];       /* id ของคนที่เลือกมาเล่น */
-  var lineup = [];       /* โหมดทีม: [[p,p],[p,p]] · โหมดเดี่ยว: [p,p,p] คิวคนทาย */
-  var swapFrom = null;   /* กำลังจะสลับใคร */
-
+  var headcount = 4;
+  var picked = [];
+  var leaderId = null;   /* หัวหน้าห้อง คนที่ถือเครื่อง */
   var state = null;
-  var ticker = null;
-  var audioCtx = null;
+  var clockTimer = null;
 
-  /* ---------- helper ---------- */
+  /* ===========================================================
+     ตัวช่วย
+     =========================================================== */
 
   function $(id) { return document.getElementById(id); }
 
@@ -383,6 +418,18 @@
   function setNote(el, msg, kind) {
     el.textContent = msg || "";
     el.className = "note" + (kind ? " note--" + kind : "");
+  }
+
+  function tidy(s) {
+    return String(s == null ? "" : s).replace(/\s+/g, " ").replace(/^ | $/g, "");
+  }
+
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
   }
 
   function chip(label, value, pressed) {
@@ -405,7 +452,6 @@
         for (var i = 0; i < kids.length; i++) {
           kids[i].setAttribute("aria-pressed", kids[i] === b ? "true" : "false");
         }
-        refreshPool();
       });
       host.appendChild(b);
     });
@@ -420,21 +466,12 @@
         var at = list.indexOf(it.value);
         if (at === -1) list.push(it.value);
         else if (list.length > 1) list.splice(at, 1);
-        else return; /* ต้องเหลืออย่างน้อย 1 */
+        else return;  /* ต้องเหลืออย่างน้อย 1 */
         b.setAttribute("aria-pressed", list.indexOf(it.value) !== -1 ? "true" : "false");
         onChange();
-        refreshPool();
       });
       host.appendChild(b);
     });
-  }
-
-  function shuffle(arr) {
-    for (var i = arr.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
-    }
-    return arr;
   }
 
   /* ---------- คลังคำ ---------- */
@@ -451,52 +488,29 @@
     return out;
   }
 
-  function refreshPool() {
+  function refreshSetupInfo() {
     var n = buildPool().length;
     $("pool-info").textContent = "มีคำให้สุ่มตอนนี้ " + n + " คำ";
-    $("btn-start").disabled = n < 5;
+    $("rounds-info").textContent = "เล่น " + picked.length + " คน คนละ " + cfg.roundsPer +
+      " รอบ รวม " + (picked.length * cfg.roundsPer) + " รอบ";
+    $("btn-start").disabled = n < 1;
   }
 
+  /* สุ่มแบบ shuffle bag ไม่ให้คำซ้ำจนกว่าจะครบกอง */
   function drawWord() {
     if (!state.bag.length) state.bag = shuffle(buildPool());
     return state.bag.pop();
-  }
-
-  /* ---------- เสียง ---------- */
-
-  function beep(freq, ms) {
-    try {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      var o = audioCtx.createOscillator();
-      var g = audioCtx.createGain();
-      o.frequency.value = freq;
-      o.type = "square";
-      g.gain.value = 0.06;
-      o.connect(g); g.connect(audioCtx.destination);
-      o.start();
-      o.stop(audioCtx.currentTime + ms / 1000);
-    } catch (e) { /* ปิดเสียงไว้ก็เล่นได้ */ }
   }
 
   /* ===========================================================
      หน้าจอ 1 — ใครเล่นบ้าง
      =========================================================== */
 
-  function pickedPlayers() {
-    var out = [];
-    for (var i = 0; i < picked.length; i++) {
-      var p = Players.get(picked[i]);
-      if (p) out.push(p);
-    }
-    return out;
-  }
-
   function renderHeadcount() {
     var items = [];
     for (var n = MIN_PLAYERS; n <= MAX_PLAYERS; n++) items.push({ label: n + " คน", value: n });
     buildSingle($("opt-headcount"), items, headcount, function (v) {
       headcount = Number(v);
-      /* เลือกไว้เกินจำนวนใหม่ ตัดคนท้ายออกให้พอดี */
       if (picked.length > headcount) {
         picked = picked.slice(0, headcount);
         setNote($("pick-note"), "ลดเหลือ " + headcount + " คน ตัดคนที่เลือกไว้ท้ายสุดออก");
@@ -531,16 +545,14 @@
         var at = picked.indexOf(p.id);
         if (at === -1) {
           if (picked.length >= headcount) {
-            /* บอกเหตุผลให้เห็น ไม่ใช่เงียบเฉยๆ */
             setNote($("pick-note"), "เลือกครบ " + headcount + " คนแล้ว ถ้าจะเพิ่มคนนี้ ให้เอาคนอื่นออกก่อน หรือเพิ่มจำนวนคนด้านบน", "bad");
             return;
           }
           picked.push(p.id);
-          setNote($("pick-note"), "");
         } else {
           picked.splice(at, 1);
-          setNote($("pick-note"), "");
         }
+        setNote($("pick-note"), "");
         renderPickList();
       });
 
@@ -549,13 +561,63 @@
     });
 
     var ready = picked.length === headcount;
-    $("btn-to-setup").disabled = !ready;
+    renderLeader();
+    refreshReady();
 
-    /* เลือกครบแล้วบอกให้รู้ ไม่ครบก็บอกว่าขาดอีกกี่คน */
     if (!$("pick-note").textContent) {
-      if (ready) setNote($("pick-note"), "ครบแล้ว กดตั้งค่าเกมได้เลย", "ok");
+      if (ready) setNote($("pick-note"), leaderId ? "ครบแล้ว กดตั้งค่าเกมได้เลย" : "เลือกหัวหน้าห้องอีก 1 คน", leaderId ? "ok" : "");
       else if (all.length) setNote($("pick-note"), "เลือกอีก " + (headcount - picked.length) + " คน");
     }
+  }
+
+  /* เลือกหัวหน้าห้องจากคนที่เลือกมาเล่นแล้วเท่านั้น */
+  function renderLeader() {
+    var people = pickedPlayers();
+    var host = $("opt-leader");
+    host.innerHTML = "";
+
+    /* ถ้าหัวหน้าห้องคนเดิมถูกเอาออกจากรายชื่อ ให้ล้างค่า */
+    if (leaderId) {
+      var still = false;
+      for (var k = 0; k < people.length; k++) {
+        if (people[k].id === leaderId) { still = true; break; }
+      }
+      if (!still) leaderId = null;
+    }
+
+    $("leader-empty").style.display = people.length ? "none" : "block";
+
+    people.forEach(function (p) {
+      var b = chip(p.name, p.id, p.id === leaderId);
+      b.addEventListener("click", function () {
+        leaderId = p.id;
+        var kids = host.children;
+        for (var i = 0; i < kids.length; i++) {
+          kids[i].setAttribute("aria-pressed", kids[i] === b ? "true" : "false");
+        }
+        paintLeaderLine();
+        refreshReady();
+      });
+      host.appendChild(b);
+    });
+
+    paintLeaderLine();
+  }
+
+  function paintLeaderLine() {
+    var line = $("leaderline");
+    var p = leaderId ? Players.get(leaderId) : null;
+    if (p) {
+      $("leadername").textContent = p.name;
+      line.hidden = false;
+    } else {
+      line.hidden = true;
+    }
+  }
+
+  /* กดตั้งค่าเกมได้เมื่อเลือกคนครบและมีหัวหน้าห้องแล้ว */
+  function refreshReady() {
+    $("btn-to-setup").disabled = !(picked.length === headcount && leaderId);
   }
 
   function addName() {
@@ -571,8 +633,7 @@
     var p = Players.add(raw);
 
     if (!p) {
-      /* ชื่อซ้ำ — เลือกคนเดิมให้เลยถ้ายังไม่ได้เลือก */
-      var key = raw.replace(/\s+/g, " ").replace(/^ | $/g, "").toLowerCase();
+      var key = tidy(raw).toLowerCase();
       var all = Players.all();
       var found = null;
       for (var i = 0; i < all.length; i++) {
@@ -593,148 +654,16 @@
     if (picked.length < headcount) picked.push(p.id);
     input.value = "";
     renderPickList();
-    if (picked.indexOf(p.id) === -1) {
-      setNote($("pick-note"), "เพิ่ม " + p.name + " แล้ว แต่ยังไม่ได้เลือกลงเล่น เพราะครบจำนวนแล้ว");
-    }
     input.focus();
   }
 
-  /* ===========================================================
-     หน้าจอ 2 — ตั้งค่า + แบ่งทีม / คิวคนทาย
-     =========================================================== */
-
-  function isSolo() { return cfg.mode === "solo"; }
-
-  function applyMode() {
-    var solo = isSolo();
-
-    $("f-teams").style.display  = solo ? "none" : "block";
-    $("f-time").style.display   = solo ? "none" : "block";
-    $("f-lineup").style.display = solo ? "none" : "block";
-    $("f-queue").style.display  = solo ? "block" : "none";
-
-    $("mode-desc").textContent = solo
-      ? "คนทาย 1 คน ที่เหลือวาดคำเดียวกันพร้อมกัน ทายถูกได้แต้มทั้งคนทายและเจ้าของรูปที่ทำให้ทายถูก ไม่จับเวลา"
-      : "คนวาด 1 คน ทีมของตัวเองช่วยกันทาย จับเวลาเป็นรอบ แต้มเข้าทีม";
-
-    $("setup-rule").textContent = solo
-      ? "ห้ามพูด ห้ามเขียนตัวหนังสือ ห้ามใบ้เป็นตัวเลข วาดอย่างเดียว"
-      : "คนวาดห้ามพูด ห้ามเขียนตัวหนังสือ ห้ามใบ้เป็นตัวเลข วาดอย่างเดียว";
-
-    if (solo) buildQueue();
-    else fitTeams();
-  }
-
-  /* จำนวนคนน้อยกว่าจำนวนทีม ให้ลดทีมลงอัตโนมัติแล้วบอกผู้ใช้ */
-  function fitTeams() {
-    var people = pickedPlayers();
-    var msg = "";
-
-    if (cfg.teams > people.length) {
-      var was = cfg.teams;
-      cfg.teams = Math.max(2, people.length);
-      if (cfg.teams > people.length) cfg.teams = people.length;
-      msg = "มีแค่ " + people.length + " คน แบ่ง " + was + " ทีมไม่ได้ ลดเหลือ " + cfg.teams + " ทีมให้แล้ว";
-      renderTeamOpt();
+  function pickedPlayers() {
+    var out = [];
+    for (var i = 0; i < picked.length; i++) {
+      var p = Players.get(picked[i]);
+      if (p) out.push(p);
     }
-
-    reshuffle();
-    if (msg) setNote($("team-note"), msg, "bad");
-  }
-
-  /* แบ่งสุ่มให้จำนวนคนต่อทีมต่างกันไม่เกิน 1 คน */
-  function reshuffle() {
-    var people = shuffle(pickedPlayers().slice());
-    lineup = [];
-    for (var t = 0; t < cfg.teams; t++) lineup.push([]);
-    /* แจกวนทีละคน จำนวนจึงต่างกันไม่เกิน 1 เสมอ */
-    for (var i = 0; i < people.length; i++) lineup[i % cfg.teams].push(people[i]);
-    swapFrom = null;
-    renderTeams();
-  }
-
-  function renderTeams() {
-    var host = $("teambox");
-    host.innerHTML = "";
-
-    lineup.forEach(function (members, ti) {
-      var box = document.createElement("div");
-      box.className = "team";
-
-      var h = document.createElement("h4");
-      h.textContent = TEAM_NAMES[ti] + " · " + members.length + " คน";
-      box.appendChild(h);
-
-      var row = document.createElement("div");
-      row.className = "members";
-
-      members.forEach(function (p, pi) {
-        var b = document.createElement("button");
-        b.type = "button";
-        b.className = "mem";
-        b.textContent = p.name;
-        if (swapFrom && swapFrom.t === ti && swapFrom.i === pi) b.className += " is-picked";
-        b.addEventListener("click", function () { tapMember(ti, pi); });
-        row.appendChild(b);
-      });
-
-      box.appendChild(row);
-      host.appendChild(box);
-    });
-  }
-
-  function tapMember(t, i) {
-    if (!swapFrom) {
-      swapFrom = { t: t, i: i };
-      setNote($("team-note"), "เลือก " + lineup[t][i].name + " แล้ว กดอีกคนเพื่อสลับที่");
-      renderTeams();
-      return;
-    }
-
-    if (swapFrom.t === t && swapFrom.i === i) {
-      swapFrom = null;
-      setNote($("team-note"), "");
-      renderTeams();
-      return;
-    }
-
-    var a = lineup[swapFrom.t][swapFrom.i];
-    var b = lineup[t][i];
-    lineup[swapFrom.t][swapFrom.i] = b;
-    lineup[t][i] = a;
-    setNote($("team-note"), "สลับ " + a.name + " กับ " + b.name + " แล้ว", "ok");
-    swapFrom = null;
-    renderTeams();
-  }
-
-  function buildQueue() {
-    lineup = shuffle(pickedPlayers().slice());
-    renderQueue();
-  }
-
-  function renderQueue() {
-    var ul = $("queue");
-    ul.innerHTML = "";
-    lineup.forEach(function (p) {
-      var li = document.createElement("li");
-      li.textContent = p.name;
-      ul.appendChild(li);
-    });
-  }
-
-  function renderTeamOpt() {
-    var people = pickedPlayers().length || MAX_PLAYERS;
-    var items = [];
-    for (var n = 2; n <= 4; n++) {
-      if (n <= people) items.push({ label: n + " ทีม", value: n });
-    }
-    if (!items.length) items.push({ label: "2 ทีม", value: 2 });
-
-    buildSingle($("opt-teams"), items, cfg.teams, function (v) {
-      cfg.teams = Number(v);
-      setNote($("team-note"), "");
-      reshuffle();
-    });
+    return out;
   }
 
   /* ===========================================================
@@ -742,319 +671,432 @@
      =========================================================== */
 
   function startGame() {
-    var scores = [];
-    var slots = isSolo() ? lineup.length : cfg.teams;
-    for (var i = 0; i < slots; i++) scores.push(0);
+    var people = pickedPlayers();
+    if (people.length < MIN_PLAYERS) return;
+
+    var totals = [];
+    for (var i = 0; i < people.length; i++) totals.push(0);
 
     state = {
-      solo: isSolo(),
-      scores: scores,
-      turn: 0,
+      players: people,
+      totals: totals,
+      roundIdx: 0,
+      totalRounds: people.length * cfg.roundsPer,
+      guesser: 0,
       bag: shuffle(buildPool()),
-      round: null,
+      word: null,
+      queue: [],        /* index ผู้เล่น เรียงตามลำดับที่คว้าคิว */
+      gaveUp: [],       /* index ผู้เล่นที่ยอมแพ้ */
+      qpos: 0,          /* กำลังดูรูปของคิวที่เท่าไหร่ */
+      lastTap: {},      /* index -> เวลาแตะล่าสุด กันกดซ้ำ */
+      gained: null,
+      startedAt: 0,
       recorded: false
     };
-    toReady();
+
+    startRound();
   }
 
-  function slotName(i) {
-    return state.solo ? lineup[i].name : TEAM_NAMES[i];
-  }
-
-  function paintScores(host, highlight) {
-    host.innerHTML = "";
-    for (var i = 0; i < state.scores.length; i++) {
-      var d = document.createElement("div");
-      d.className = "score" + (highlight && i === state.turn ? " is-turn" : "");
-      var b = document.createElement("b");
-      b.textContent = state.scores[i];
-      var s = document.createElement("span");
-      s.textContent = slotName(i);
-      d.appendChild(b);
-      d.appendChild(s);
-      host.appendChild(d);
+  function drawerIdxs() {
+    var out = [];
+    for (var i = 0; i < state.players.length; i++) {
+      if (i !== state.guesser) out.push(i);
     }
-  }
-
-  function toReady() {
-    paintScores($("scores-ready"), true);
-
-    if (state.solo) {
-      $("ready-kicker").textContent = "รอบนี้คนทายคือ";
-      $("ready-team").textContent = lineup[state.turn].name;
-      $("ready-hint").textContent = "คนอื่นวาดคำที่ขึ้นจอพร้อมกัน " +
-        lineup[state.turn].name + " ห้ามดูจอ ดูได้แค่รูปที่เพื่อนวาด";
-    } else {
-      $("ready-kicker").textContent = "ส่งมือถือให้คนวาดของ";
-      $("ready-team").textContent = TEAM_NAMES[state.turn];
-      $("ready-hint").textContent = "คนอื่นอย่าแอบดูจอนะ กดเริ่มแล้วเวลาเดินทันที";
-    }
-
-    show("s-ready");
+    return out;
   }
 
   function startRound() {
-    state.round = {
-      got: 0,
-      log: [],
-      endAt: state.solo ? 0 : Date.now() + cfg.seconds * 1000,
-      warned: false,
-      current: null
-    };
+    state.guesser = state.roundIdx % state.players.length;
+    state.word = drawWord();
+    state.queue = [];
+    state.gaveUp = [];
+    state.qpos = 0;
+    state.lastTap = {};
+    state.gained = null;
 
-    $("run-score").textContent = "0";
-    $("run-score2").textContent = "0";
+    paintScores($("scores-pass"));
 
-    /* โหมดเดี่ยวไม่จับเวลา จบรอบเองด้วยปุ่ม */
-    $("timer-wrap").style.display   = state.solo ? "none" : "block";
-    $("notimer-line").style.display = state.solo ? "block" : "none";
-    $("endround-wrap").style.display = state.solo ? "block" : "none";
+    $("pd-step").textContent = "รอบที่ " + (state.roundIdx + 1) + " / " + state.totalRounds;
+    $("pd-guesser").textContent = state.players[state.guesser].name;
+    $("pd-warn").textContent = state.players[state.guesser].name + " ห้ามดูจอ ให้หันหลังหรือหลับตาไว้";
 
-    $("play-who").textContent = state.solo
-      ? lineup[state.turn].name + " เป็นคนทาย · คนอื่นวาดคำนี้"
-      : "";
+    var host = $("pd-drawers");
+    host.innerHTML = "";
+    drawerIdxs().forEach(function (i) {
+      var s = document.createElement("span");
+      s.textContent = state.players[i].name;
+      host.appendChild(s);
+    });
 
-    nextWord();
-    show("s-play");
-    beep(660, 90);
-
-    if (!state.solo) {
-      ticker = setInterval(tick, 100);
-      tick();
-    }
+    show("s-pass-draw");
   }
 
-  function tick() {
-    var left = Math.max(0, state.round.endAt - Date.now());
-    var secs = Math.ceil(left / 1000);
-    $("clock").textContent = secs;
-    $("timer-fill").style.width = (left / (cfg.seconds * 1000) * 100) + "%";
+  /* ---------- หน้าคำ ---------- */
 
-    if (secs <= 10) {
-      $("timer").classList.add("is-low");
-      if (!state.round.warned) { state.round.warned = true; beep(880, 120); }
-    } else {
-      $("timer").classList.remove("is-low");
-    }
+  function openWord() {
+    $("w-main").textContent = state.word.w;
+    $("w-sub").textContent = state.word.en || "";
+    $("w-lv").textContent = LV_LABEL[state.word.lv] || "";
 
-    if (left <= 0) endRound();
+    renderClaims();
+
+    state.startedAt = Date.now();
+    $("clock").textContent = "0:00";
+    if (clockTimer) clearInterval(clockTimer);
+    clockTimer = setInterval(tickClock, 250);
+
+    show("s-word");
   }
 
-  function nextWord() {
-    var w = drawWord();
-    state.round.current = w;
-    $("w-main").textContent = w.w;
-    $("w-sub").textContent = w.en || "";
-    $("w-lv").textContent = LV_LABEL[w.lv] || "";
+  /* นาฬิกาเดินหน้า เพื่อความสนุกเท่านั้น ไม่ตัดจบอัตโนมัติ */
+  function tickClock() {
+    var secs = Math.floor((Date.now() - state.startedAt) / 1000);
+    var m = Math.floor(secs / 60);
+    var s = secs % 60;
+    $("clock").textContent = m + ":" + (s < 10 ? "0" : "") + s;
   }
 
-  function roundLive() {
-    if (!state.round) return false;
-    if (state.solo) return true;                       /* ไม่จับเวลา เล่นได้จนกดจบรอบ */
-    return Date.now() <= state.round.endAt;
+  function stopClock() {
+    if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
   }
 
-  /* กดข้าม หรือ ทายถูก */
-  function score(hit) {
-    if (!roundLive()) return;
-
-    if (!hit) {
-      state.round.log.push({ w: state.round.current.w, hit: false, who: "" });
-      nextWord();
-      return;
-    }
-
-    if (state.solo) {
-      /* ต้องเลือกก่อนว่ารูปของใครทำให้ทายถูก คนนั้นได้แต้มด้วย */
-      askWhoDrew();
-      return;
-    }
-
-    state.round.log.push({ w: state.round.current.w, hit: true, who: "" });
-    state.round.got++;
-    $("run-score").textContent = state.round.got;
-    beep(1040, 60);
-    nextWord();
-  }
-
-  /* ---------- โหมดเดี่ยว: รูปใครทำให้ทายถูก ---------- */
-
-  function askWhoDrew() {
-    $("pick-word").textContent = state.round.current.w;
-
-    var host = $("pick-drawers");
+  function renderClaims() {
+    var host = $("claims");
     host.innerHTML = "";
 
-    lineup.forEach(function (p, i) {
-      if (i === state.turn) return;   /* คนทายไม่ได้วาด */
-
+    drawerIdxs().forEach(function (i) {
       var li = document.createElement("li");
+
+      var qpos = state.queue.indexOf(i);
+      var out = state.gaveUp.indexOf(i) !== -1;
+
       var b = document.createElement("button");
       b.type = "button";
-      b.className = "pchip";
-      b.textContent = p.name;
-      b.addEventListener("click", function () { awardSolo(i); });
+      b.className = "claim" + (qpos !== -1 ? " is-done" : (out ? " is-out" : ""));
+
+      if (qpos !== -1) b.textContent = state.players[i].name + " · คิว " + (qpos + 1);
+      else if (out)    b.textContent = state.players[i].name + " · ยอมแพ้";
+      else             b.textContent = state.players[i].name;
+
+      if (qpos !== -1 || out) b.disabled = true;
+      else b.addEventListener("click", function () { claim(i); });
+
       li.appendChild(b);
+
+      var g = document.createElement("button");
+      g.type = "button";
+      g.className = "giveup";
+      g.textContent = "ยอมแพ้";
+      g.setAttribute("aria-label", "ยอมแพ้แทน " + state.players[i].name);
+      if (qpos !== -1 || out) g.disabled = true;
+      else g.addEventListener("click", function () { giveUp(i); });
+
+      li.appendChild(g);
       host.appendChild(li);
     });
 
-    show("s-pick");
+    refreshAllDone();
   }
 
-  /* drawerIdx = -1 คือไม่ระบุ ให้แต้มคนทายคนเดียว */
-  function awardSolo(drawerIdx) {
-    var guesser = state.turn;
-
-    state.scores[guesser] += 1;
-    if (drawerIdx >= 0) state.scores[drawerIdx] += 1;
-
-    state.round.got++;
-    state.round.log.push({
-      w: state.round.current.w,
-      hit: true,
-      who: drawerIdx >= 0 ? lineup[drawerIdx].name : ""
-    });
-
-    $("run-score2").textContent = state.round.got;
-    beep(1040, 60);
-
-    nextWord();
-    show("s-play");
+  /* กันกดซ้ำเฉพาะปุ่มของคนเดิม คนละคนกดติดกันได้ */
+  function tappedTooFast(i) {
+    var now = Date.now();
+    var last = state.lastTap[i] || 0;
+    if (now - last < TAP_GUARD_MS) return true;
+    state.lastTap[i] = now;
+    return false;
   }
 
-  /* ---------- จบรอบ ---------- */
+  function claim(i) {
+    if (tappedTooFast(i)) return;
+    if (state.queue.indexOf(i) !== -1) return;
+    if (state.gaveUp.indexOf(i) !== -1) return;
+    state.queue.push(i);
+    renderClaims();
+  }
 
-  function endRound() {
-    if (ticker) { clearInterval(ticker); ticker = null; }
-    beep(220, 400);
+  function giveUp(i) {
+    if (tappedTooFast(i)) return;
+    if (state.queue.indexOf(i) !== -1) return;
+    if (state.gaveUp.indexOf(i) !== -1) return;
+    state.gaveUp.push(i);
+    renderClaims();
+  }
 
-    /* โหมดทีม แต้มเข้าทีมตอนจบรอบ · โหมดเดี่ยวให้แต้มไปแล้วทีละคำ */
-    if (!state.solo) state.scores[state.turn] += state.round.got;
+  function refreshAllDone() {
+    var drawers = drawerIdxs().length;
+    var settled = state.queue.length + state.gaveUp.length;
+    var btn = $("btn-all-done");
 
-    $("round-kicker").textContent = state.solo ? "จบรอบ" : "หมดเวลา";
-    $("round-team").textContent = slotName(state.turn);
-    $("round-score").textContent = state.round.got;
+    /* กดได้เมื่อมีคนคว้าคิวแล้วอย่างน้อย 1 คน
+       หรือทุกคนยอมแพ้หมด จะได้ไม่ค้าง */
+    btn.disabled = !(state.queue.length >= 1 || (settled >= drawers && drawers > 0));
+    btn.textContent = state.queue.length ? "ทุกคนเสร็จแล้ว" : "ไม่มีใครวาดทัน ไปต่อ";
+  }
 
-    var ul = $("round-list");
-    ul.innerHTML = "";
+  function allDone() {
+    stopClock();
 
-    if (!state.round.log.length) {
-      var li0 = document.createElement("li");
-      li0.className = "muted";
-      li0.textContent = "ยังไม่ได้คำไหนเลย เอาใหม่รอบหน้า";
-      ul.appendChild(li0);
+    /* ซ่อนคำทันที ห้ามค้างให้เลื่อนขึ้นไปเห็น */
+    $("w-main").textContent = "—";
+    $("w-sub").textContent = "";
+    $("w-lv").textContent = "";
+
+    if (!state.queue.length) return endRound(-1);
+
+    $("pg-guesser").textContent = state.players[state.guesser].name;
+    show("s-pass-guess");
+  }
+
+  /* ---------- หน้าทาย ---------- */
+
+  function toGuess() {
+    state.qpos = 0;
+    paintGuess();
+    show("s-guess");
+  }
+
+  function paintGuess() {
+    paintScores($("scores-guess"));
+    var pi = state.queue[state.qpos];
+    var left = state.queue.length - state.qpos - 1;
+
+    $("g-qno").textContent = "คิวที่ " + (state.qpos + 1);
+    $("g-who").textContent = state.players[pi].name;
+    $("g-left").textContent = left > 0
+      ? "ถ้าทายผิด ยังเหลือรูปให้ดูอีก " + left + " คน"
+      : "คิวสุดท้ายแล้ว ถ้าผิดรอบนี้ไม่มีใครได้แต้ม";
+  }
+
+  function guessRight() {
+    endRound(state.qpos);
+  }
+
+  function guessWrong() {
+    state.qpos++;
+    if (state.qpos >= state.queue.length) return endRound(-1);
+    paintGuess();
+  }
+
+  /* ---------- สรุปรอบ ---------- */
+
+  /* hitPos = ตำแหน่งคิวที่ทายถูก หรือ -1 ถ้าไม่มีใครถูก */
+  function endRound(hitPos) {
+    var gained = {};
+
+    if (hitPos >= 0) {
+      var drawer = state.queue[hitPos];
+      var drawerPts = SCORE_DRAWER + (hitPos === 0 ? SCORE_FIRST_BONUS : 0);
+      gained[drawer] = (gained[drawer] || 0) + drawerPts;
+      gained[state.guesser] = (gained[state.guesser] || 0) + SCORE_GUESSER;
     }
 
-    state.round.log.forEach(function (r) {
+    for (var k in gained) {
+      if (Object.prototype.hasOwnProperty.call(gained, k)) {
+        state.totals[Number(k)] += gained[k];
+      }
+    }
+    state.gained = gained;
+
+    /* เฉลยคำ */
+    $("rd-step").textContent = "รอบที่ " + (state.roundIdx + 1) + " / " + state.totalRounds;
+    $("rd-word").textContent = state.word.w;
+    $("rd-sub").textContent = state.word.en || "";
+
+    /* ใครได้แต้มเท่าไหร่ เพราะอะไร */
+    var ul = $("rd-tally");
+    ul.innerHTML = "";
+
+    if (hitPos >= 0) {
+      var dIdx = state.queue[hitPos];
+      var why = hitPos === 0 ? "รูปถูกทาย และได้คิว 1" : "รูปถูกทาย (คิว " + (hitPos + 1) + ")";
+      ul.appendChild(tallyRow(state.players[dIdx].name, gained[dIdx], why));
+      ul.appendChild(tallyRow(state.players[state.guesser].name, gained[state.guesser], "ทายถูก"));
+    } else {
       var li = document.createElement("li");
+      li.className = "muted";
+      li.textContent = state.queue.length
+        ? "รอบนี้ไม่มีใครได้แต้ม ไล่ดูจนหมดคิวแล้วยังทายไม่ถูก"
+        : "รอบนี้ไม่มีใครได้แต้ม ไม่มีใครวาดทัน";
+      ul.appendChild(li);
+    }
 
-      var w = document.createElement("span");
-      w.className = "w";
-      w.textContent = r.w;
-      li.appendChild(w);
+    /* ลำดับคิวทั้งหมด ใครเร็วใครช้า */
+    var ql = $("rd-queue");
+    ql.innerHTML = "";
 
-      var s = document.createElement("span");
-      s.className = r.hit ? "ok" : "no";
-      if (r.hit) s.textContent = r.who ? "ได้ · รูปของ " + r.who : "ได้";
-      else s.textContent = "ข้าม";
-      li.appendChild(s);
+    state.queue.forEach(function (pi, n) {
+      var li2 = document.createElement("li");
+      var no = document.createElement("span");
+      no.className = "n";
+      no.textContent = n + 1;
+      li2.appendChild(no);
+      var nm = document.createElement("span");
+      nm.textContent = state.players[pi].name;
+      li2.appendChild(nm);
+      ql.appendChild(li2);
+    });
+
+    state.gaveUp.forEach(function (pi) {
+      var li3 = document.createElement("li");
+      var no2 = document.createElement("span");
+      no2.className = "n";
+      no2.textContent = "—";
+      li3.appendChild(no2);
+      var nm2 = document.createElement("span");
+      nm2.textContent = state.players[pi].name;
+      li3.appendChild(nm2);
+      var o = document.createElement("span");
+      o.className = "out";
+      o.textContent = "ยอมแพ้";
+      li3.appendChild(o);
+      ql.appendChild(li3);
+    });
+
+    var last = (state.roundIdx + 1 >= state.totalRounds);
+    $("btn-next-round").textContent = last ? "ดูผลรวม" : "รอบต่อไป";
+
+    show("s-round");
+  }
+
+  function tallyRow(name, pts, why) {
+    var li = document.createElement("li");
+
+    var nm = document.createElement("span");
+    nm.className = "nm";
+    nm.textContent = name;
+    li.appendChild(nm);
+
+    var rt = document.createElement("span");
+    rt.className = "rt";
+    var p = document.createElement("span");
+    p.className = "pt";
+    p.textContent = "+" + pts;
+    rt.appendChild(p);
+    var w = document.createElement("span");
+    w.className = "why";
+    w.textContent = why;
+    rt.appendChild(w);
+    li.appendChild(rt);
+
+    return li;
+  }
+
+  function nextRound() {
+    state.roundIdx++;
+    if (state.roundIdx >= state.totalRounds) return gameOver();
+    startRound();
+  }
+
+  /* ---------- จบเกม ---------- */
+
+  function gameOver() {
+    var best = -Infinity, i;
+    for (i = 0; i < state.totals.length; i++) {
+      if (state.totals[i] > best) best = state.totals[i];
+    }
+
+    var winners = [];
+    for (i = 0; i < state.totals.length; i++) {
+      if (state.totals[i] === best) winners.push(i);
+    }
+
+    var isWin = {};
+    winners.forEach(function (w) { isWin[w] = true; });
+
+    /* เสมอได้ ไม่ต้องตัดสิน */
+    $("over-title").textContent = winners.length === 1
+      ? state.players[winners[0]].name + " ชนะ"
+      : "เสมอกัน " + winners.length + " คน";
+
+    var order = [];
+    for (i = 0; i < state.players.length; i++) order.push(i);
+    order.sort(function (a, b) { return state.totals[b] - state.totals[a]; });
+
+    var ul = $("rank");
+    ul.innerHTML = "";
+    order.forEach(function (idx, pos) {
+      var li = document.createElement("li");
+      if (isWin[idx]) li.className = "is-first";
+
+      var no = document.createElement("span");
+      no.className = "no";
+      no.textContent = (pos + 1) + ".";
+      li.appendChild(no);
+
+      var nm = document.createElement("span");
+      nm.className = "nm";
+      nm.textContent = state.players[idx].name;
+      li.appendChild(nm);
+
+      var pt = document.createElement("span");
+      pt.className = "pt";
+      pt.textContent = state.totals[idx];
+      li.appendChild(pt);
 
       ul.appendChild(li);
     });
 
-    $("btn-next").textContent = state.solo ? "คนทายคนต่อไป" : "ทีมต่อไป";
-    show("s-round");
-  }
-
-  function afterRound() {
-    var best = -1, winner = -1, tie = false;
-    for (var i = 0; i < state.scores.length; i++) {
-      if (state.scores[i] > best) { best = state.scores[i]; winner = i; tie = false; }
-      else if (state.scores[i] === best) { tie = true; }
-    }
-
-    var everyonePlayed = (state.turn === state.scores.length - 1);
-    if (best >= cfg.target && everyonePlayed && !tie) return gameOver(winner);
-
-    state.turn = (state.turn + 1) % state.scores.length;
-    toReady();
-  }
-
-  /* ---------- บันทึกผล ---------- */
-
-  function recordResult(winner) {
-    if (state.recorded) return;
-    state.recorded = true;
-
-    var results = [];
-
-    if (state.solo) {
-      for (var i = 0; i < lineup.length; i++) {
+    if (!state.recorded) {
+      state.recorded = true;
+      var results = [];
+      for (var j = 0; j < state.players.length; j++) {
         results.push({
-          playerId: lineup[i].id,
-          name: lineup[i].name,
-          score: state.scores[i],
-          won: winner === i
+          playerId: state.players[j].id,
+          name: state.players[j].name,
+          score: state.totals[j],
+          won: !!isWin[j]
         });
       }
-    } else {
-      for (var t = 0; t < lineup.length; t++) {
-        for (var j = 0; j < lineup[t].length; j++) {
-          results.push({
-            playerId: lineup[t][j].id,
-            name: lineup[t][j].name,
-            score: state.scores[t],   /* ทุกคนในทีมได้แต้มรวมของทีม */
-            won: winner === t
-          });
-        }
-      }
+      Players.recordGame({
+        game: "catch-sketch",
+        gameLabel: "วาดให้ทาย",
+        playedAt: Date.now(),
+        results: results
+      });
     }
 
-    Players.recordGame({
-      game: "catch-sketch",
-      gameLabel: "วาดให้ทาย",
-      playedAt: Date.now(),
-      results: results
-    });
+    show("s-over");
   }
 
-  function gameOver(winner) {
-    if (ticker) { clearInterval(ticker); ticker = null; }
+  /* ---------- แถบคะแนนสะสม ---------- */
 
-    $("over-title").textContent = winner >= 0 ? slotName(winner) + " ชนะ" : "จบเกม";
-    paintScores($("scores-over"), false);
-    recordResult(winner);
-    show("s-over");
+  function paintScores(host) {
+    host.innerHTML = "";
+    for (var i = 0; i < state.players.length; i++) {
+      var d = document.createElement("div");
+      d.className = "score" + (i === state.guesser ? " is-turn" : "");
+
+      var b = document.createElement("b");
+      b.textContent = state.totals[i];
+      d.appendChild(b);
+
+      var s = document.createElement("span");
+      s.textContent = state.players[i].name + (i === state.guesser ? " (ทาย)" : "");
+      d.appendChild(s);
+
+      host.appendChild(d);
+    }
   }
 
   /* ===========================================================
      ผูกปุ่ม
      =========================================================== */
 
-  buildSingle($("opt-mode"),
-    [{ label: "คนวาดคนเดียว", value: "team" }, { label: "คนทายคนเดียว", value: "solo" }],
-    cfg.mode, function (v) { cfg.mode = String(v); applyMode(); });
-
-  buildSingle($("opt-time"),
-    [{label:"ไม่จับเวลา",value:0},{label:"60 วิ",value:60},{label:"90 วิ",value:90},{label:"120 วิ",value:120}],
-    cfg.seconds, function (v) { cfg.seconds = Number(v); });
-
-  buildSingle($("opt-target"),
-    [{label:"10 แต้ม",value:10},{label:"15 แต้ม",value:15},{label:"20 แต้ม",value:20},{label:"30 แต้ม",value:30}],
-    cfg.target, function (v) { cfg.target = Number(v); });
-
   buildMulti($("opt-packs"),
     Object.keys(PACKS).map(function (k) { return { label: PACKS[k].label, value: k }; }),
-    cfg.packs, function () {});
+    cfg.packs, refreshSetupInfo);
 
   buildMulti($("opt-levels"),
     [{label:"ง่าย",value:1},{label:"กลาง",value:2},{label:"ยาก",value:3}],
-    cfg.levels, function () {});
+    cfg.levels, refreshSetupInfo);
+
+  buildSingle($("opt-rounds"),
+    [{label:"1 รอบ",value:1},{label:"2 รอบ",value:2},{label:"3 รอบ",value:3}],
+    cfg.roundsPer, function (v) { cfg.roundsPer = Number(v); refreshSetupInfo(); });
 
   renderHeadcount();
   renderPickList();
-  renderTeamOpt();
-  refreshPool();
 
   $("btn-add").addEventListener("click", addName);
   $("new-name").addEventListener("keydown", function (e) {
@@ -1062,9 +1104,8 @@
   });
 
   $("btn-to-setup").addEventListener("click", function () {
-    if (picked.length !== headcount) return;
-    renderTeamOpt();
-    applyMode();
+    if (picked.length !== headcount || !leaderId) return;
+    refreshSetupInfo();
     show("s-setup");
   });
 
@@ -1073,31 +1114,20 @@
     show("s-players");
   });
 
-  $("btn-reshuffle").addEventListener("click", function () {
-    setNote($("team-note"), "");
-    reshuffle();
-  });
-  $("btn-requeue").addEventListener("click", buildQueue);
-
   $("btn-start").addEventListener("click", startGame);
-  $("btn-go").addEventListener("click", startRound);
-  $("btn-ok").addEventListener("click", function () { score(true); });
-  $("btn-skip").addEventListener("click", function () { score(false); });
-  $("btn-endround").addEventListener("click", function () { if (roundLive()) endRound(); });
-  $("btn-nobody").addEventListener("click", function () { awardSolo(-1); });
-  $("btn-next").addEventListener("click", afterRound);
-  $("btn-quit").addEventListener("click", function () { gameOver(-1); });
+  $("btn-open-word").addEventListener("click", openWord);
+  $("btn-all-done").addEventListener("click", allDone);
+  $("btn-ready-guess").addEventListener("click", toGuess);
+  $("btn-right").addEventListener("click", guessRight);
+  $("btn-wrong").addEventListener("click", guessWrong);
+  $("btn-next-round").addEventListener("click", nextRound);
 
+  /* เล่นอีกรอบ กลับไปหน้าตั้งค่า โดยจำรายชื่อผู้เล่นไว้ */
   $("btn-again").addEventListener("click", function () {
     state = null;
-    renderPickList();
-    show("s-players");
-  });
-
-  document.addEventListener("keydown", function (e) {
-    if (!$("s-play").classList.contains("is-on")) return;
-    if (e.key === " " || e.key === "Enter") { e.preventDefault(); score(true); }
-    if (e.key === "ArrowRight" || e.key === "s") { e.preventDefault(); score(false); }
+    stopClock();
+    refreshSetupInfo();
+    show("s-setup");
   });
 
 })();
