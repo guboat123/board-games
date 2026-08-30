@@ -39,7 +39,19 @@ dead-code grep), so B/C findings never run out. Severity, by contrast, did conve
 | 2 | 8 | 7 | 9 | game-breaking bugs present (freeze, chips to wrong player, poker page dead) |
 | 3 | 5 | 4 | 8 | all fixed + verified |
 | 4 | 6 | 7 | — | every round-3 fix held (100%); poker agent was stopped mid-run, no result |
-| 5 | running | running | running | first agent check of the 9 poker fixes from round 3 |
+| 5 | 5 (A2) | 5 (A3) | 13 (A6) | first agent check of the poker fixes: 6 of 8 held, 2 failed |
+| 6 | running | running | running | first round judged by the new criterion |
+
+Round 5 is where the poker relay was finally stress-tested end to end, and it surfaced the worst
+defect of the whole project: pressing "← ออก" never released the seat or closed the socket, so the
+table waited forever for a player who had already walked away, and the room could never be reaped.
+Fixed with a real `leave` message plus server-side ping/pong for sockets that die without a FIN.
+Seat lifecycle (leave / away-expiry / full accounting) is now covered by `lan/tests/test-room.mjs`.
+
+The pot display was also split in two: what the table shows is the chips physically on the felt,
+while bet-size shortcuts compute from the contested portion only. That resolves the round-3
+complaint (shortcuts computed from an inflated pot) and the round-5 one (pot read 20 when 30 was
+on the table) at the same time, instead of trading one for the other.
 
 Round 4 raised the count on both solo games while every earlier fix still passed — that is the
 evidence behind the criterion change. It also showed ~2 of 13 findings were regressions introduced
