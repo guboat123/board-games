@@ -16,8 +16,17 @@ Static Thai party-game site, 3 games:
 
 Poker needs `lan/server.mjs` — a dependency-free WebSocket relay + static server, run on one
 machine on the WiFi. It is NOT part of the Pages deployment; Pages serves the two solo-device
-games only. Start it with the `board-games-lan` entry in `C:\ClaudeCode\.claude\launch.json`
-(port 8080), or `node lan/server.mjs`.
+games only.
+
+**To play locally, double-click `Board games.bat` in the desktop launcher hub**
+(`<OneDrive>\Desktop\ClaudeCode Systems\`) — it starts the server and opens the browser, the same
+shape as the PFM and 4PET launchers. The master copy lives in the repo at `lan/start.bat`; re-copy
+it to the hub on a new machine. It is safe to double-click twice: if port 8080 is already listening
+it just opens the browser instead of starting a second server. The server window prints the WiFi
+address other devices need for poker.
+
+Other ways in: the `board-games-lan` entry in `C:\ClaudeCode\.claude\launch.json`, or
+`node lan/server.mjs`.
 
 ## Current work: agent playtest loop
 
