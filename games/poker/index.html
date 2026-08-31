@@ -774,6 +774,12 @@ button { font-family: inherit; }
    = จบรอบเล่นแล้วไม่มีใครรู้ว่าใครชนะ ซึ่งเป็นเหตุผลเดียวของการตั้ง limit */
 .table-area.is-over .center { display: none; }
 #t-standings.is-on { max-height: 78%; }
+/* ⚠️ ตอนเปิดไพ่หลายคน กล่องผลมีได้ถึง 9 แถว เพดาน 33% เหลือที่ให้แถวแค่ ~58px
+   = เห็นทีละแถวเดียว ทั้งที่จุดประสงค์คือดูว่าใครมีอะไรบ้าง
+   (บั๊กทรงเดียวกับตารางอันดับรอบ 7) ตอนนั้นกองจ่ายออกไปแล้ว ซ่อนบรรทัดกองได้
+   แต่ไพ่กลางต้องเหลือไว้ ใช้อ่านชุดไพ่ของแต่ละคน */
+#t-result.is-many { max-height: 74%; }
+.table-area.is-many .pot { visibility: hidden; }
 #t-standings .rows { min-height: 64px; }
 /* ต้องเป็น flex ไม่ใช่ block ไม่งั้น flex ของลูกไม่ทำงาน
    แถวอันดับจะยืดเต็มเนื้อหา แล้วดันปุ่ม "เริ่มรอบเล่นใหม่" ตกออกนอกจอ */
@@ -781,11 +787,53 @@ button { font-family: inherit; }
 .result h3 { margin: 0 0 4px; font-size: 1.1rem; color: var(--gold); }
 .result .row { display: flex; justify-content: space-between; gap: 10px; font-size: .85rem; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
 .result .row b { font-family: var(--mono); color: var(--good); }
+/* ---------- ตารางผลตอนเปิดไพ่ ----------
+   3 ช่อง: ไพ่ | ชื่อ+ชุดไพ่ | ยอดที่ได้  เรียงตรงกันทุกแถว อ่านไล่ลงมาได้
+   ผู้ชนะอยู่กล่องบนที่ไม่เลื่อน คนที่แพ้อยู่ในกล่องเลื่อนข้างล่าง */
+.result .row {
+  display: grid; grid-template-columns: auto 1fr auto;
+  align-items: center; gap: 10px;
+  padding: 7px 2px; text-align: left;
+}
+.res-cards { display: flex; gap: 3px; flex: 0 0 auto; margin: 0; }
+.res-cards .pc--sm { width: 30px; font-size: 9.2px; }
+.res-mid { min-width: 0; }
+.res-name { font-weight: 700; font-size: .88rem; white-space: nowrap;
+            overflow: hidden; text-overflow: ellipsis; }
+.result .hand-lbl { display: block; margin: 1px 0 0; color: var(--muted); font-size: .76rem; }
+.res-amt { font-family: var(--mono); color: var(--good); font-size: .92rem; }
+
+/* กล่องผู้ชนะ อยู่กับที่เสมอ ไม่เลื่อนหนีสายตา */
+.win-box { flex: 0 0 auto; }
+.res-more {
+  flex: 0 0 auto; font-size: .68rem; color: var(--muted);
+  text-align: left; margin: 7px 0 1px; letter-spacing: .04em;
+}
+.result .row--win {
+  background: rgba(216,164,65,.14); border: 1px solid rgba(216,164,65,.45);
+  border-radius: 10px; padding: 8px 9px;
+}
+.result .row--win .res-cards .pc--sm { width: 36px; font-size: 11px; }
+.result .row--win .res-name { font-size: 1.02rem; font-weight: 800; color: var(--gold); }
+.result .row--win .hand-lbl { color: #ffe9ad; font-size: .84rem; }
+.result .row--win .res-amt { font-size: 1.06rem; font-weight: 800; }
+.result .row--lose { opacity: .72; border-bottom: 1px solid rgba(255,255,255,.07); }
+/* ⚠️ ต้องเจาะจงกว่า .result .row b (0,2,0) ที่ตั้งสีเขียวไว้ก่อน
+   ถ้าเขียนแค่ .res-amt--lose (0,1,0) จะแพ้ แล้วเงินที่เสียจะขึ้นเป็นสีเขียว
+   ได้ = เขียว · เสีย = แดง ต้องแยกออกจากกันชัดๆ ในหนึ่งวินาที */
+.result .row .res-amt--lose { color: #ff6b5e; font-size: .86rem; font-weight: 700; }
+.result .row--lose .res-cards .pc--sm { width: 26px; font-size: 8px; }
+.win-tag {
+  display: inline-block; vertical-align: middle;
+  font-family: var(--mono); font-size: .56rem; letter-spacing: .12em;
+  color: #06170f; background: var(--gold);
+  border-radius: 4px; padding: 2px 5px; margin-right: 6px;
+}
+
 .result .hand-lbl { color: var(--muted); font-size: .78rem; margin-left: 6px; }
 /* ไพ่ในกล่องผล ใหญ่พออ่านออกจริง เพราะไม่ต้องแย่งที่กับที่นั่งรอบโต๊ะ */
 .res-cards { display: inline-flex; gap: 3px; vertical-align: middle; margin: 0 4px; }
-.res-cards .pc--sm { width: 26px; font-size: 6px; }
-.result .row span { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; text-align: left; }
+.res-cards .pc--sm { width: 34px; font-size: 10.5px; }
 
 /* ต้องปิด animation ด้วย ไม่ใช่แค่ transition
    ไม่งั้นไพ่ยังวิ่งอยู่ ทั้งที่เครื่องตั้งไว้ว่าขอให้ลดการเคลื่อนไหว */
@@ -2745,9 +2793,11 @@ button { font-family: inherit; }
            เจ้าของกดแล้วโดนพับทิ้งเพราะอีกฝ่ายเรซแค่ 10 โดยไม่รู้ตัว (มือแรกของการเล่นจริง)
            ตอนนี้ขึ้นต้นด้วย Fold เสมอ และมีคำเตือนใต้ปุ่ม */
         [
-          { k: "checkfold", t: "Check / Fold", sub: "ถ้าโดนเดิมพันเพิ่ม จะพับให้เลย" },
-          { k: "call", t: "Call Any", sub: "ตามทุกจำนวน แม้อีกฝ่ายลงหมดตัก" },
-          { k: "fold", t: "Fold", sub: "พับทันทีที่ถึงตา" }
+          /* ใส่ Pre- นำหน้าให้ชัดว่าเป็น "คำสั่งล่วงหน้า" ไม่ใช่ปุ่มลงมือทันที
+             ความสับสนตรงนี้เคยทำให้เจ้าของเสียมือแรกไปแล้ว */
+          { k: "checkfold", t: "Pre-Check / Fold", sub: "ถ้าโดนเดิมพันเพิ่ม จะพับให้เลย" },
+          { k: "call", t: "Pre-Call Any", sub: "ตามทุกจำนวน แม้อีกฝ่ายลงหมดตัก" },
+          { k: "fold", t: "Pre-Fold", sub: "พับทันทีที่ถึงตา" }
         ].forEach(function (o) {
           var pb = document.createElement("button");
           pb.type = "button";
@@ -3105,9 +3155,16 @@ button { font-family: inherit; }
       right.style.color = p.net > 0 ? "var(--good)" : (p.net < 0 ? "#ff8f84" : "var(--muted)");
       row.appendChild(left);
       row.appendChild(right);
-      rows.appendChild(row);
+      (isWin ? winBox : rows).appendChild(row);
     });
-    box.appendChild(rows);
+    box.appendChild(winBox);
+    if (rows.childNodes.length) {
+      var moreLbl = document.createElement("div");
+      moreLbl.className = "res-more";
+      moreLbl.textContent = "คนอื่นที่เปิดไพ่";
+      box.appendChild(moreLbl);
+      box.appendChild(rows);
+    }
 
     var foot = document.createElement("div");
     foot.className = "foot";
@@ -3129,7 +3186,10 @@ button { font-family: inherit; }
     var r = view.lastResult;
     /* จบรอบเล่นแล้วให้โชว์แค่สรุปรวม ไม่งั้นสองกล่องซ้อนกันอ่านไม่ออก */
     if (!r || view.phase !== "showdown" || (view.limit && view.limit.over)) {
-      box.classList.remove("is-on"); box.classList.remove("is-pop"); return;
+      box.classList.remove("is-on"); box.classList.remove("is-pop");
+      box.classList.remove("is-many");
+      $("table-area").classList.remove("is-many");
+      return;
     }
 
     /* กล่องผลเด้งขึ้นมาครั้งเดียวตอนเปิดไพ่ ไม่ใช่ทุกครั้งที่วาดใหม่
@@ -3146,33 +3206,85 @@ button { font-family: inherit; }
        แล้วแถวที่ 3 ขึ้นไปจะล้นออกนอกขอบกล่อง */
     var rows = document.createElement("div");
     rows.className = "rows";
-    r.payouts.forEach(function (p) {
+
+    var wonBy = {};
+    r.payouts.forEach(function (p) { wonBy[p.seatId] = p.amount; });
+
+    /* รายชื่อที่จะโชว์
+       - เปิดไพ่จริง = ทุกคนที่โชว์ไพ่ ผู้ชนะขึ้นก่อน แล้วค่อยคนที่แพ้
+         เพราะตอนนั้นทุกคนอยากรู้ว่า "แพ้ด้วยอะไร" ไม่ใช่แค่ใครชนะ
+       - คนอื่นหมอบหมด = ไม่มีใครเปิดไพ่ โชว์แค่คนที่ได้เงินพอ */
+    var list;
+    if (r.showdown && r.reveal && r.reveal.length) {
+      var losers = r.reveal.filter(function (x) { return wonBy[x.seatId] === undefined; });
+      var winners = r.reveal.filter(function (x) { return wonBy[x.seatId] !== undefined; });
+      /* คนที่ได้เงินแต่ไม่ได้เปิดไพ่ (เช่นได้กองรองคืน) ต้องไม่ตกหล่น */
+      r.payouts.forEach(function (p) {
+        if (!r.reveal.some(function (x) { return x.seatId === p.seatId; })) {
+          winners.push({ seatId: p.seatId, name: p.name, cards: [], hand: "" });
+        }
+      });
+      list = winners.concat(losers);
+    } else {
+      list = r.payouts.map(function (p) {
+        return { seatId: p.seatId, name: p.name, cards: [], hand: "" };
+      });
+    }
+
+    /* ⚠️ แถวผู้ชนะต้องอยู่นอกส่วนที่เลื่อนได้
+       ถ้าอยู่ในกล่องเลื่อนรวมกับคนอื่น มันจะโดนตัดหัวทันทีที่มีคนเปิดไพ่หลายคน
+       ซึ่งพังจุดประสงค์ทั้งหมด (แถวที่ต้องเห็นชัดที่สุดกลับเป็นแถวที่ถูกซ่อน) */
+    var winBox = document.createElement("div");
+    winBox.className = "win-box";
+
+    list.forEach(function (x) {
+      var amount = wonBy[x.seatId];
+      var isWin = amount !== undefined;
       var row = document.createElement("div");
-      row.className = "row";
-      var left = document.createElement("span");
-      var rv = r.reveal.filter(function (x) { return x.seatId === p.seatId; })[0];
-      /* โชว์ไพ่จริงตรงนี้ด้วย เพราะไพ่เล็กข้างชื่อบนโต๊ะอ่านยากบนมือถือ
-         และตรงนี้คือที่ที่ทุกคนมองอยู่แล้วตอนจบมือ */
-      left.textContent = p.name;
-      if (rv && rv.cards && rv.cards.length) {
-        var cw = document.createElement("span");
-        cw.className = "res-cards";
-        rv.cards.forEach(function (cc) { cw.appendChild(window.Cards.make(cc, "sm")); });
-        left.appendChild(cw);
+      row.className = "row" + (isWin ? " row--win" : " row--lose");
+
+      /* วางเป็นตาราง 3 ช่อง: ไพ่ | ชื่อ+ชุด | ยอด
+         แบบเดียวกับป้ายชุดไพ่ อ่านไล่ลงมาได้ทีละแถวโดยไม่ต้องกวาดสายตา */
+      var cw = document.createElement("div");
+      cw.className = "res-cards";
+      (x.cards || []).forEach(function (cc) { cw.appendChild(window.Cards.make(cc, "sm")); });
+
+      var mid = document.createElement("div");
+      mid.className = "res-mid";
+      var nm = document.createElement("div");
+      nm.className = "res-name";
+      nm.textContent = x.name;
+      if (isWin) {
+        var tag = document.createElement("span");
+        tag.className = "win-tag";
+        tag.textContent = "WINNER";
+        nm.insertBefore(tag, nm.firstChild);
       }
-      if (rv) {
-        var hl = document.createElement("span");
+      mid.appendChild(nm);
+      if (x.hand) {
+        var hl = document.createElement("div");
         hl.className = "hand-lbl";
-        hl.textContent = rv.hand;
-        left.appendChild(hl);
+        hl.textContent = x.hand;
+        mid.appendChild(hl);
       }
+
       var right = document.createElement("b");
-      right.textContent = "+" + p.amount.toLocaleString("th-TH");
-      row.appendChild(left);
+      right.className = "res-amt" + (isWin ? "" : " res-amt--lose");
+      /* คนแพ้โชว์เงินที่ลงไปในมือนี้ ไม่ใช่ยอดสะสม (ยอดสะสมดูที่แผงโต๊ะ·เงิน)
+         ช่องขวาจะได้ไม่ว่างและตอบคำถามที่คนอยากรู้ตอนนั้นพอดี */
+      right.textContent = isWin ? "+" + amount.toLocaleString("th-TH")
+                        : (x.put ? "−" + x.put.toLocaleString("th-TH") : "");
+      row.appendChild(cw);
+      row.appendChild(mid);
       row.appendChild(right);
       rows.appendChild(row);
     });
     box.appendChild(rows);
+
+    /* เปิดไพ่หลายคน = ต้องการที่มากกว่าปกติ ไม่งั้นเห็นทีละแถวเดียว */
+    var many = list.length > 2;
+    box.classList.toggle("is-many", many);
+    $("table-area").classList.toggle("is-many", many);
 
     box.classList.add("is-on");
   }

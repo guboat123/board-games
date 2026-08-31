@@ -142,8 +142,32 @@ export function compareScore(a, b) {
   return 0;
 }
 
+/* ชื่อชุดแบบละเอียด — บอกด้วยว่าชุดนั้นประกอบด้วยแต้มอะไร
+   เพราะตอนเปิดไพ่ทุกคนอยากรู้ว่า "แพ้ด้วยอะไร" ไม่ใช่แค่ "แพ้ Straight"
+   score = [หมวด, ตัวตัดสิน1, ตัวตัดสิน2, ...] ตามที่ evaluate7 คืนมา */
+function rankName(i) { return RANK_CHARS[i] || "?"; }
+
+/* ช่วงของไพ่เรียง เช่น 9 8 7 6 5 -> "9-5"
+   A-2-3-4-5 ใบสูงสุดคือ 5 (index 3) แต่คนเรียกว่า A-5 จึงต้องแยกเคส */
+function straightRange(hi) {
+  if (hi === 3) return "A-5";
+  return rankName(hi) + "-" + rankName(hi - 4);
+}
+
 export function describeScore(score) {
-  return HAND_NAMES[score[0]] || "";
+  const name = HAND_NAMES[score[0]] || "";
+  switch (score[0]) {
+    case 8: return score[1] === 12 ? "Royal Flush" : name + " " + straightRange(score[1]);
+    case 7: return name + " " + rankName(score[1]) + "s";
+    case 6: return name + " " + rankName(score[1]) + "s over " + rankName(score[2]) + "s";
+    case 5: return name + " " + rankName(score[1]) + " high";
+    case 4: return name + " " + straightRange(score[1]);
+    case 3: return name + " " + rankName(score[1]) + "s";
+    case 2: return name + " " + rankName(score[1]) + "s & " + rankName(score[2]) + "s";
+    case 1: return name + " " + rankName(score[1]) + "s";
+    case 0: return name + " " + rankName(score[1]);
+    default: return name;
+  }
 }
 
 /* ===========================================================

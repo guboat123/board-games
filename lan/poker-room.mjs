@@ -542,7 +542,11 @@ export function createTable(opts = {}) {
         reveal.push({
           seatId: s.seatId, name: s.name,
           cards: s.cards.map(cardCode),
-          hand: describeScore(sc)
+          hand: describeScore(sc),
+          /* เงินที่คนนี้ลงไปในมือนี้ (หลังคืนส่วนที่ไม่มีใครตามแล้ว)
+             ต้องอ่านตรงนี้ เพราะ committed จะถูกล้างเป็น 0 ตอนจบ finishHand
+             ใช้บอกคนที่แพ้ว่ามือนี้เสียไปเท่าไหร่ */
+          put: s.committed
         });
       }
     } else if (live.length === 1) {
