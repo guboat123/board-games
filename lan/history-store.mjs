@@ -112,6 +112,18 @@ export function recordHand(hand, seatKey, at) {
     p.lastSeen = at;
   });
 
+  /* ⚠️ ต้องหักเงินที่ลงไปด้วย ไม่ใช่บวกแต่ที่ได้
+     เดิมบวกอย่างเดียว ทุกคนจึงเป็นบวกตลอดกาล ต่อให้เสียจริงทุกมือ
+     และหน้าจอก็แสดงค่านั้นพร้อมเครื่องหมาย + กับสีเขียว = ตัวเลขโกหกคนอ่าน
+     puts ถูกบันทึกไว้ตอนจบมือ ครบทุกคนที่ลงเงิน ไม่ใช่เฉพาะคนที่เปิดไพ่ */
+  ((hand.result && hand.result.puts) || []).forEach(x => {
+    const key = seatKey(-1, x.name);
+    if (!key) return;
+    const p = db.players[key] || (db.players[key] = blank(key));
+    p.net -= x.amount;
+    p.lastSeen = at;
+  });
+
   dirty = true;
   try { fs.appendFileSync(HANDS, JSON.stringify({ at: at, hand: hand }) + "\n", "utf8"); } catch (e) {}
 }

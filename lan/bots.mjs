@@ -76,15 +76,24 @@ function drawStrength(hole, board) {
   const cards = hole.concat(board).map(toNum).filter(x => x >= 0);
   if (cards.length < 5) return 0;
 
+  /* ⚠️ ต้องมีไพ่ในมือร่วมด้วย ไม่ใช่นับจากไพ่กลางล้วน
+     ของเดิมรวมมือกับบอร์ดแล้วนับเฉยๆ บนบอร์ดที่มีดอกเดียวกันสี่ใบ
+     บอทที่ถือไพ่ไม่เกี่ยวเลยก็คิดว่าตัวเองมีลุ้นฟลัช +0.24 แล้วตามหรือบลัฟต่อ
+     ทั้งที่เป็นบอร์ดที่มันตายสนิท (คนอื่นถือดอกนั้นใบเดียวก็ชนะแล้ว) */
+  const holeNums = hole.map(toNum).filter(x => x >= 0);
   const suits = [0, 0, 0, 0];
   cards.forEach(c => suits[c & 3]++);
-  const flushDraw = suits.some(n => n === 4);
+  const flushDraw = suits.some((n, suit) =>
+    n === 4 && holeNums.some(c => (c & 3) === suit));
 
   const has = new Array(13).fill(false);
   cards.forEach(c => { has[c >> 2] = true; });
+  const holeRanks = holeNums.map(c => c >> 2);
   let openEnded = false;
   for (let i = 0; i <= 9; i++) {
-    if (has[i] && has[i + 1] && has[i + 2] && has[i + 3]) openEnded = true;
+    if (!(has[i] && has[i + 1] && has[i + 2] && has[i + 3])) continue;
+    /* ต้องมีไพ่ในมืออย่างน้อยหนึ่งใบอยู่ในสี่ใบที่เรียงกันนั้น */
+    if (holeRanks.some(r => r >= i && r <= i + 3)) openEnded = true;
   }
 
   if (flushDraw && openEnded) return 0.34;
@@ -110,14 +119,20 @@ export function createBotManager(room, broadcast) {
      นี่ไม่ใช่การโกง — เป็นข้อมูลที่คนนั่งอยู่โต๊ะเดียวกันก็เห็นเหมือนกันหมด */
   const reads = {};         /* ชื่อ -> { n, strong, weak } */
   let lastSeenHand = -1;
+  let showOffHand = -1;     /* ตัดสินใจขิงไปแล้วในมือไหน (กันทอยลูกเต๋าซ้ำ) */
+  let seenThisHand = {};    /* เก็บไพ่ของใครไปแล้วบ้างในมือนี้ (กันนับซ้ำ) */
 
   function readOf(name) {
     return reads[name] || { n: 0, strong: 0, weak: 0 };
   }
 
   function observe(st) {
-    if (st.phase !== "showdown" || st.handNo === lastSeenHand) return;
-    lastSeenHand = st.handNo;
+    if (st.phase !== "showdown") return;
+    /* ⚠️ ห้ามล็อกทิ้งหลังดูรอบเดียว
+       คนกดโชว์ไพ่เองทีหลัง (และบอทก็ขิงทีหลัง) ถ้าล็อกตั้งแต่รอบแรกที่เห็น showdown
+       ไพ่ที่ "ตั้งใจโชว์" ซึ่งเป็นข้อมูลที่มีค่าที่สุด จะไม่เคยถูกเก็บเลย
+       ใช้กันซ้ำที่ระดับ "คนนี้ในมือนี้" แทน แล้วเก็บเพิ่มได้เรื่อยๆ ตลอดช่วง showdown */
+    if (st.handNo !== lastSeenHand) { lastSeenHand = st.handNo; seenThisHand = {}; }
 
     const seen = [];
     const r = st.lastResult;
@@ -136,6 +151,8 @@ export function createBotManager(room, broadcast) {
     }
 
     for (const x of seen) {
+      if (seenThisHand[x.name]) continue;
+      seenThisHand[x.name] = true;
       const v = preflopStrength(x.cards);
       const rec = reads[x.name] || (reads[x.name] = { n: 0, strong: 0, weak: 0 });
       rec.n++;
@@ -151,6 +168,13 @@ export function createBotManager(room, broadcast) {
      ระดับสูงขิงบ่อยกว่า เพราะเขาเล่นกับภาพจำของคนอื่นเป็น */
   function maybeShowOff(st) {
     if (st.phase !== "showdown" || !st.lastResult || st.lastResult.showdown) return;
+    /* ⚠️ ตัดสินใจครั้งเดียวต่อมือ ห้ามทอยใหม่ทุกครั้งที่มีการส่ง state
+       poke() ถูกเรียกทุกครั้งที่ broadcast ซึ่งเกิดหลายรอบต่อหนึ่ง showdown
+       (บอทลงมือ · ตัวจับเวลา · ทุกข้อความที่เครื่องไหนก็ตามส่งเข้ามาระหว่างดูผล)
+       ทอยใหม่ทุกรอบทำให้โอกาส 0.25 กลายเป็น ~0.68 หลังสี่รอบ และเพิ่มขึ้นเรื่อยๆ
+       ยิ่งคนนั่งดูผลนาน บอทยิ่งขิงทุกมือ ซึ่งทำให้ข้อมูลที่ observe() เก็บเพี้ยนตามไปด้วย */
+    if (showOffHand === st.handNo) return;
+    showOffHand = st.handNo;
     for (const b of botSeats()) {
       if (st.shown[b.seatId]) continue;
       if (!b.cards || b.cards.length !== 2) continue;

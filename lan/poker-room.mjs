@@ -52,6 +52,9 @@ export function createTable(opts = {}) {
     hostSeat: null,      /* ช่องของคนที่เปิดโต๊ะ ใช้ตัดสินว่าใครตั้งค่าโต๊ะได้ */
     startedAt: 0,        /* เวลาที่กดเริ่มตาแรก ใช้นับถอยหลัง */
     sessionOver: false,  /* ครบตามที่ตั้งไว้แล้ว */
+    cashedOut: 0,        /* ชิปที่คนลุกจากโต๊ะถือกลับไป ใช้ตรวจว่ายอดรวมยังตรง */
+    boughtOut: 0,        /* ยอดซื้อเข้าของคนที่ลุกไปแล้ว คู่กับ cashedOut */
+    shownBy: {},         /* รหัสคนที่กดโชว์ไพ่เอง (ไม่ใช่เลขที่นั่ง ที่นั่งเปลี่ยนมือได้) */
     standings: null,     /* ผลรวมตอนจบรอบเล่น */
     lastResult: null,        /* สรุปมือที่เพิ่งจบ */
     log: [],                 /* ข้อความสั้นๆ ให้โชว์ข้างโต๊ะ */
@@ -143,6 +146,11 @@ export function createTable(opts = {}) {
       for (let i = 0; i < MAX_SEATS; i++) {
         const s = st.seats[i];
         if (!s || s.token !== token) continue;
+        /* ⚠️ ที่นั่งบอทห้ามให้ใครยึดด้วย token
+           บอทนั่งด้วย token "bot:1" "bot:2" ... ซึ่งเดาได้ทันที
+           ถ้าปล่อยผ่าน คนนอกจะได้ชิป 2,000 ที่ไม่ได้ซื้อ เห็นไพ่ในมือของที่นั่งนั้น
+           และตัวจัดการบอทก็ยังสั่งที่นั่งเดิมอยู่ = มีสองคนเดินที่นั่งเดียวกัน */
+        if (s.isBot && !(opts && opts.bot)) continue;
         s.connected = true;
         s.awaySince = 0;
         s.lastActAt = Date.now();   /* เพิ่งกลับเข้ามา = ยังอยู่ */
@@ -172,8 +180,15 @@ export function createTable(opts = {}) {
 
     /* ที่นั่งที่ร้างนานเกิน SEAT_GRACE_MIN ถือว่าเจ้าของไม่กลับแล้ว คืนให้คนใหม่ได้
        ไม่งั้นโต๊ะจะขึ้นว่า "เต็ม" ทั้งที่มีคนต่ออยู่แค่ 8 แล้วไม่มีใครเข้าได้อีกเลย */
+    /* ⚠️ ต้องไม่อยู่ในมือที่กำลังเล่น และต้องไม่มีเงินค้างในกอง
+       ไม่งั้นคนที่หลุดกลางมือ (บนโต๊ะที่ไม่จำกัดเวลา มือหนึ่งกินเวลาเกิน 5 นาทีได้ง่ายๆ)
+       จะถูกลบที่นั่งทิ้งทั้งตัก พร้อมเงินที่ลงกองไปแล้ว
+       ผลคือ finishHand จ่ายออกน้อยกว่าที่เก็บเข้ามา และคนใหม่ยังรับช่วง st.current ต่อ
+       ทั้งที่ตัวเองไม่ได้อยู่ในมือ (วัดได้ ชิปหายไป 1,000 จากโต๊ะในครั้งเดียว) */
     function expired(x) {
-      return x && !x.connected && x.awaySince && (Date.now() - x.awaySince > SEAT_GRACE_MIN * 60000);
+      if (!x || x.connected || !x.awaySince) return false;
+      if (x.inHand || x.committed > 0) return false;
+      return Date.now() - x.awaySince > SEAT_GRACE_MIN * 60000;
     }
 
     let idx = -1;
@@ -191,7 +206,7 @@ export function createTable(opts = {}) {
         for (let i = 0; i < MAX_SEATS; i++) {
           if (expired(st.seats[i])) {
             note(st.seats[i].name + " ไม่ได้กลับมานาน คืนที่นั่งให้คนใหม่");
-            st.seats[i] = null;
+            cashOut(i);
             idx = i;
             break;
           }
@@ -278,31 +293,45 @@ export function createTable(opts = {}) {
     s.sitOut = true;
 
     /* ต้องเดินตาต่อก่อนเสมอ ไม่งั้นถ้าคนที่ลุกคือคนที่ถึงตาพอดี
-       โต๊ะจะค้างรอคนที่เดินออกไปแล้ว */
+       โต๊ะจะค้างรอคนที่เดินออกไปแล้ว
+       ⚠️ บรรทัดนี้อาจจบมือให้เลย (ถ้าเหลือคนเดียว) แล้ว finishHand จะคืนเงิน
+       ส่วนที่ไม่มีใครตามเข้าที่นั่งนี้ด้วย ที่นั่งจึงอาจ "รวยขึ้น" ระหว่างบรรทัดนี้ */
     if (wasInHand || st.current === seatId) checkRoundEnd(seatId);
 
     /* เงินที่ลงกองไปแล้วเป็นของกอง ไม่ใช่ของเขาอีกต่อไป
        ถ้าลบที่นั่งทิ้งทันที เงินก้อนนั้นจะหายไปจากโต๊ะ (ยอดรวมไม่ตรงกับที่ซื้อเข้ามา)
        จึงต้องคาที่นั่งไว้จนจบมือก่อน แล้วค่อยเก็บกวาดใน finishHand */
-    if (s.committed > 0) {
+    if (st.seats[seatId] && s.committed > 0) {
       s.leaving = true;
       if (!seated().some(x => x.connected)) st.phase = "waiting";
       return;
     }
 
+    /* ⚠️ ต้องปล่อยที่นั่งผ่าน cashOut เสมอ ห้าม st.seats[i] = null ตรงๆ
+       ชิปที่ติดตัวออกไปต้องถูกจดไว้ ไม่งั้นยอดรวมบนโต๊ะจะไม่ตรงกับที่ซื้อเข้ามา
+       แล้วไล่หาไม่เจอว่าหายไปตอนไหน — เคสจริงคือ ไล่ 800 คนอื่นหมอบหมด
+       มือจบในบรรทัดข้างบน ได้คืน 780 แล้วที่นั่งถูกลบพร้อมชิป 980 แบบไม่มีร่องรอย */
+    cashOut(seatId);
+    if (!seated().some(x => x.connected)) st.phase = "waiting";
+  }
+
+  /* ปล่อยที่นั่งแล้วบันทึกชิปที่ติดตัวออกไปด้วย
+     ⚠️ ต้องจดไว้เสมอ ไม่งั้นยอดรวมบนโต๊ะจะไม่ตรงกับที่ซื้อเข้ามา แล้วหาไม่เจอว่าหายไปไหน
+     สมการที่ต้องเป็นจริงตลอด: ผลรวมชิปบนโต๊ะ + กองกลาง + ชิปที่ถือกลับบ้าน = ผลรวมที่ซื้อเข้า */
+  function cashOut(seatId) {
+    const s = st.seats[seatId];
+    if (!s) return;
+    st.cashedOut += s.stack + s.committed;
+    st.boughtOut += s.boughtIn;
     st.seats[seatId] = null;
     if (st.hostSeat === seatId) st.hostSeat = null;
-    if (!seated().some(x => x.connected)) st.phase = "waiting";
   }
 
   /* เก็บที่นั่งของคนที่ลุกไประหว่างมือ หลังจ่ายเงินเรียบร้อยแล้ว */
   function sweepLeavers() {
     for (let i = 0; i < MAX_SEATS; i++) {
       const s = st.seats[i];
-      if (s && s.leaving) {
-        st.seats[i] = null;
-        if (st.hostSeat === i) st.hostSeat = null;
-      }
+      if (s && s.leaving) cashOut(i);
     }
   }
 
@@ -352,6 +381,7 @@ export function createTable(opts = {}) {
     st.minRaise = cfg.bigBlind;
     st.lastResult = null;
     st.shown = {};           /* เริ่มมือใหม่ ล้างของเก่าทิ้ง ไม่งั้นไพ่มือก่อนจะค้างโชว์ */
+    st.shownBy = {};
     st.phase = "preflop";
 
     for (const s of seated()) {
@@ -394,6 +424,14 @@ export function createTable(opts = {}) {
     };
     setCurrent(nextOccupied(bbSeat, s => s.inHand && !s.folded && !s.allIn));
     note("— มือที่ " + st.handNo + " เริ่มแล้ว —");
+    /* ⚠️ บอดอาจทำให้ทุกคนหมดตักตั้งแต่ยังไม่ได้เดิน (เช่นตัวต่อตัว บอด 10/20 คนหนึ่งเหลือ 8)
+       ตอนนั้น canAct() ว่าง setCurrent จึงได้ -1 แล้วไม่มีใครกดอะไรได้เลย
+       ไม่มีใครเรียก checkRoundEnd/nextPhase ต่อ ไพ่กลางไม่ถูกแจก กองไม่ถูกจ่าย
+       ทุกคำสั่งถูกปฏิเสธ ("ยังไม่ถึงตาคุณ" / "มือนี้ยังไม่จบ") และ tick() ก็ออกที่ current < 0
+       = โต๊ะค้างถาวร ต้องลุกออกอย่างเดียว วัดได้ 299 ใน 3,000 มือตัวต่อตัว
+       nextPhase มีการ์ดตัวนี้อยู่แล้ว (บรรทัด "if (st.current === -1) return nextPhase()")
+       ตรงนี้แค่ขาดไป — เปิดไพ่รวดเดียวจนจบเหมือนกรณี all-in ปกติ */
+    if (st.current === -1 && inHand().length > 1) return nextPhase();
     return {};
   }
 
@@ -634,6 +672,14 @@ export function createTable(opts = {}) {
         showdown: !!(st.lastResult && st.lastResult.showdown),
         payouts: (st.lastResult && st.lastResult.payouts || [])
           .map(x => ({ name: x.name, amount: x.amount })),
+        /* ⚠️ ต้องเก็บ "ใครลงไปเท่าไหร่" ของทุกคนในมือ ไม่ใช่เฉพาะคนที่เปิดไพ่
+           สถิติสะสมเคยบวกแต่ยอดที่ชนะ ไม่เคยหักที่ลงไป
+           ทุกคนจึงขึ้นเป็นบวกตลอดกาล ต่อให้เสียจริง (วัดได้ ผลรวมทั้งโต๊ะ +240 ทั้งที่ต้องเป็น 0)
+           เก็บตรงนี้เพราะเป็นจุดสุดท้ายที่ committed ยังไม่ถูกล้าง */
+        puts: players.map(pl => {
+          const sx = st.seats[pl.id];
+          return { name: sx ? sx.name : "", amount: pl.contributed };
+        }).filter(x => x.name),
         /* ต้องเก็บ put ด้วย ไม่งั้นย้อนดูประวัติแล้วไม่รู้ว่าใครเสียไปเท่าไหร่
            (หน้าจอมีให้ดูตอนจบมือ แต่ไฟล์ประวัติหายไป ซึ่งเป็นที่ที่ใช้ศึกษาจริง) */
         reveal: (st.lastResult && st.lastResult.reveal || [])
@@ -791,12 +837,17 @@ export function createTable(opts = {}) {
         lastKind: s.lastKind || "",
         /* ไพ่ในมือ: เห็นแค่ของตัวเอง หรือของทุกคนตอนเปิดไพ่ */
         /* เห็นไพ่คนอื่นได้สามทางเท่านั้น: ไพ่ตัวเอง · เปิดไพ่ตามกติกา · เจ้าตัวเลือกโชว์เอง */
+        /* ⚠️ st.shown ผูกกับเลขที่นั่ง แต่ย้ายที่นั่งทำได้ตอน showdown พอดี (ตั้งใจให้ทำตอนนั้น)
+           ถ้าเช็คแค่ st.shown[i] พอคนที่โชว์ย้ายออก แล้วมีคนย้ายมานั่งช่องเดิม
+           ไพ่จริงของคนใหม่ (ยังไม่ถูกล้างจนกว่าจะขึ้นมือใหม่) จะถูกส่งให้ทุกเครื่องทันที
+           จึงต้องตรงทั้งเลขที่นั่งและรหัสคน */
         cards: (i === mySeat ||
                 (st.lastResult && st.lastResult.showdown && !s.folded && s.cards.length) ||
-                st.shown[i])
+                (st.shown[i] && st.shownBy[s.token || ("seat:" + i)]))
                  ? s.cards.map(cardCode) : (s.cards.length ? ["??", "??"] : []),
         /* บอกหน้าจอว่าใบนี้มาจากการโชว์เอง จะได้ติดป้ายให้ต่างจากการเปิดไพ่ปกติ */
-        selfShown: !!st.shown[i]
+        /* ต้องตรงกันทั้งเลขที่นั่งและรหัสคน กันไพ่รั่วตอนมีคนย้ายที่นั่งตอน showdown */
+        selfShown: !!(st.shown[i] && st.shownBy[s.token || ("seat:" + i)])
       } : null)
     };
   }
@@ -814,6 +865,13 @@ export function createTable(opts = {}) {
     }
     if (msg.type === "sitout") {
       const s = st.seats[seatId];
+      /* ⚠️ ห้ามพักมือตอนถึงตาตัวเอง
+         พักมือแล้ว st.current ยังชี้มาที่เขาและยังนับว่าอยู่ในมือ คนอื่นจึงเดินต่อไม่ได้
+         บนโต๊ะที่ตั้ง "ไม่จำกัดเวลา" ไม่มี tick() มาช่วยพับให้ = โต๊ะค้างจนกว่าเขาจะกดกลับมาเล่น
+         อยากออกจากมือนี้จริงๆ ให้กด Fold ซึ่งเป็นคำสั่งที่ตรงกับความตั้งใจอยู่แล้ว */
+      if (s && msg.value && st.current === seatId && s.inHand && !s.folded) {
+        return { error: "ถึงตาคุณอยู่ กด Fold ก่อนถ้าจะออกจากมือนี้" };
+      }
       if (s) {
         s.sitOut = !!msg.value;
         s.lastActAt = Date.now();   /* กดปุ่มเอง = ยังอยู่ นับเวลาใหม่ */
@@ -890,6 +948,12 @@ export function createTable(opts = {}) {
        แต่เดิมไม่มีคำสั่งให้กดเลิกจริง ปิดรอบได้ทางเดียวคือเล่นให้ครบตาที่ตั้งไว้
        คนที่เลือกไม่จำกัดจึงไม่มีทางได้เห็นตารางสรุปเลย */
     if (msg.type === "endrun") {
+      /* ⚠️ ต้องเช็คเจ้าภาพเหมือนคำสั่งตั้งค่าโต๊ะ
+         คำสั่งนี้ปิดรอบให้ "ทั้งโต๊ะ" ไม่ใช่แค่ตัวเอง ปล่อยให้ใครก็กดได้
+         = คนเดียวกดพลาด แล้วสถิติได้-เสียของทุกคนถูกแช่แข็งทันที */
+      if (st.hostSeat !== null && st.hostSeat !== seatId) {
+        return { error: "เฉพาะคนที่เปิดโต๊ะเท่านั้นที่เลิกรอบได้" };
+      }
       if (st.phase !== "waiting" && st.phase !== "showdown") {
         return { error: "มือนี้ยังไม่จบ เลิกตอนนี้ไม่ได้" };
       }
@@ -900,6 +964,11 @@ export function createTable(opts = {}) {
 
     /* เริ่มรอบเล่นใหม่: ล้างเวลาและจำนวนตา แต่ชิปคงไว้ */
     if (msg.type === "newsession") {
+      /* ⚠️ เจ้าภาพเท่านั้น คำสั่งนี้ล้างกำไรขาดทุนของทุกคนทิ้ง (boughtIn ถูกตั้งใหม่เท่าชิปที่มี)
+         กดพลาดครั้งเดียว = สถิติทั้งรอบของทุกคนหายถาวร เอากลับไม่ได้ */
+      if (st.hostSeat !== null && st.hostSeat !== seatId) {
+        return { error: "เฉพาะคนที่เปิดโต๊ะเท่านั้นที่เริ่มรอบใหม่ได้" };
+      }
       if (st.phase !== "waiting" && st.phase !== "showdown") {
         return { error: "มือนี้ยังไม่จบ เริ่มรอบใหม่ตอนนี้ไม่ได้" };
       }
@@ -927,6 +996,11 @@ export function createTable(opts = {}) {
       if (!s2 || !s2.cards.length) return { error: "รอบนี้คุณไม่ได้ร่วมมือ" };
       if (st.shown[seatId]) return {};
       st.shown[seatId] = true;
+      /* ⚠️ จำ "ใครโชว์" ด้วยรหัสคน ไม่ใช่แค่เลขที่นั่ง
+         เลขที่นั่งเปลี่ยนมือได้ และย้ายที่นั่งทำได้ตอน showdown พอดี (ตั้งใจให้ทำตอนนั้น)
+         ถ้าอ้างแต่เลขที่นั่ง พอคนโชว์ย้ายออกแล้วมีคนอื่นย้ายมานั่งแทน
+         ธงจะไปติดคนใหม่ แล้วไพ่จริงของเขา (ยังไม่ถูกล้างจนกว่าจะขึ้นมือใหม่) จะถูกส่งให้ทุกเครื่อง */
+      st.shownBy[s2.token || ("seat:" + seatId)] = true;
       note(s2.name + " โชว์ไพ่");
       return {};
     }
