@@ -187,6 +187,7 @@ export function createTable(opts = {}) {
       connected: true,
       sitOut: false,
       lastAction: "",
+      lastKind: "",
       timeCards: cfg.timeCards,   /* การ์ดต่อเวลาที่เหลือของคนนี้ */
       token: token      /* รหัสประจำเครื่อง ใช้พิสูจน์ตัวตนตอนกลับเข้ามา */
     };
@@ -230,7 +231,8 @@ export function createTable(opts = {}) {
     const wasInHand = s.inHand && !s.folded;
     if (wasInHand) {
       s.folded = true;
-      s.lastAction = "หมอบ (ออกจากโต๊ะ)";
+      s.lastAction = "Fold (ออกจากโต๊ะ)";
+      s.lastKind = "fold";
     }
     note(s.name + " ออกจากโต๊ะ");
     s.connected = false;
@@ -274,7 +276,8 @@ export function createTable(opts = {}) {
 
     if (s.inHand && !s.folded) {
       s.folded = true;
-      s.lastAction = "หมอบ (หลุด)";
+      s.lastAction = "Fold (หลุด)";
+      s.lastKind = "fold";
       /* เช็คจบมือเสมอ แต่บอกไปด้วยว่าคนที่หลุดคือใคร
          จะได้ไม่ไปเลื่อนตาของคนอื่นที่ยังไม่ได้พูด */
       checkRoundEnd(seatId);
@@ -313,7 +316,7 @@ export function createTable(opts = {}) {
 
     for (const s of seated()) {
       s.bet = 0; s.committed = 0; s.cards = []; s.folded = false;
-      s.allIn = false; s.acted = false; s.lastAction = "";
+      s.allIn = false; s.acted = false; s.lastAction = ""; s.lastKind = "";
       s.inHand = ready.includes(s);
     }
 
@@ -325,8 +328,8 @@ export function createTable(opts = {}) {
     const sbSeat = heads ? st.button : nextOccupied(st.button, s => s.inHand);
     const bbSeat = nextOccupied(sbSeat, s => s.inHand);
 
-    postBlind(sbSeat, cfg.smallBlind, "บอดเล็ก");
-    postBlind(bbSeat, cfg.bigBlind, "บอดใหญ่");
+    postBlind(sbSeat, cfg.smallBlind, "SB");
+    postBlind(bbSeat, cfg.bigBlind, "BB");
     st.currentBet = cfg.bigBlind;
 
     /* แจกคนละ 2 ใบ */
@@ -384,25 +387,28 @@ export function createTable(opts = {}) {
       if (inHand().length <= 1) return { error: "เหลือคุณคนเดียว ชนะไปแล้ว" };
       s.folded = true;
       s.acted = true;
-      s.lastAction = "หมอบ";
-      note(s.name + " หมอบ");
+      s.lastAction = "Fold";
+      s.lastKind = "fold";
+      note(s.name + " fold");
     }
 
     else if (msg.action === "check") {
       if (toCall > 0) return { error: "มีเงินต้องตามอยู่ เคาะไม่ได้" };
       s.acted = true;
-      s.lastAction = "เคาะ";
-      note(s.name + " เคาะ");
+      s.lastAction = "Check";
+      s.lastKind = "check";
+      note(s.name + " check");
     }
 
     else if (msg.action === "call") {
       if (toCall <= 0) return { error: "ไม่มีเงินต้องตาม ใช้เคาะแทน" };
       const pay = Math.min(toCall, s.stack);
       s.stack -= pay; s.bet += pay; s.committed += pay;
-      if (s.stack === 0) { s.allIn = true; s.lastAction = "หมดหน้าตัก"; }
-      else s.lastAction = "ตาม " + pay;
+      if (s.stack === 0) { s.allIn = true; s.lastAction = "All in"; }
+      else s.lastAction = "Call " + pay;
+      s.lastKind = "call";
       s.acted = true;
-      note(s.name + (s.allIn ? " หมดหน้าตัก " : " ตาม ") + pay);
+      note(s.name + (s.allIn ? " all in " : " call ") + pay);
     }
 
     else if (msg.action === "raise") {
@@ -435,7 +441,8 @@ export function createTable(opts = {}) {
       s.acted = true;
       if (isFullRaise) for (const o of canAct()) if (o !== s) o.acted = false;
 
-      s.lastAction = (s.allIn ? "หมดหน้าตัก " : "เพิ่มเป็น ") + target;
+      s.lastAction = (s.allIn ? "All in " : "Raise to ") + target;
+      s.lastKind = "raise";
       note(s.name + " " + s.lastAction);
     }
 
@@ -705,6 +712,9 @@ export function createTable(opts = {}) {
         sitOut: s.sitOut,
         timeCards: s.timeCards,
         lastAction: s.lastAction,
+        /* รหัสท่าแบบเครื่องอ่าน แยกจากข้อความที่คนอ่าน
+           เดิมหน้าจอเดาท่าจากการอ่านคำแรกของ lastAction ซึ่งพังทันทีที่เปลี่ยนภาษา */
+        lastKind: s.lastKind || "",
         /* ไพ่ในมือ: เห็นแค่ของตัวเอง หรือของทุกคนตอนเปิดไพ่ */
         cards: (i === mySeat || (st.lastResult && st.lastResult.showdown && !s.folded && s.cards.length))
                  ? s.cards.map(cardCode) : (s.cards.length ? ["??", "??"] : [])
