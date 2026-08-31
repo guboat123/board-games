@@ -689,6 +689,8 @@ button { font-family: inherit; }
 .act--fold  { background: #3a1d1a; border-color: #6b2f28; color: #ffb3ab; }
 .act--call  { background: #1d4030; border-color: #2f6a4a; }
 .act--raise { background: var(--gold); border-color: var(--gold); color: #06170f; }
+/* ปุ่มโชว์ไพ่ ไม่ใช่การลงเงิน จึงใช้สีของตัวเอง ไม่ปนกับปุ่มเดิมพัน */
+.act--show { background: #2b2140; border-color: #6a53a8; color: #d9c8ff; }
 .act small { display: block; font-family: var(--mono); font-size: .72rem; font-weight: 500; opacity: .85; }
 /* ⚠️ ปุ่มที่กดไม่ได้ ห้ามหรี่ทั้งปุ่มด้วย opacity
    ปุ่มทอง (.act--raise) เป็นตัวหนังสือสีเกือบดำบนพื้นทอง พอหรี่ทั้งก้อนเหลือ 32%
@@ -862,6 +864,12 @@ button { font-family: inherit; }
    ได้ = เขียว · เสีย = แดง ต้องแยกออกจากกันชัดๆ ในหนึ่งวินาที */
 .result .row .res-amt--lose { color: #ff6b5e; font-size: .86rem; font-weight: 700; }
 .result .row--lose .res-cards .pc--sm { width: 26px; font-size: 8px; }
+.show-tag {
+  display: inline-block; vertical-align: middle;
+  font-family: var(--mono); font-size: .54rem; letter-spacing: .08em;
+  color: #d9c8ff; background: #3a2d59; border: 1px solid #6a53a8;
+  border-radius: 4px; padding: 1px 5px; margin-left: 6px;
+}
 .win-tag {
   display: inline-block; vertical-align: middle;
   font-family: var(--mono); font-size: .56rem; letter-spacing: .12em;
@@ -2896,6 +2904,14 @@ button { font-family: inherit; }
       start.disabled = !!why;
       row.appendChild(start);
 
+      /* โชว์ไพ่เอง — ของสนุกที่โต๊ะจริงมี เช่นชนะเพราะทุกคนหมอบ แล้วโชว์ว่าบลัฟ
+         โผล่เฉพาะตอนจบมือ และเฉพาะคนที่ไพ่ยังไม่ถูกเปิด */
+      var alreadyOpen = view.lastResult && view.lastResult.showdown && !me.folded;
+      if (view.phase === "showdown" && me.cards.length && !alreadyOpen && !me.selfShown) {
+        row.appendChild(mkBtn("act act--show", "โชว์ไพ่", "ให้ทุกคนเห็นไพ่ที่คุณถือ",
+          function () { send({ type: "showcards" }); }));
+      }
+
       return;
     }
 
@@ -3357,6 +3373,15 @@ button { font-family: inherit; }
       });
     }
 
+    /* คนที่เลือกโชว์ไพ่เอง ไม่ได้อยู่ใน reveal ของเซิร์ฟเวอร์ (เขาไม่ได้เล่นถึงเปิดไพ่)
+       ต้องเติมเข้ามาเอง ไม่งั้นกดโชว์แล้วไม่มีอะไรขึ้นในกล่องผล */
+    view.seats.forEach(function (sx, ix) {
+      if (!sx || !sx.selfShown) return;
+      var already = list.filter(function (y) { return y.seatId === ix; })[0];
+      if (already) { already.selfShown = true; if (!already.cards.length) already.cards = sx.cards; return; }
+      list.push({ seatId: ix, name: sx.name, cards: sx.cards, hand: "", selfShown: true });
+    });
+
     /* ⚠️ แถวผู้ชนะต้องอยู่นอกส่วนที่เลื่อนได้
        ถ้าอยู่ในกล่องเลื่อนรวมกับคนอื่น มันจะโดนตัดหัวทันทีที่มีคนเปิดไพ่หลายคน
        ซึ่งพังจุดประสงค์ทั้งหมด (แถวที่ต้องเห็นชัดที่สุดกลับเป็นแถวที่ถูกซ่อน) */
@@ -3380,6 +3405,12 @@ button { font-family: inherit; }
       var nm = document.createElement("div");
       nm.className = "res-name";
       nm.textContent = x.name;
+      if (x.selfShown) {
+        var st2 = document.createElement("span");
+        st2.className = "show-tag";
+        st2.textContent = "โชว์เอง";
+        nm.appendChild(st2);
+      }
       if (isWin) {
         var tag = document.createElement("span");
         tag.className = "win-tag";

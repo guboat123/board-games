@@ -50,6 +50,7 @@ export function createTable(opts = {}) {
     turnAt: 0,               /* เวลาที่ตาเพิ่งเปลี่ยนมาถึงคนปัจจุบัน ใช้วัดว่าคิดนานแค่ไหน */
     turnExtra: 0,            /* เวลาที่ซื้อเพิ่มด้วยการ์ดในตานี้ (มิลลิวินาที) */
     hand: null,              /* สมุดบันทึกของมือที่กำลังเล่น */
+    shown: {},               /* ที่นั่งที่ "เลือกโชว์ไพ่เอง" หลังจบมือ */
     hands: []                /* ประวัติมือที่จบแล้ว ใช้ย้อนดูรูปแบบการเล่น */
   };
   const MAX_HISTORY = 200;   /* เก็บในหน่วยความจำ ไม่มีฐานข้อมูล จึงต้องมีเพดาน */
@@ -315,6 +316,7 @@ export function createTable(opts = {}) {
     st.currentBet = 0;
     st.minRaise = cfg.bigBlind;
     st.lastResult = null;
+    st.shown = {};           /* เริ่มมือใหม่ ล้างของเก่าทิ้ง ไม่งั้นไพ่มือก่อนจะค้างโชว์ */
     st.phase = "preflop";
 
     for (const s of seated()) {
@@ -749,8 +751,13 @@ export function createTable(opts = {}) {
            เดิมหน้าจอเดาท่าจากการอ่านคำแรกของ lastAction ซึ่งพังทันทีที่เปลี่ยนภาษา */
         lastKind: s.lastKind || "",
         /* ไพ่ในมือ: เห็นแค่ของตัวเอง หรือของทุกคนตอนเปิดไพ่ */
-        cards: (i === mySeat || (st.lastResult && st.lastResult.showdown && !s.folded && s.cards.length))
-                 ? s.cards.map(cardCode) : (s.cards.length ? ["??", "??"] : [])
+        /* เห็นไพ่คนอื่นได้สามทางเท่านั้น: ไพ่ตัวเอง · เปิดไพ่ตามกติกา · เจ้าตัวเลือกโชว์เอง */
+        cards: (i === mySeat ||
+                (st.lastResult && st.lastResult.showdown && !s.folded && s.cards.length) ||
+                st.shown[i])
+                 ? s.cards.map(cardCode) : (s.cards.length ? ["??", "??"] : []),
+        /* บอกหน้าจอว่าใบนี้มาจากการโชว์เอง จะได้ติดป้ายให้ต่างจากการเปิดไพ่ปกติ */
+        selfShown: !!st.shown[i]
       } : null)
     };
   }
@@ -847,6 +854,19 @@ export function createTable(opts = {}) {
         p2.timeCards = cfg.timeCards;
       }
       note("เริ่มรอบเล่นใหม่");
+      return {};
+    }
+
+    /* โชว์ไพ่เองหลังจบมือ — ของสนุกที่โต๊ะจริงมี เช่นโชว์ว่าเมื่อกี้บลัฟ
+       ทำได้เฉพาะช่วงจบมือของมือนั้น และเฉพาะไพ่ของตัวเอง
+       คนที่หมอบไปแล้วก็โชว์ได้ นั่นแหละคือจังหวะที่สนุกที่สุด */
+    if (msg.type === "showcards") {
+      const s2 = st.seats[seatId];
+      if (st.phase !== "showdown") return { error: "โชว์ได้ตอนจบมือเท่านั้น" };
+      if (!s2 || !s2.cards.length) return { error: "รอบนี้คุณไม่ได้ร่วมมือ" };
+      if (st.shown[seatId]) return {};
+      st.shown[seatId] = true;
+      note(s2.name + " โชว์ไพ่");
       return {};
     }
 
