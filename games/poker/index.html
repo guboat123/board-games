@@ -203,7 +203,19 @@ button { font-family: inherit; }
 }
 .topbtn:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
 /* แผงสรุปโต๊ะ ใช้เปลือกเดียวกับกล่องผล แต่สูงกว่าเพราะมี 9 แถวเสมอ */
-#t-table.is-on { max-height: 88%; }
+/* ⚠️ แผงนี้ต้องเลื่อนได้ทั้งใบ ไม่ใช่เลื่อนเฉพาะ .rows
+   ในแผงมีของที่หดไม่ได้เยอะ: หัวข้อ + แท็บ + กล่องบอท + วงโต๊ะ (สูงตาม padding-top 64%
+   ซึ่ง flex หดให้ไม่ได้) + หัวตาราง + ส่วนท้ายที่มีปุ่ม "ปิด"
+   รวมกันเกินความสูงกล่องบนจอ 360px ของที่อยู่ล่างสุด — ตารางเงิน ปุ่มพักมือ
+   ปุ่มเลิกเล่นรอบนี้ และปุ่มปิด — จึงถูกตัดหายไปโดยไม่มีแถบเลื่อนบอกว่ายังมีต่อ
+   ให้ทั้งแผงเลื่อนได้ แล้วปิด scroll ซ้อนใน .rows จะได้มีบริบทเลื่อนเดียว */
+#t-table.is-on { max-height: 88%; overflow-y: auto; display: block; }
+/* ⚠️ ต้องเป็น block ไม่ใช่ flex
+   ตอนเป็นคอลัมน์ flex แถวเงิน (.rows, flex: 1 1 auto) ถูกบีบเหลือ 64px
+   แล้วเนื้อหา 9 แถวล้นทะลุลงไปทับส่วนท้ายที่มีปุ่ม "ปิด"
+   เลื่อนยังไงปุ่มก็ไม่โผล่ เพราะมันไม่ได้อยู่ต่อท้ายเนื้อหาจริง แค่ลอยทับกันอยู่
+   block ทำให้ทุกอย่างเรียงต่อกันตามปกติ แล้วทั้งแผงเลื่อนได้จริง */
+#t-table .rows { overflow: visible; min-height: 0; }
 #t-table .rows { min-height: 64px; }
 .mhead, .mrow {
   display: grid; grid-template-columns: 1fr auto auto;
@@ -649,7 +661,13 @@ button { font-family: inherit; }
      ไพ่ถูกยกขึ้น 34px แล้วไปมุดใต้กล่องที่นั่งของเราเอง
      ตอนไม่ได้แง้มจะไม่เห็นปัญหา เพราะไพ่ยังไม่ถูกยก */
   flex: 0 0 auto; position: relative; z-index: 5;
-  height: 132px;
+  /* ⚠️ ต้องสูงพอใส่ทั้งบรรทัดคำสั่งและไพ่ (ไพ่ .pc--lg สูง 109px หดไม่ได้ เพราะผูก aspect-ratio)
+     รวมกับข้อความ ~20px + ขอบบน 3px + ขอบล่าง 4px = ต้องมีอย่างน้อย 136px
+     ของเดิม 132px (และ 108px บนจอเตี้ย) เนื้อหาจึงล้นออกทาง "ด้านบน"
+     เพราะกล่องนี้จัดชิดล่าง (justify-content: flex-end)
+     ผลคือบรรทัด "กดค้างที่ปุ่มทองเพื่อแง้มดูไพ่" ไปนอนทับแถบข้อความของโต๊ะ
+     ทั้งที่มันคือคำสั่งของกลไกหลักของเกม (วัดจริงบน 360x640: ล้นขึ้นไป 24px) */
+  height: 140px;
   background: linear-gradient(#0d3a25, #08281a);
   border-top: 3px solid var(--rail-light);
   /* เรียงเป็นคอลัมน์ ข้อความอยู่แถวของมันเอง ไพ่อยู่แถวล่าง
@@ -667,7 +685,8 @@ button { font-family: inherit; }
   pointer-events: none;
 }
 @media (max-height: 700px) {
-  .hand-area { height: 108px; }
+  /* จอเตี้ยก็ยังต้องใส่ไพ่ 109px + ข้อความให้ครบ ลดได้แค่ขนาดตัวอักษร ไม่ใช่ความสูงกล่อง */
+  .hand-area { height: 134px; }
   .hand-hint { font-size: .68rem; }
 }
 .hole { position: relative; display: flex; gap: 8px; }
@@ -722,10 +741,17 @@ button { font-family: inherit; }
   background: #123a26; border-color: var(--live); color: #bff0d2;
   box-shadow: 0 4px 14px rgba(0,0,0,.55);
 }
+/* ⚠️ ปุ่มนี้ลอยขึ้นไปอยู่ในแถบไพ่ในมือ ซึ่งมีปุ่มทอง "แง้มดูไพ่" อยู่ตรงกลาง
+   ปุ่มทองกว้างราว 131-229px บนจอ 360px ส่วนปุ่มนี้ชิดขวา
+   ถ้าปล่อยให้กว้างตามข้อความเต็ม (มี <small> "การ์ดต่อเวลา เหลือ N ใบ" ~158px)
+   ขอบซ้ายของมันจะเลยเข้ามาในเขตปุ่มทอง แล้วเพราะอยู่หลังในลำดับ DOM ที่ z-index เท่ากัน
+   มันจะกินการกดแทน = ตั้งใจแง้มดูไพ่ แต่กลายเป็นใช้การ์ดต่อเวลาทิ้งไปหนึ่งใบ
+   จำกัดความกว้างไว้ไม่ให้ล้ำเข้าเขตปุ่มทอง (ปุ่มทองเริ่มที่ ~36% ของจอ) */
 #btn-timecard {
   position: absolute; right: 10px; bottom: 100%;
   z-index: 5; flex: 0 0 auto; width: auto;
-  margin-bottom: 8px; padding: 8px 12px;
+  max-width: 32vw;
+  margin-bottom: 8px; padding: 8px 10px;
   background: #3a2d0f; border-color: var(--gold); color: var(--gold);
   box-shadow: 0 4px 14px rgba(0,0,0,.55);
 }
@@ -909,7 +935,10 @@ button { font-family: inherit; }
 /* ⚠️ ต้องใช้ตัวเลือกที่มี id ด้วย ไม่งั้นแพ้ #t-result.is-many (1,1,0)
    แล้วเพดาน 74% เดิมจะกลับมาคุมทั้งที่กองซ้อนคุมความสูงให้แล้ว */
 .result-stack > #t-result { flex: 0 1 auto; min-height: 0; max-height: none; }
-.result-stack > #t-money  { flex: 0 0 auto; max-height: none; }
+/* ⚠️ โซนเงินหดไม่ได้ (0 0 auto) จึงต้องมีเพดานของตัวเองเสมอ
+   ถ้าปล่อยเป็น none พอมี 9 คนมันจะสูงจนกินที่ทั้งกอง แล้วกล่องผลเหลือน้อยกว่า
+   ขอบในของตัวเอง = แถวผู้ชนะหายเกลี้ยง ซึ่งเป็นบั๊กเดิมที่การแยกโซนตั้งใจจะแก้ */
+.result-stack > #t-money  { flex: 0 0 auto; max-height: 34%; overflow-y: auto; }
 
 /* ---------- โซนเงิน ----------
    ⚠️ ต้องเตี้ยไว้ ตัวมันหดไม่ได้ (flex 0 0 auto) ทุกพิกเซลที่มันกิน
@@ -929,6 +958,8 @@ button { font-family: inherit; }
 .result.is-on { display: flex; flex-direction: column; overflow: hidden; }
 .result h3 { margin: 0 0 4px; font-size: 1.1rem; color: var(--gold); }
 .result .row { display: flex; justify-content: space-between; gap: 10px; font-size: .85rem; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+/* แถวตารางอันดับมีสองช่อง (ชื่อ | ยอด) ไม่ใช่สามช่องเหมือนแถวผลมือ */
+.result .row--rank { display: grid; grid-template-columns: 1fr auto; align-items: baseline; }
 .result .row b { font-family: var(--mono); color: var(--good); }
 /* ---------- ตารางผลตอนเปิดไพ่ ----------
    3 ช่อง: ไพ่ | ชื่อ+ชุดไพ่ | ยอดที่ได้  เรียงตรงกันทุกแถว อ่านไล่ลงมาได้
@@ -952,31 +983,32 @@ button { font-family: inherit; }
 /* ---------- แถบเงินสะสมท้ายกล่องผล ----------
    ⚠️ ต้องอยู่นอกส่วนที่เลื่อนได้ (flex: 0 0 auto) เหมือน .win-box
    ถ้าอยู่ใน .rows มันจะถูกดันหายตอนมีคนเปิดไพ่หลายคน ซึ่งเป็นจังหวะที่ต้องเห็นที่สุด */
-.res-money {
-  flex: 0 0 auto; margin-top: 8px; padding-top: 8px;
-  border-top: 1px solid #1d3a2b; cursor: pointer;
-}
-.res-money .lbl {
-  display: block; font-size: .68rem; color: var(--muted);
+/* ⚠️ ทุกกฎในบล็อกนี้ต้องขึ้นต้นด้วย #t-money
+   เคยเขียนเป็น .res-money ตอนที่แถบเงินยังอยู่ท้ายกล่องผล
+   พอย้ายออกมาเป็นกล่องแยก (id t-money) ชื่อคลาสเดิมไม่มีในหน้าอีกแล้ว
+   กฎทั้งชุดจึงตายเงียบ: ชิปกลายเป็นบล็อกเต็มบรรทัด ไม่มีกรอบ ไม่มีช่องไฟ
+   ตัวหนังสือสามตัวติดกันเป็นพืด และที่แย่ที่สุดคือ v--up / v--dn ไม่มีสี
+   = ได้กับเสียเป็นสีเดียวกัน ซึ่งเป็นสิ่งเดียวที่ต้องแยกออกได้ในวินาทีเดียว */
+#t-money { text-align: center; cursor: pointer; }
+#t-money .lbl {
+  display: block; font-size: .66rem; color: var(--muted);
   margin-bottom: 5px; letter-spacing: .02em;
 }
 /* จัดกลาง ไม่ชิดซ้าย — จำนวนคนบนโต๊ะไม่คงที่ (2-9 คน) แถวสุดท้ายจึงไม่เต็มเสมอ
    ชิดซ้ายแล้วแถวสุดท้ายห้อยอยู่ข้างเดียว ดูเหมือนวางไม่เสร็จ */
-.res-money .chips { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
-#t-money { text-align: center; }
-#t-money .chips { justify-content: center; }
-.res-money .chip {
+#t-money .chips { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+#t-money .chip {
   display: flex; align-items: baseline; gap: 5px;
   background: #0d2519; border: 1px solid #1d3a2b; border-radius: 7px;
-  padding: 3px 7px; font-size: .74rem;
+  padding: 2px 6px; font-size: .72rem;
 }
-.res-money .chip.is-me { border-color: var(--gold); }
-.res-money .chip .n { color: #cfe3d7; max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.res-money .chip .b { font-family: var(--mono); font-size: .68rem; color: var(--muted); }
-.res-money .chip .v { font-family: var(--mono); font-weight: 700; }
-.res-money .v--up { color: var(--good); }
-.res-money .v--dn { color: #ff6b5e; }
-.res-money .v--flat { color: var(--muted); }
+#t-money .chip.is-me { border-color: var(--gold); }
+#t-money .chip .n { color: #cfe3d7; max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#t-money .chip .b { font-family: var(--mono); font-size: .66rem; color: var(--muted); }
+#t-money .chip .v { font-family: var(--mono); font-weight: 700; }
+#t-money .v--up { color: var(--good); }
+#t-money .v--dn { color: #ff6b5e; }
+#t-money .v--flat { color: var(--muted); }
 .res-more {
   flex: 0 0 auto; font-size: .68rem; color: var(--muted);
   text-align: left; margin: 7px 0 1px; letter-spacing: .04em;
@@ -3286,8 +3318,10 @@ button { font-family: inherit; }
     /* การ์ดต่อเวลาแบบทัวร์นาเมนต์ · โผล่เฉพาะตอนใกล้หมดเวลา (ตัวจับเวลาเป็นคนเปิด/ปิด)
        ถ้าโชว์ตลอด แถวปุ่มจะแน่นและคนจะกดทิ้งโดยไม่จำเป็น */
     if (view.turnBudgetMs && me.timeCards > 0) {
-      var tcb = mkBtn("act", "+" + view.timeCardSeconds + " วินาที",
-        "การ์ดต่อเวลา เหลือ " + me.timeCards + " ใบ",
+      /* ป้ายใต้ปุ่มต้องสั้น ปุ่มนี้ลอยไปอยู่ข้างปุ่มทอง "แง้มดูไพ่"
+         ข้อความยาวทำให้ปุ่มกว้างจนล้ำเข้าเขตปุ่มทอง แล้วกินการกดแทน */
+      var tcb = mkBtn("act", "+" + view.timeCardSeconds + " วิ",
+        "เหลือ " + me.timeCards + " ใบ",
         function () { send({ type: "timecard" }); });
       tcb.id = "btn-timecard";
       tcb.style.display = "none";
@@ -3621,7 +3655,11 @@ button { font-family: inherit; }
     rows.className = "rows";
     view.standings.forEach(function (p, i) {
       var row = document.createElement("div");
-      row.className = "row" + (i === 0 ? " row--win" : "");
+      /* ⚠️ ต้องมีคลาส row--rank ด้วย
+         .result .row เป็นกริด 3 คอลัมน์ (ไพ่ | ชื่อ | ยอด) สำหรับกล่องผลมือ
+         แถวอันดับมีแค่สองช่อง ยอดเงินจึงไปตกในคอลัมน์กลางที่ชิดซ้าย
+         ทำให้ตัวเลขของแต่ละแถวอยู่คนละตำแหน่ง ตามความยาวชื่อ อ่านเทียบกันไม่ได้ */
+      row.className = "row row--rank" + (i === 0 ? " row--win" : "");
       var left = document.createElement("span");
       left.textContent = (i + 1) + ". " + p.name +
                          (p.busts ? " (ล้ม " + p.busts + ")" : "");
@@ -3772,9 +3810,14 @@ button { font-family: inherit; }
       row.appendChild(cw);
       row.appendChild(mid);
       row.appendChild(right);
-      rows.appendChild(row);
+      /* ⚠️ ผู้ชนะเข้ากล่องที่ไม่เลื่อน คนที่แพ้เข้ากล่องเลื่อน
+         เดิมสร้าง winBox ไว้แล้วไม่เคยใส่อะไรลงไป ทุกแถวจึงตกไปอยู่ในกล่องเลื่อน
+         พอเปิดไพ่หลายคน แถวผู้ชนะ (แถวแรก) ถูกเลื่อนพ้นตาไปเป็นแถวแรกที่โดนตัด
+         ซึ่งตรงข้ามกับที่คอมเมนต์ข้างบนบอกไว้เป๊ะๆ */
+      (isWin ? winBox : rows).appendChild(row);
     });
-    box.appendChild(rows);
+    box.appendChild(winBox);
+    if (rows.childNodes.length) box.appendChild(rows);
 
     /* เปิดไพ่หลายคน = ต้องการที่มากกว่าปกติ ไม่งั้นเห็นทีละแถวเดียว */
     var many = list.length > 2;
@@ -3797,14 +3840,12 @@ button { font-family: inherit; }
       box.classList.remove("is-on"); box.innerHTML = ""; return;
     }
 
+    /* ไม่มีหัวข้อแยก ป้ายบรรทัดเดียวพอ — ทุกพิกเซลที่โซนนี้กิน
+       คือพิกเซลที่หายไปจากแถวผู้ชนะ ซึ่งสำคัญกว่า */
     box.innerHTML = "";
-    var h = document.createElement("h3");
-    h.textContent = "เงินสะสมทั้งโต๊ะ";
-    box.appendChild(h);
-
     var lbl = document.createElement("span");
     lbl.className = "lbl";
-    lbl.textContent = "ซื้อเข้า → ได้ / เสีย  (แตะเพื่อดูตารางเต็ม)";
+    lbl.textContent = "เงินสะสมทั้งโต๊ะ · ซื้อเข้า → ได้ / เสีย  (แตะเพื่อดูตารางเต็ม)";
     box.appendChild(lbl);
 
     var chips = document.createElement("div");
