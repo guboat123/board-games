@@ -243,7 +243,10 @@ function lanUrls() {
   const skip = /(wsl|docker|virtual|vmware|hyper-v|loopback|bluetooth)/i;
   return lanAddresses()
     .filter(a => !skip.test(a.name))
-    .map(a => ({ name: a.name, url: "http://" + a.address + ":" + PORT + "/games/poker/" }));
+    /* ⚠️ ชี้ไปหน้ารวมเกม ไม่ใช่ตรงเข้าโต๊ะโป๊กเกอร์ (เจ้าของสั่ง)
+       เพื่อนที่เปิดลิงก์มาจะได้เลือกเกมเองว่าจะเล่นอะไร ไม่ใช่ถูกลากเข้าโต๊ะทันที
+       และลิงก์สั้นกว่า พิมพ์ตามเองได้ถ้าคัดลอกไม่ติด */
+    .map(a => ({ name: a.name, url: "http://" + a.address + ":" + PORT + "/" }));
 }
 
 function pushLobby() {

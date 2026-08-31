@@ -1813,10 +1813,10 @@ button { font-family: inherit; }
     updateShareUrl();
   }
 
+  /* ⚠️ ลิงก์ชี้ไปหน้ารวมเกม ไม่ต่อรหัสห้องท้ายลิงก์ (เจ้าของสั่ง)
+     เพื่อนเปิดมาแล้วเลือกเองว่าจะเล่นอะไร ไม่ใช่ถูกลากเข้าโต๊ะโป๊กเกอร์ทันที */
   function shareUrl() {
-    if (!lanList.length) return "";
-    var code = ($("f-room").value || "").trim().toUpperCase();
-    return lanList[0].url + (code ? "#" + encodeURIComponent(code) : "");
+    return lanList.length ? lanList[0].url : "";
   }
 
   function updateShareUrl() {
@@ -1826,7 +1826,7 @@ button { font-family: inherit; }
     var code = ($("f-room").value || "").trim().toUpperCase();
     var more = lanList.length > 1 ? " · มีอีก " + (lanList.length - 1) + " เส้นทาง" : "";
     $("share-hint").textContent = (code
-      ? "ต้องอยู่วง WiFi เดียวกัน · เปิดแล้วเข้าห้อง " + code + " ให้เลย"
+      ? "ต้องอยู่วง WiFi เดียวกัน · บอกเพื่อนให้พิมพ์รหัสห้อง " + code
       : "ต้องอยู่วง WiFi เดียวกัน") + more;
   }
 

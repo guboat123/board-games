@@ -110,6 +110,21 @@ const WALLET_START = { 1: 5000, 2: 20000, 3: 100000 };
    (คนตึงจะ "เรซหรือพับ" ไม่ใช่ตามเฉยๆ) — ค่าข้างล่างวัดจากการสุ่ม 30,000 มือ
    ให้ความถี่ออกมาใกล้คนเล่นจริง:
      lv1 เล่น 77% เรซ 3%  · lv2 เล่น 40% เรซ 8%  · lv3 เล่น 28% เรซ 18% */
+/* ---------- ความไม่แน่ใจในการอ่านไพ่ตัวเอง ----------
+   ⚠️ ที่ผ่านมาบอทรู้ค่ามือตัวเองแม่นยำเป๊ะทุกครั้ง ซึ่งไม่มีคนไหนเป็น
+   คนเล่นจริงประเมินพลาดตลอด: คิดว่าคู่ควีนบนบอร์ดสามดอกยังดีอยู่ · มองไม่เห็นว่าสเตรทมาแล้ว
+   ความพลาดนี้แหละที่ทำให้เขาเป็นคน และเป็นสิ่งที่แยกมือใหม่ออกจากมืออาชีพจริงๆ
+   (มืออาชีพไม่ได้กล้ากว่า เขาแค่ประเมินแม่นกว่า)
+
+   ตัวเลข = ส่วนเบี่ยงเบนของการประเมิน ยิ่งมากยิ่งมองไพ่ตัวเองเพี้ยน */
+const MISREAD = { 1: 0.14, 2: 0.10, 3: 0.045 };
+
+/* สุ่มแบบระฆังคว่ำ (บวกสองครั้งแล้วเฉลี่ย) พลาดนิดหน่อยบ่อย พลาดหนักนานๆ ครั้ง
+   ต่างจากสุ่มแบนๆ ที่พลาดหนักบ่อยพอกับพลาดนิดเดียว ซึ่งไม่เหมือนคน */
+function wobble(sd) {
+  return ((Math.random() + Math.random()) - 1) * sd * 2;
+}
+
 const LEVEL = {
   1: { name: "มือใหม่",  margin: -0.16, preMargin: -0.18, bet: 0.70, raise: 0.86, preRaise: 0.78, bluff: 0.02, think: [700, 1800],  sizing: 0.35 },
   2: { name: "นักพนัน", margin:  0.02, preMargin: -0.04, bet: 0.55, raise: 0.72, preRaise: 0.60, bluff: 0.08, think: [900, 2600],  sizing: 0.55 },
@@ -389,8 +404,10 @@ function decideBeginner(f) {
      เกณฑ์ทุกตัวข้างล่างจึงผูกกับ nerve ของแต่ละตัว ไม่ใช่เลขเดียวกันทั้งระดับ
      Wally (0.20) ขยาดตั้งแต่โดนเดิมพันหนึ่งในหก · Bruno (0.60) ยอมถึงเกือบครึ่งตัก */
   const nerve = f.trait.nerve;
-  const got = f.pre ? f.base >= 0.50 : f.base >= 0.45;
-  const strong = f.base >= 0.78;
+  /* มือใหม่ประเมินไพ่ตัวเองพลาดมากที่สุด (ดู MISREAD) */
+  const seen = Math.max(0, Math.min(1, f.base + wobble(MISREAD[1])));
+  const got = f.pre ? seen >= 0.50 : seen >= 0.45;
+  const strong = seen >= 0.78;
 
   if (f.toCall === 0) {
     if (strong) return bet();
@@ -406,24 +423,24 @@ function decideBeginner(f) {
   const cheap = f.price > 0 && f.price < 0.15;
   const scary = !cheap && f.toCall > f.me.stack * (0.15 + nerve * 0.45);
   const nearAllIn = !cheap && f.toCall > f.me.stack * (0.55 + nerve * 0.35);
-  if (f.base >= 0.90) return bet();
+  if (seen >= 0.90) return bet();
 
   /* เกือบทั้งตัก: ต้องมั่นใจแค่ไหนถึงจะกล้า ขึ้นกับว่าเป็นคนแบบไหน
      ขี้กลัว (0.2) ต้องเกือบแน่นอน 0.90 · ใจถึง (0.6) แค่มือดีพอใช้ 0.72 ก็ลงแล้ว */
   if (nearAllIn) {
     const need = 0.94 - nerve * 0.34;
-    return f.base >= need ? { type: "act", action: "call" }
-                          : { type: "act", action: "fold" };
+    return seen >= need ? { type: "act", action: "call" }
+                        : { type: "act", action: "fold" };
   }
 
   if (got && !scary) return { type: "act", action: "call" };
-  if (got && scary && f.base >= (0.82 - nerve * 0.22)) return { type: "act", action: "call" };
+  if (got && scary && seen >= (0.82 - nerve * 0.22)) return { type: "act", action: "call" };
 
   /* ⚠️ ความผิดพลาดแบบมือใหม่ที่ตั้งใจให้มี ไม่ใช่บั๊ก
      คนเพิ่งหัดมักตามด้วย "ไพ่หน้าตาดี" (เอซใบเดียว ไพ่สูงสองใบ) ทั้งที่ยังไม่เข้าชุดอะไรเลย
      คนใจถึงยิ่งทำบ่อย ส่วนคนขี้กลัวแทบไม่ทำ
      ทำเฉพาะตอนเดิมพันไม่ใหญ่ ไม่งั้นกลายเป็นทิ้งเงินทั้งตักซึ่งไม่ใช่ประเด็น */
-  if (!scary && f.base >= 0.38 && Math.random() < nerve * 0.35) {
+  if (!scary && seen >= 0.38 && Math.random() < nerve * 0.35) {
     return { type: "act", action: "call" };
   }
   return { type: "act", action: "fold" };
@@ -436,7 +453,8 @@ function decideGambler(f) {
   const committed = f.me.bet > 0 ? 0.10 : 0;
   /* ไล่ลุ้นทุกทาง ให้น้ำหนักไพ่ลุ้นมากกว่าที่ควรเกือบเท่าตัว */
   const chase = f.draw * 1.8;
-  const eq = Math.min(1, f.base + chase);
+  /* นักพนันประเมินพลาดปานกลาง และมักพลาดไปทางเข้าข้างตัวเอง */
+  const eq = Math.max(0, Math.min(1, f.base + chase + wobble(MISREAD[2]) + 0.02));
 
   const shove = () => ({ type: "act", action: "raise", amount: f.me.bet + f.me.stack });
   const bet = (mult) => raiseTo(f, eq, mult);
@@ -475,8 +493,9 @@ function decidePro(f) {
      หนึ่งคู่บนบอร์ดสามดอกเดียวกัน แทบไม่มีค่า แต่บนบอร์ดแห้งยังใช้สู้ได้
      ยิ่งมือกลางๆ ยิ่งโดนหักเยอะ ส่วนมือแรงจริง (ตองขึ้นไป) แทบไม่กระทบ */
   const fragile = Math.max(0, 0.72 - f.base) * f.wet * 0.5;
+  /* มืออาชีพก็ยังพลาดได้ แค่พลาดน้อยกว่ามาก */
   const eq = Math.max(0, Math.min(1, f.base + f.draw - fragile + (f.bluffing ? 0.26 : 0) +
-                                     (Math.random() - 0.5) * 0.08));
+                                     wobble(MISREAD[3])));
 
   /* ตำแหน่งมีผลจริง: ได้เดินท้ายแปลว่าเห็นคนอื่นตัดสินใจก่อน เล่นกว้างขึ้นได้
      คนที่ต้องเดินก่อนเป็นฝ่ายเสียเปรียบ ต้องมือแน่นกว่า
@@ -584,8 +603,131 @@ export function createBotManager(room, broadcast) {
 
      นี่ไม่ใช่การโกง — เป็นข้อมูลที่คนนั่งอยู่โต๊ะเดียวกันก็เห็นเหมือนกันหมด */
   const reads = {};         /* ชื่อ -> { n, strong, weak } */
+
+  /* ---------- ความจำเรื่องคู่แข่งแต่ละคน ----------
+     ⚠️ ต่างจาก reads (ซึ่งจำแค่ "ไพ่ที่เคยเห็น") อันนี้จำ "สิ่งที่เขาทำกับเรา"
+     สามอย่างที่คนเล่นจริงจำได้เองโดยไม่ต้องพยายาม และเอามาใช้ทุกครั้งที่เจอกัน:
+
+       hurt   คนนี้เคยกินเงินเราไปเท่าไหร่ — เจอเขาดันทีไรก็ระวังกว่าปกติ
+              (ไม่ใช่เหตุผลทางคณิตศาสตร์ แต่มันคือสิ่งที่เกิดขึ้นจริงในหัวคน)
+       caught คนนี้เคยโดนจับได้ว่าบลัฟกี่ครั้ง — ท่าดันของเขาเชื่อได้น้อยลง
+       sticky คนนี้ตามบ่อยแค่ไหน — "ไล่ไม่ไป" แปลว่าบลัฟใส่เขาไม่คุ้ม
+              ต้องรอไพ่จริงแล้วค่อยเก็บ ซึ่งเป็นการปรับตัวที่คนเล่นเป็นทำโดยอัตโนมัติ
+
+     ทุกอย่างเก็บด้วยชื่อ ไม่ใช่เลขที่นั่ง เพราะคนย้ายที่นั่งได้ */
+  const foes = {};   /* "เรา|เขา" -> { hurt, caught, sticky, seen } */
+
+  function foeKey(meName, hisName) { return meName + "|" + hisName; }
+  function foeOf(meName, hisName) {
+    const k = foeKey(meName, hisName);
+    return foes[k] || (foes[k] = { hurt: 0, caught: 0, sticky: 0, seen: 0 });
+  }
+
+  /* เรียกตอนจบมือ: ใครกินเงินใคร และใครโดนจับได้ว่าบลัฟ */
+  function rememberFoes(st) {
+    const r = st.lastResult;
+    if (!r) return;
+    const won = {}; (r.payouts || []).forEach(x => { won[x.seatId] = x.amount; });
+    const put = {}; (r.puts || []).forEach(x => { put[x.seatId] = x.amount; });
+
+    /* คนที่ได้เงินไปมากที่สุดในมือนี้ = คนที่กินเงินคนอื่น */
+    let topSeat = -1, topAmt = 0;
+    for (const k in won) if (won[k] > topAmt) { topAmt = won[k]; topSeat = Number(k); }
+    const winner = topSeat >= 0 && st.seats[topSeat] ? st.seats[topSeat].name : null;
+
+    for (let i = 0; i < st.seats.length; i++) {
+      const b = st.seats[i];
+      if (!b || !b.isBot) continue;
+      const lost = (put[i] || 0) - (won[i] || 0);
+      if (winner && winner !== b.name && lost > 0) {
+        const f = foeOf(b.name, winner);
+        f.hurt += lost;
+        f.seen++;
+      }
+      /* ใครที่เปิดไพ่ออกมาแล้วเป็นไพ่ขยะ = โดนจับได้ว่าบลัฟ ทุกคนที่โต๊ะจำได้ */
+      (r.reveal || []).forEach(x => {
+        if (!x.cards || x.cards.length !== 2) return;
+        if (x.name === b.name) return;
+        if (preflopStrength(x.cards) < 0.32) foeOf(b.name, x.name).caught++;
+      });
+    }
+  }
+
+  /* นับว่าคนนี้ตามบ่อยแค่ไหน เรียกทุกครั้งที่เห็นเขาลงมือ */
+  function noteSticky(st, i) {
+    const x = st.seats[i];
+    if (!x) return;
+    for (let j = 0; j < st.seats.length; j++) {
+      const b = st.seats[j];
+      if (!b || !b.isBot || j === i) continue;
+      const f = foeOf(b.name, x.name);
+      if (x.lastKind === "call") f.sticky = Math.min(60, f.sticky + 1);
+      else if (x.lastKind === "fold") f.sticky = Math.max(0, f.sticky - 1.6);
+    }
+  }
   let lastSeenHand = -1;
   let showOffHand = -1;     /* ตัดสินใจขิงไปแล้วในมือไหน (กันทอยลูกเต๋าซ้ำ) */
+
+  /* ---------- อารมณ์ที่ค้างข้ามมือ ----------
+     ⚠️ นี่คือสิ่งที่ขาดไปมากที่สุดในความ "เหมือนคน"
+     ที่ผ่านมาบอทลืมทุกอย่างทันทีที่มือจบ มือที่ 40 กับมือแรกคิดเหมือนกันเป๊ะ
+     ทั้งที่คนเล่นจริงพกอารมณ์จากมือก่อนหน้ามาด้วยเสมอ และนั่นคือสิ่งที่คนอ่านออก
+
+     เก็บสามอย่าง ทุกตัวจางลงเองทุกมือ (คนเราไม่ได้โกรธค้างตลอดไป):
+       tilt       เพิ่งเสียหนัก โดยเฉพาะเสียทั้งที่ไพ่ดี = เล่นแย่ลงชั่วคราว
+                  ตามเยอะขึ้น บลัฟบ่อยขึ้น วินัยหลุด — คนที่ "เสียแล้วรวน" อาการหนักกว่า
+       confidence เพิ่งชนะติดกัน = กล้าขึ้น ไล่มากขึ้น
+       boredom    ไม่ได้ไพ่เล่นมาหลายมือ = เริ่มอยากเล่นด้วยไพ่ที่ไม่ควรเล่น
+                  (นี่คือเหตุผลจริงที่คนเสียเงินมากที่สุด ไม่ใช่เพราะคิดเลขผิด) */
+  const moods = {};   /* ชื่อ -> { tilt, confidence, boredom } */
+  let moodHand = -1;
+
+  function moodOf(name) {
+    return moods[name] || (moods[name] = { tilt: 0, confidence: 0, boredom: 0 });
+  }
+
+  function updateMoods(st) {
+    if (st.phase !== "showdown" || st.handNo === moodHand) return;
+    moodHand = st.handNo;
+    const r = st.lastResult;
+    if (!r) return;
+    const won = {};
+    (r.payouts || []).forEach(x => { won[x.seatId] = x.amount; });
+    const putBy = {};
+    (r.puts || []).forEach(x => { putBy[x.seatId] = x.amount; });
+
+    for (let i = 0; i < st.seats.length; i++) {
+      const b = st.seats[i];
+      if (!b || !b.isBot) continue;
+      const m = moodOf(b.name);
+      const tr = traitOf(b.name);
+
+      /* จางลงก่อน แล้วค่อยบวกของมือนี้ */
+      m.tilt *= 0.82;
+      m.confidence *= 0.85;
+
+      const put = putBy[i] || 0;
+      const got = won[i] || 0;
+      const net = got - put;
+      const stackNow = Math.max(1, b.stack);
+
+      if (put === 0) {
+        /* ไม่ได้ลงเงินเลย = ไม่ได้ไพ่ให้เล่น นานเข้าก็เริ่มอยู่ไม่สุข */
+        m.boredom = Math.min(1, m.boredom + 0.13);
+      } else {
+        m.boredom *= 0.4;
+      }
+
+      if (net < 0 && put > stackNow * 0.25) {
+        /* เสียหนัก ยิ่งเสียเยอะเทียบตักยิ่งรวน และคนที่ใจไม่นิ่งรวนกว่า */
+        const hurt = Math.min(1, put / (stackNow + put));
+        m.tilt = Math.min(1, m.tilt + hurt * (0.30 + tr.tilt * 0.45));
+      }
+      if (net > 0 && got > stackNow * 0.3) {
+        m.confidence = Math.min(1, m.confidence + 0.28);
+      }
+    }
+  }
 
   /* ---------- แผนประจำสตรีทของบอทแต่ละตัว ----------
      ⚠️ นี่คือสิ่งที่ทำให้บอท "ดูเหมือนคน" มากที่สุดในบรรดาทั้งหมด
@@ -689,6 +831,8 @@ export function createBotManager(room, broadcast) {
         if (st.phase === "preflop") rec.preRaise++;
       } else if (x.lastKind === "call") rec.calls++;
       else if (x.lastKind === "check") rec.checks++;
+      /* จำไว้ว่าคนนี้ตามบ่อยแค่ไหน — ใช้ตัดสินว่าบลัฟใส่เขาคุ้มไหม */
+      noteSticky(st, i);
     }
   }
 
@@ -944,6 +1088,8 @@ export function createBotManager(room, broadcast) {
     /* จำไพ่ที่เพิ่งเห็น แล้วขิงถ้ามีจังหวะ ทำก่อนอย่างอื่นเสมอ
        เพราะเป็นข้อมูลของ "มือที่เพิ่งจบ" ซึ่งจะหายไปทันทีที่ขึ้นมือใหม่ */
     trackActions(st);
+    updateMoods(st);
+    if (st.phase === "showdown" && st.handNo === moodHand) rememberFoes(st);
     observe(st);
     maybeShowOff(st);
     /* ⚠️ บันทึกเงินบอททุกครั้งที่จบมือ ไม่ใช่แค่ตอนลุกจากโต๊ะ
@@ -1102,6 +1248,8 @@ export function createBotManager(room, broadcast) {
        จำกัดเพดานไว้ ไม่งั้นบอทที่ซวยติดกันจะกลายเป็นหมอบทุกมือจนไม่มีใครอยากเล่นด้วย */
     /* นิสัยประจำตัว — ผูกกับ "ชื่อ" ไม่ใช่ระดับ สองตัวในระดับเดียวกันจึงไม่เหมือนกัน */
     const trait = traitOf(me.name);
+    /* อารมณ์ที่ค้างมาจากมือก่อนๆ (ดู updateMoods) */
+    const mood = moodOf(me.name);
 
     const busts = Math.min(me.busts || 0, 3);
 
@@ -1154,7 +1302,14 @@ export function createBotManager(room, broadcast) {
     /* ความอดทนมีผลก่อนฟลอปเป็นหลัก — คนอดทนรอมือดี คนใจร้อนเล่นแทบทุกมือ
        ช่วง ±0.05 พอให้ความถี่การเล่นต่างกันเห็นได้ใน 20-30 มือ */
     const patienceGap = pre ? (trait.patience - 0.5) * 0.10 : 0;
-    const caution = busts * 0.03 + respect + debtFear - boldness + patienceGap;
+    /* ⚠️ อารมณ์ต้องมีผลจริงกับการตัดสินใจ ไม่ใช่ตัวเลขที่เก็บไว้เฉยๆ
+       เพิ่งเสียหนัก = ระวังตัวน้อยลง (ไล่เอาคืน) · เพิ่งชนะ = กล้าขึ้นนิดหน่อย
+       เบื่อเพราะไม่ได้ไพ่ = เริ่มเล่นมือที่ไม่ควรเล่น ซึ่งมีผลเฉพาะก่อนฟลอป
+       เพดานรวมไม่เกิน ~0.13 ไม่งั้นอารมณ์กลบทุกอย่างจนกลายเป็นสุ่ม */
+    const moodSwing = mood.tilt * 0.09 + mood.confidence * 0.03 +
+                      (pre ? mood.boredom * 0.07 : 0);
+
+    const caution = busts * 0.03 + respect + debtFear - boldness + patienceGap - moodSwing;
 
     /* ⚠️ ต้องประเมินหน้าไพ่กลางก่อน "แผนประจำสตรีท" เพราะแผนใช้ค่านี้
        เคยประกาศไว้ทีหลังแล้วชนกฎ temporal dead zone ของ const — บอทพังทั้งตัว
@@ -1165,7 +1320,10 @@ export function createBotManager(room, broadcast) {
     /* แผนของรอบเดิมพันนี้ ตัดสินครั้งเดียวแล้วเดินตาม (ดู planFor)
        ยังคูณด้วยสภาพจิตใจตอนนี้: ล้มมาเยอะหรือเป็นหนี้ ก็ไม่ค่อยกล้าบลัฟ */
     const plan = planFor(seatId, view, base, trait, lv, wet);
-    const bluffing = plan.bluff && !(busts >= 2 && Math.random() < 0.5) &&
+    /* เสียหนักมาแล้วชอบบลัฟมากขึ้น (อยากได้คืนเร็วๆ) ซึ่งเป็นวิธีที่แย่ที่สุดพอดี
+       — ตั้งใจให้เป็นแบบนี้ เพราะมันคือสิ่งที่คนจริงทำ */
+    const bluffing = (plan.bluff || (mood.tilt > 0.45 && base < 0.45 && Math.random() < mood.tilt * 0.22)) &&
+                     !(busts >= 2 && Math.random() < 0.5) &&
                      !(debt > 0 && Math.random() < 0.6);
 
     /* เดิมพันต่อเนื่อง: คนที่เป็นคนไล่ก่อนฟลอป มักยิงต่อในฟลอปไม่ว่าไพ่จะออกยังไง
@@ -1194,11 +1352,21 @@ export function createBotManager(room, broadcast) {
     /* ⚠️ แรงกดดันจากกระเป๋าต้องส่งเข้าไปถึงตัวคิด "ขนาดเดิมพัน" ด้วย ไม่ใช่แค่เกณฑ์ตาม
        คนที่เหลือเงินน้อยไม่ได้แค่ตามน้อยลง เขาลงเงินต่อครั้งน้อยลงด้วย
        0 = สบายมาก · 1 = จนถึงขั้นต้องระวังทุกบาท */
-    const walletPressure = Math.min(1, Math.max(0, 1 - ratio) + (debt > 0 ? 0.4 : 0));
+    /* ⚠️ "อีกหนึ่งตักแล้วจะติดลบ" เป็นความรู้สึกคนละแบบกับ "เงินเริ่มน้อย"
+       คนที่รู้ว่าเสียตักนี้แล้วต้องกู้มาเล่นต่อ จะเล่นคนละคนกับคนที่ยังมีเหลือสามตัก
+       ไม่ใช่แค่ระวังขึ้นทีละนิดตามสัดส่วน แต่เป็นเส้นที่ข้ามแล้วเปลี่ยนพฤติกรรมทันที
+       และคนที่ติดลบอยู่แล้ว รู้ตัวว่ากำลังเล่นด้วยเงินที่ไม่มี */
+    const walletNow = typeof me.wallet === "number" ? me.wallet : 0;
+    const nextBuyIn = walletNow < BUY_IN;        /* ซื้อเข้าอีกครั้งแล้วติดลบ */
+    const walletPressure = Math.min(1,
+      Math.max(0, 1 - ratio) +
+      (nextBuyIn ? 0.35 : 0) +
+      (debt > 0 ? 0.4 : 0));
 
     /* ⚠️ เดาว่าคู่แข่งที่ยังสู้อยู่ "น่าจะถืออะไร" แล้วเอาตัวที่แรงที่สุดมาเป็นตัววัด
        ของเดิมบอทสู้กับ "ราคา" อย่างเดียว โดยไม่สนว่าคนที่ดันมาน่าจะมีอะไร
        ซึ่งเป็นเหตุผลที่มันดูกล้าแบบไม่มีเหตุผล — มันไม่ได้กำลังไม่กลัว มันแค่ไม่รู้ */
+    /* ---------- ความจำที่มีต่อคนที่กำลังดันเราอยู่ ---------- */
     let threat = 0, threatName = "", threatCred = 1;
     view.seats.forEach(function (x, i) {
       if (i === seatId || !x || !x.inHand || x.folded) return;
@@ -1210,14 +1378,53 @@ export function createBotManager(room, broadcast) {
       }
     });
 
+    /* ⚠️ ความจำต่อ "คนนี้" โดยเฉพาะ ไม่ใช่ค่าเฉลี่ยของทั้งโต๊ะ
+       เคยโดนเขากินหนัก = ระวังเขามากกว่าคนอื่น (คนจริงเป็นแบบนี้ ต่อให้ไม่ค่อยมีเหตุผล)
+       เคยจับได้ว่าเขาบลัฟ = ท่าดันของเขาเชื่อได้น้อยลง สู้กลับได้เบามือขึ้น */
+    const foe = threatName ? foeOf(me.name, threatName) : null;
+    let grudge = 0;
+    if (foe && foe.seen >= 2) {
+      const scale = Math.min(1, foe.hurt / Math.max(1, me.stack * 1.5));
+      grudge = scale * 0.05 - Math.min(foe.caught, 4) * 0.018;
+    }
+
+    /* "ไล่ไม่ไป" — คนที่ตามตลอด บลัฟใส่ไม่คุ้ม ต้องรอไพ่จริงแล้วค่อยเก็บ */
+    let stickyHere = 0;
+    view.seats.forEach(function (x, i) {
+      if (!x || i === seatId || x.folded || !x.inHand) return;
+      const ff = foeOf(me.name, x.name);
+      if (ff.sticky > stickyHere) stickyHere = ff.sticky;
+    });
+    const unbluffable = Math.min(1, stickyHere / 25);
+
     const facts = { pre, base, draw, live, me, view, seatId, lv, walletPressure, trait, wet, plan,
-                    potNow, toCall, price, caution, crowdFactor, bluffing, cbet, actsLast,
-                    threat, threatName, threatCred };
+                    potNow, toCall, price, caution: caution + grudge, crowdFactor,
+                    bluffing: bluffing && Math.random() > unbluffable * 0.7,
+                    cbet, actsLast, threat, threatName, threatCred, unbluffable };
 
     /* ⚠️ แต่ละระดับใช้ "วิธีคิด" คนละแบบ ไม่ใช่เกณฑ์ชุดเดียวกันปรับตัวเลข
        (ดูคำอธิบายเหนือ decideBeginner / decideGambler / decidePro) */
     const style = STYLE[me.botLevel] || decidePro;
-    const msg = style(facts);
+    let msg = style(facts);
+
+    /* ---------- ความโลเล ----------
+       ⚠️ คนเล่นจริงไม่ได้ตัดสินใจเหมือนกันทุกครั้งในสถานการณ์เดียวกัน
+       จังหวะที่ก้ำกึ่งจริงๆ วันนี้ตาม พรุ่งนี้ทิ้ง ตัวเองก็อธิบายไม่ได้ว่าทำไม
+       นั่นคือสิ่งที่ทำให้อ่านทางไม่ออก และเป็นสิ่งที่บอทที่คิดด้วยสูตรล้วนไม่มี
+
+       เปลี่ยนใจเฉพาะตอน "ใกล้เส้นตัดสินใจ" เท่านั้น ไม่ใช่สุ่มมั่ว
+       ห่างจากเส้นมากๆ (ไพ่ดีชัดเจน หรือขยะชัดเจน) ต้องไม่เปลี่ยน ไม่งั้นกลายเป็นบอทเพี้ยน
+       และเปลี่ยนได้แค่ระหว่างตาม-ทิ้ง ซึ่งเป็นคู่ที่คนลังเลจริง
+       มือใหม่ลังเลบ่อยสุด มืออาชีพแทบไม่ลังเล — คนที่มั่นใจในเกณฑ์ตัวเองไม่เปลี่ยนใจ */
+    if (msg && (msg.action === "call" || msg.action === "fold") && toCall > 0) {
+      const gap = Math.abs((base + draw) - (price + caution));
+      const closeness = Math.max(0, 1 - gap / 0.12);
+      const wobbleRate = { 1: 0.22, 2: 0.14, 3: 0.06 }[me.botLevel] || 0.12;
+      /* เสียหนักมาก็ยิ่งลังเล */
+      if (closeness > 0 && Math.random() < closeness * wobbleRate * (1 + mood.tilt * 0.6)) {
+        msg = { type: "act", action: msg.action === "call" ? "fold" : "call" };
+      }
+    }
 
     /* ยิงบลัฟไปแล้วหนึ่งกระบอก ต้องนับไว้ ไม่งั้นโควตาที่ตั้งใจไว้ไม่มีความหมาย
        นับเฉพาะตอน "ลงเงินด้วยมือที่ไม่มีอะไรจริง" ไม่ใช่ทุกครั้งที่เรซ */
