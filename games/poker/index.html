@@ -220,9 +220,13 @@ button { font-family: inherit; }
 .mseat:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
 /* แท็บในแผงเดียวกัน */
 /* กล่องเพิ่มบอทซ้อม */
-.botbox { border: 1px solid #2b4b37; border-radius: 10px; padding: 8px; margin-bottom: 9px; }
-.botbox__t { font-size: .74rem; color: var(--muted); text-align: left; margin-bottom: 6px; }
-.botbox__row { display: flex; gap: 5px; margin-bottom: 5px; }
+.botbox {
+  flex: 0 0 auto;
+  border: 1px solid #2b4b37; border-radius: 10px;
+  padding: 6px 7px; margin-bottom: 8px;
+}
+.botbox__t { flex: 0 0 auto; font-size: .72rem; color: var(--muted); align-self: center; margin-right: 2px; }
+.botbox__row { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
 .botbox__row:last-child { margin-bottom: 0; }
 .botlv, .botadd {
   flex: 1 1 0; padding: 7px 3px; font-family: inherit;
@@ -824,7 +828,11 @@ button { font-family: inherit; }
 #t-standings .rows { min-height: 64px; }
 /* ต้องเป็น flex ไม่ใช่ block ไม่งั้น flex ของลูกไม่ทำงาน
    แถวอันดับจะยืดเต็มเนื้อหา แล้วดันปุ่ม "เริ่มรอบเล่นใหม่" ตกออกนอกจอ */
-.result.is-on { display: flex; flex-direction: column; }
+/* ⚠️ กันของล้นออกนอกกรอบแผงถาวร
+   เคยใส่กล่องเพิ่มบอทไว้ในส่วนท้าย ซึ่งไม่ยอมหด มันเลยทะลุลงไปอยู่ใต้แผง
+   โดนของอื่นทับจนมองไม่เห็น และไม่มีอะไรฟ้องว่าผิด
+   เนื้อหาที่ยาวต้องเลื่อนใน .rows เท่านั้น */
+.result.is-on { display: flex; flex-direction: column; overflow: hidden; }
 .result h3 { margin: 0 0 4px; font-size: 1.1rem; color: var(--gold); }
 .result .row { display: flex; justify-content: space-between; gap: 10px; font-size: .85rem; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
 .result .row b { font-family: var(--mono); color: var(--good); }
@@ -2577,6 +2585,58 @@ button { font-family: inherit; }
   }
   var PHASE_TH = { preflop: "Preflop", flop: "Flop", turn: "Turn", river: "River" };
 
+  /* แถวเดียวจบ: เลือกระดับ แล้วกดจำนวน — ต้องเตี้ยพอที่จะไม่เบียดของอื่นออกนอกจอ */
+  function buildBotBox() {
+    var wrap = document.createElement("div");
+    wrap.className = "botbox";
+
+    var lvRow = document.createElement("div");
+    lvRow.className = "botbox__row";
+    var lbl = document.createElement("span");
+    lbl.className = "botbox__t";
+    lbl.textContent = "บอทซ้อม";
+    lvRow.appendChild(lbl);
+    [[1, "อ่อน"], [2, "กลาง"], [3, "เก่ง"]].forEach(function (o) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "botlv" + (botLevel === o[0] ? " is-on" : "");
+      b.textContent = o[1];
+      b.addEventListener("click", function () { botLevel = o[0]; paintTablePanel(); });
+      lvRow.appendChild(b);
+    });
+    wrap.appendChild(lvRow);
+
+    var addRow = document.createElement("div");
+    addRow.className = "botbox__row";
+    [1, 2, 3].forEach(function (n) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "botadd";
+      b.textContent = "+" + n;
+      b.addEventListener("click", function () {
+        send({ type: "addbot", count: n, level: botLevel });
+        tablePanelOn = false;
+        paintTablePanel();
+      });
+      addRow.appendChild(b);
+    });
+    var botCount = view.seats.filter(function (x) { return x && x.isBot; }).length;
+    if (botCount) {
+      var rm = document.createElement("button");
+      rm.type = "button";
+      rm.className = "botadd botadd--rm";
+      rm.textContent = "เอาออก " + botCount;
+      rm.addEventListener("click", function () {
+        send({ type: "addbot", count: 0 });
+        tablePanelOn = false;
+        paintTablePanel();
+      });
+      addRow.appendChild(rm);
+    }
+    wrap.appendChild(addRow);
+    return wrap;
+  }
+
   function paintTablePanel() {
     var box = $("t-table");
     if (!tablePanelOn || !view) { box.classList.remove("is-on"); box.innerHTML = ""; return; }
@@ -2605,6 +2665,11 @@ button { font-family: inherit; }
       tabs.appendChild(b);
     });
     box.appendChild(tabs);
+
+    /* ⚠️ กล่องเพิ่มบอทต้องอยู่บนสุด เห็นทันทีที่เปิดแผง
+       เคยวางไว้ล่างสุดใต้ตารางเงิน 9 แถว ต้องเลื่อนลงไปไกลถึงเจอ
+       ซึ่งเท่ากับไม่มีปุ่มสำหรับคนใช้จริง */
+    box.appendChild(buildBotBox());
 
     if (panelTab === "log") { paintHistoryInto(box); box.classList.add("is-on"); return; }
     if (panelTab === "all") { paintProfilesInto(box); box.classList.add("is-on"); return; }
@@ -2691,54 +2756,7 @@ button { font-family: inherit; }
        ไว้ซ้อมตอนยังไม่มีคนมาเล่นด้วย เซิร์ฟเวอร์เป็นคนคุมบอทเอง
        บอทเห็นเฉพาะไพ่ตัวเองกับไพ่กลางเหมือนคน ไม่ได้แอบดูสำรับ
        ระดับต่างกันที่ "ตัดสินใจดีแค่ไหน" ไม่ใช่ "โกงมากแค่ไหน" */
-    var botWrap = document.createElement("div");
-    botWrap.className = "botbox";
-    var bl = document.createElement("div");
-    bl.className = "botbox__t";
-    bl.textContent = "เพิ่มบอทไว้ซ้อม";
-    botWrap.appendChild(bl);
-
-    var lvRow = document.createElement("div");
-    lvRow.className = "botbox__row";
-    [[1, "1 มือใหม่"], [2, "2 ปานกลาง"], [3, "3 เก่ง"]].forEach(function (o) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.className = "botlv" + (botLevel === o[0] ? " is-on" : "");
-      b.textContent = o[1];
-      b.addEventListener("click", function () { botLevel = o[0]; paintTablePanel(); });
-      lvRow.appendChild(b);
-    });
-    botWrap.appendChild(lvRow);
-
-    var addRow = document.createElement("div");
-    addRow.className = "botbox__row";
-    [1, 2, 3].forEach(function (n) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.className = "botadd";
-      b.textContent = "+ " + n + " ตัว";
-      b.addEventListener("click", function () {
-        send({ type: "addbot", count: n, level: botLevel });
-        tablePanelOn = false;
-        paintTablePanel();
-      });
-      addRow.appendChild(b);
-    });
-    var botCount = view.seats.filter(function (x) { return x && x.isBot; }).length;
-    if (botCount) {
-      var rm = document.createElement("button");
-      rm.type = "button";
-      rm.className = "botadd botadd--rm";
-      rm.textContent = "เอาออก (" + botCount + ")";
-      rm.addEventListener("click", function () {
-        send({ type: "addbot", count: 0 });
-        tablePanelOn = false;
-        paintTablePanel();
-      });
-      addRow.appendChild(rm);
-    }
-    botWrap.appendChild(addRow);
-    foot.appendChild(botWrap);
+    /* กล่องเพิ่มบอทถูกย้ายไปไว้ใต้แท็บแล้ว (ดู buildBotBox) */
 
     /* พักมือ = ยังนั่งอยู่ ชิปยังอยู่ แต่ไม่ถูกแจกไพ่รอบต่อไป
        เซิร์ฟเวอร์รองรับมาตลอด แต่ไม่เคยมีปุ่มให้กด */
@@ -2761,7 +2779,7 @@ button { font-family: inherit; }
         tablePanelOn = false;
         paintTablePanel();
       });
-      foot.appendChild(so);
+      rows.appendChild(so);
     }
 
     var close = document.createElement("button");
