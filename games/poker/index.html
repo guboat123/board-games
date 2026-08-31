@@ -1046,6 +1046,22 @@ button { font-family: inherit; }
    เปลี่ยนเป็นแถวสองบรรทัด: บรรทัดบน = ใคร กับ มีเท่าไหร่ · บรรทัดล่าง = รายละเอียด
    แล้วแบ่งกลุ่มตามระดับ เพราะเงินตั้งต้นคนละก้อน (5,000 / 20,000 / 100,000)
    เอาตัวเลขข้ามระดับมาเรียงรวมกันจึงเทียบกันไม่ได้เลย */
+/* ---------- ลิงก์ชวนเพื่อน ---------- */
+.share {
+  margin: 12px 0 4px; padding: 10px 12px;
+  border: 1px solid var(--live); border-radius: 12px;
+  background: rgba(47,168,92,.08); text-align: left;
+}
+.share__t { font-size: .82rem; font-weight: 700; color: var(--live); margin-bottom: 6px; }
+.share__url {
+  font-family: var(--mono); font-size: .84rem; color: #e6f2ea;
+  background: rgba(0,0,0,.3); border-radius: 8px; padding: 8px 10px;
+  word-break: break-all; user-select: all; -webkit-user-select: all;
+  margin-bottom: 8px;
+}
+.share__row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.share__hint { font-size: .68rem; color: var(--muted); }
+
 .bank-grp {
   display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
   font-size: .74rem; font-weight: 700; color: var(--gold);
@@ -1219,6 +1235,17 @@ button { font-family: inherit; }
 
     <button class="btn-main" id="btn-join">นั่งโต๊ะ</button>
     <p class="err" id="join-err"></p>
+    <!-- ⚠️ ลิงก์ชวนเพื่อนต้องอยู่ "ก่อนเข้าโต๊ะ" เพราะนั่นคือตอนที่คนจะส่งให้เพื่อน
+         และต้องเป็นที่อยู่ในวง WiFi ไม่ใช่ localhost ซึ่งส่งไปแล้วเพื่อนเข้าไม่ได้ -->
+    <div class="share" id="share-box" style="display:none">
+      <div class="share__t">📱 ให้เพื่อนเข้าเล่นด้วย</div>
+      <div class="share__url" id="share-url"></div>
+      <div class="share__row">
+        <button type="button" class="qbtn" id="share-copy">คัดลอกลิงก์</button>
+        <span class="share__hint" id="share-hint">ต้องอยู่วง WiFi เดียวกัน</span>
+      </div>
+    </div>
+
     <!-- เงินติดตัวบอท ดูได้ก่อนเข้าเกม ไม่ต้องนั่งโต๊ะก่อน -->
     <details class="bank-box" id="bank-box">
       <summary>💰 เงินติดตัวบอท</summary>
@@ -1771,6 +1798,38 @@ button { font-family: inherit; }
     });
   }
 
+  /* ---------- ลิงก์ที่ส่งให้เพื่อนได้จริง ----------
+     ⚠️ ห้ามใช้ location.href เป็นลิงก์ชวนเพื่อน
+     เครื่องเจ้าภาพเปิดหน้านี้ที่ http://localhost:8080 ซึ่งบนเครื่องเพื่อน
+     "localhost" หมายถึงเครื่องของเพื่อนเอง ส่งไปแล้วเข้าไม่ได้แน่นอน
+     ต่อรหัสห้องท้ายลิงก์ให้ด้วย เพื่อนจะได้เข้ามาที่โต๊ะเดียวกันโดยไม่ต้องพิมพ์รหัสเอง */
+  var lanList = [];
+  function paintShare(lan) {
+    var box = $("share-box");
+    if (!box) return;
+    if (lan) lanList = lan;
+    if (!lanList.length) { box.style.display = "none"; return; }
+    box.style.display = "";
+    updateShareUrl();
+  }
+
+  function shareUrl() {
+    if (!lanList.length) return "";
+    var code = ($("f-room").value || "").trim().toUpperCase();
+    return lanList[0].url + (code ? "#" + encodeURIComponent(code) : "");
+  }
+
+  function updateShareUrl() {
+    var el = $("share-url");
+    if (!el || !lanList.length) return;
+    el.textContent = shareUrl();
+    var code = ($("f-room").value || "").trim().toUpperCase();
+    var more = lanList.length > 1 ? " · มีอีก " + (lanList.length - 1) + " เส้นทาง" : "";
+    $("share-hint").textContent = (code
+      ? "ต้องอยู่วง WiFi เดียวกัน · เปิดแล้วเข้าห้อง " + code + " ให้เลย"
+      : "ต้องอยู่วง WiFi เดียวกัน") + more;
+  }
+
   function openLobby() {
     lobbyWanted = true;
     var proto = location.protocol === "https:" ? "wss://" : "ws://";
@@ -1784,7 +1843,14 @@ button { font-family: inherit; }
     lobbyWs.onmessage = function (ev) {
       var msg;
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
-      if (msg.type === "rooms") { window.__rooms = msg.rooms; paintTables(msg.rooms); paintSeatPicker(); }
+      if (msg.type === "rooms") {
+        window.__rooms = msg.rooms;
+        paintTables(msg.rooms);
+        paintSeatPicker();
+        /* ที่อยู่มาพร้อมทุกครั้งที่รายการโต๊ะอัปเดต และเซิร์ฟเวอร์ยิงมาใหม่เองเมื่อ IP เปลี่ยน
+           ลิงก์บนจอจึงตามความจริงเสมอ โดยไม่ต้องรีเฟรชหน้า */
+        paintShare(msg.lan);
+      }
       if (msg.type === "botbank") paintBank(msg.bots || []);
     };
     lobbyWs.onerror = function () {
@@ -1819,6 +1885,33 @@ button { font-family: inherit; }
   paintSeatPicker();
 
   $("btn-join").addEventListener("click", join);
+
+  /* รหัสห้องเปลี่ยน ลิงก์ต้องเปลี่ยนตาม ไม่งั้นส่งลิงก์ห้องเก่าให้เพื่อน */
+  $("f-room").addEventListener("input", updateShareUrl);
+  (function () {
+    var b = $("share-copy");
+    if (!b) return;
+    b.addEventListener("click", function () {
+      var url = shareUrl();
+      if (!url) return;
+      /* ⚠️ คลิปบอร์ดถูกบล็อกบนหน้าที่ไม่ใช่ https ในหลายเบราว์เซอร์
+         และหน้านี้เสิร์ฟผ่าน http เสมอ (เป็นเซิร์ฟเวอร์ในบ้าน ไม่มีใบรับรอง)
+         จึงต้องมีทางสำรองที่ใช้ได้จริง: เลือกข้อความไว้ให้ กดค้างแล้วคัดลอกเองได้ */
+      function fallback() {
+        try {
+          var el = $("share-url");
+          var rng = document.createRange();
+          rng.selectNodeContents(el);
+          var sel = window.getSelection();
+          sel.removeAllRanges(); sel.addRange(rng);
+          toast("เลือกลิงก์ไว้ให้แล้ว กดค้างเพื่อคัดลอก");
+        } catch (e) { toast("คัดลอกไม่ได้ ลองกดค้างที่ลิงก์เอง"); }
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function () { toast("คัดลอกลิงก์แล้ว"); }, fallback);
+      } else fallback();
+    });
+  })();
 
   /* ออกจากโต๊ะกลางมือ = หมอบและเสียเงินในกอง ต้องถามก่อน */
   function leaveTable() {

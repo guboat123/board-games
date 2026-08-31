@@ -229,10 +229,39 @@ function schedulePushLobby() {
   lobbyTimer = setTimeout(function () { lobbyTimer = null; pushLobby(); }, 800);
 }
 
+/* ---------- ที่อยู่สำหรับส่งให้เพื่อน ----------
+   ⚠️ หน้าจอเดาเองไม่ได้ เครื่องเจ้าภาพเปิดที่ localhost ซึ่งส่งให้ใครก็เข้าไม่ได้
+   (บนเครื่องเพื่อน "localhost" หมายถึงเครื่องของเพื่อนเอง)
+   ที่อยู่จริงในวง WiFi รู้ได้เฉพาะฝั่งเซิร์ฟเวอร์ จึงต้องส่งลงไปให้
+
+   ⚠️ และต้องคิดใหม่ทุกครั้ง ห้ามจำไว้ตั้งแต่ตอนเปิดเซิร์ฟเวอร์
+   ย้าย WiFi · ต่อสายแลน · เราเตอร์แจก IP ใหม่ — ที่อยู่เปลี่ยนได้ตลอดโดยไม่ต้องรีสตาร์ต
+   ถ้าจำค่าเก่าไว้ ลิงก์ที่ส่งให้เพื่อนจะพาไปที่ที่ไม่มีอะไรอยู่แล้ว
+
+   ตัดที่อยู่ของ WSL / Docker / VirtualBox ออก เพราะเครื่องอื่นในบ้านเข้าไม่ถึง */
+function lanUrls() {
+  const skip = /(wsl|docker|virtual|vmware|hyper-v|loopback|bluetooth)/i;
+  return lanAddresses()
+    .filter(a => !skip.test(a.name))
+    .map(a => ({ name: a.name, url: "http://" + a.address + ":" + PORT + "/games/poker/" }));
+}
+
 function pushLobby() {
   const list = roomList();
-  for (const c of lobby) send(c, { type: "rooms", rooms: list });
+  const lan = lanUrls();
+  for (const c of lobby) send(c, { type: "rooms", rooms: list, lan });
 }
+
+/* คอยดูว่าที่อยู่ในวงเปลี่ยนไหม เปลี่ยนเมื่อไหร่ก็ส่งลิงก์ใหม่ให้ทุกคนที่ยังไม่ได้นั่งโต๊ะ
+   เช็คทุก 5 วินาที ราคาถูกมาก (อ่านจากระบบปฏิบัติการตรงๆ ไม่ได้ยิงเน็ต) */
+let lastLanKey = "";
+setInterval(() => {
+  const key = lanUrls().map(a => a.url).join("|");
+  if (key === lastLanKey) return;
+  lastLanKey = key;
+  log("ที่อยู่ในวงเปลี่ยน:", key || "(ไม่พบ)");
+  pushLobby();
+}, 5000);
 
 function getRoom(code) {
   let r = rooms.get(code);
@@ -338,7 +367,7 @@ server.on("upgrade", (req, socket) => {
 
     /* หน้าเลือกโต๊ะขอรายการโต๊ะที่เปิดอยู่ */
     if (msg.type === "lobby") {
-      send(client, { type: "rooms", rooms: roomList() });
+      send(client, { type: "rooms", rooms: roomList(), lan: lanUrls() });
       return;
     }
 
