@@ -732,6 +732,7 @@ export function createBotManager(room, broadcast) {
   }
   let lastSeenHand = -1;
   let foesHand = -1;      /* จดความจำต่อคู่แข่งไปแล้วในมือไหน */
+  const plannedThink = {};  /* เวลาที่บอทตั้งใจจะใช้คิด ใช้ตอนเดินเกมแบบไม่หน่วงเวลาจริง */
   let showOffHand = -1;     /* ตัดสินใจขิงไปแล้วในมือไหน (กันทอยลูกเต๋าซ้ำ) */
 
   /* ---------- อารมณ์ที่ค้างข้ามมือ ----------
@@ -880,7 +881,12 @@ export function createBotManager(room, broadcast) {
          เริ่มจับตอนถึงตาเขา หยุดตอนท่าเขาเปลี่ยน */
       if (st.current === i && !rec.turnAt) rec.turnAt = Date.now();
       if (st.current !== i && rec.turnAt) {
-        rec.lastMs = Date.now() - rec.turnAt;
+        /* ⚠️ เครื่องมือวัดผลเดินเกมทันที ไม่มีเวลาจริงให้จับ
+           ถ้าใช้เวลานาฬิกาตรง ๆ ทุกคนจะดู "ลงเงินทันทีแทบไม่คิด"
+           ซึ่งในสายตาบอทแปลว่าท่าที่เตรียมไว้ = บลัฟ → อ่านผิดกันทั้งโต๊ะ
+           จึงใช้เวลาที่บอทตัวนั้น "ตั้งใจจะใช้" แทน ซึ่งเป็นเลขเดียวกับที่เกมจริงหน่วงจริง */
+        rec.lastMs = plannedThink[i] !== undefined ? plannedThink[i] : (Date.now() - rec.turnAt);
+        delete plannedThink[i];
         rec.turnAt = 0;
       }
       /* ขึ้นสตรีทใหม่ ให้เริ่มนับการดันของสตรีทนั้นใหม่
@@ -1099,13 +1105,16 @@ export function createBotManager(room, broadcast) {
      คนจริงไม่เป็นแบบนั้น: ไพ่ขยะเจอเดิมพันใหญ่ = ทิ้งแทบทันที
      ส่วนจังหวะที่ก้ำกึ่งจริงๆ (ราคาพอดีกับมือ) จะนั่งคิดนาน
      เวลาคิดคือสิ่งที่คนอีกฝั่งโต๊ะอ่านได้ ถ้ามันคงที่ ทุกคนรู้ทันทีว่าเป็นเครื่อง */
-  function thinkMs(lv, view, me) {
+  /* known = ค่ามือที่ผู้เรียกคิดไว้แล้ว ส่งมาได้เพื่อไม่ต้องประเมินไพ่ซ้ำ
+     (การประเมินเจ็ดใบเป็นงานหนักที่สุดต่อหนึ่งการตัดสินใจ ทำสองรอบคือช้าเท่าตัวฟรี ๆ) */
+  function thinkMs(lv, view, me, known) {
     const lo = lv.think[0], hi = lv.think[1];
     if (!me || !me.cards || !me.cards.length) return lo;
     const potNow = typeof view.potForBet === "number" ? view.potForBet : view.pot;
     const price = view.toCall > 0 ? view.toCall / (potNow + view.toCall) : 0;
-    const eq = view.phase === "preflop" ? preflopStrength(me.cards)
-                                        : madeStrength(me.cards, view.board);
+    const eq = typeof known === "number" ? known
+             : (view.phase === "preflop" ? preflopStrength(me.cards)
+                                         : madeStrength(me.cards, view.board));
     /* ยิ่งใกล้เส้นตัดสินใจ ยิ่งคิดนาน · ห่างจากเส้นมาก = ตอบได้เลย */
     const close = 1 - Math.min(Math.abs(eq - price - 0.05) / 0.35, 1);
     let ms = lo + (hi - lo) * (0.25 + close * 0.75);
@@ -1200,6 +1209,10 @@ export function createBotManager(room, broadcast) {
     const st = room.table._state;
     trackActions(st);
     updateMoods(st);
+    /* ⚠️ ต้องขิงก่อนเก็บ ไม่ใช่หลัง — ไพ่ที่เพิ่งกดโชว์ต้องถูกจดในมือเดียวกัน
+       (ในเซิร์ฟเวอร์จริงมันรอดเพราะ poke ถูกเรียกซ้ำหลายรอบต่อหนึ่งโชว์ดาวน์
+        แต่เครื่องมือวัดเรียกจำกัดรอบ ลำดับเดิมจึงทำให้ไพ่ที่ตั้งใจโชว์หายไปเลย) */
+    maybeShowOff(st);
     /* ไพ่ที่เห็นคนอื่นเปิด ก็เป็นความจำเหมือนกัน ต้องอยู่ในชุดเดียวกันนี้ */
     observe(st);
     if (st.phase === "showdown" && st.handNo !== foesHand) {
@@ -1221,7 +1234,6 @@ export function createBotManager(room, broadcast) {
     /* จำไพ่ที่เพิ่งเห็น แล้วขิงถ้ามีจังหวะ ทำก่อนอย่างอื่นเสมอ
        เพราะเป็นข้อมูลของ "มือที่เพิ่งจบ" ซึ่งจะหายไปทันทีที่ขึ้นมือใหม่ */
     senseTable();
-    maybeShowOff(st);
     /* ⚠️ บันทึกเงินบอททุกครั้งที่จบมือ ไม่ใช่แค่ตอนลุกจากโต๊ะ
        ถ้าบันทึกแค่ตอนลุก พอเซิร์ฟเวอร์ถูกปิดกลางวง (ซึ่งเกิดบ่อยตอนแก้โค้ด)
        ชิปที่อยู่บนโต๊ะจะหายทั้งก้อน บันทึกทุกมือ ของที่เสียได้มากที่สุดคือมือเดียว */
@@ -1325,9 +1337,12 @@ export function createBotManager(room, broadcast) {
       room.table.action(seatId, { type: "act", action: view.toCall > 0 ? "fold" : "check" });
       return;
     }
-
     const pre = view.phase === "preflop";
     const base = pre ? preflopStrength(me.cards) : madeStrength(me.cards, view.board);
+
+    /* จดว่า "ถ้าเล่นจริงเขาจะใช้เวลาคิดเท่าไหร่" ให้คนอื่นอ่านทางได้เหมือนเกมจริง
+       (เกมจริงหน่วงเวลาเท่านี้อยู่แล้ว ตัวเลขจึงตรงกัน ไม่ใช่ของปลอมสำหรับเครื่องมือวัด) */
+    plannedThink[seatId] = thinkMs(lv, view, me, base);
 
     /* คนที่ยังสู้อยู่กี่คน — บลัฟได้ผลกับคนน้อย ยิ่งหลายคนยิ่งมีคนตามแน่ */
     let live = 0;
