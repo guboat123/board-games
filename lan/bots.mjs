@@ -12,11 +12,21 @@ import { evaluate7, RANK_CHARS, SUIT_CHARS } from "./poker-engine.mjs";
 
 const NAMES = ["โบ๊ท", "แมท", "น้ำ", "ปุ๊ก", "ต้น", "แนน", "เจ", "มิ้น", "ก้อง"];
 
+/* margin = ต้องได้เปรียบกว่าราคาที่จ่ายเท่าไหร่ถึงจะตาม (ติดลบ = ตามแม้ราคาไม่คุ้ม)
+   bet    = มือแข็งแค่ไหนถึงจะเปิดเดิมพันเองตอนไม่มีใครเดิมพัน
+   raise  = มือแข็งแค่ไหนถึงจะเรซทับคนอื่น
+   bluff  = โอกาสที่จะดันทั้งที่มือไม่ดี */
 const LEVEL = {
-  1: { name: "มือใหม่",  call: 0.16, raise: 0.86, bluff: 0.02, think: [700, 1800],  sizing: 0.35 },
-  2: { name: "ปานกลาง", call: 0.36, raise: 0.68, bluff: 0.08, think: [900, 2600],  sizing: 0.55 },
-  3: { name: "เก่ง",     call: 0.47, raise: 0.60, bluff: 0.16, think: [1100, 3400], sizing: 0.75 }
+  1: { name: "มือใหม่",  margin: -0.16, bet: 0.70, raise: 0.86, bluff: 0.02, think: [700, 1800],  sizing: 0.35 },
+  2: { name: "ปานกลาง", margin:  0.02, bet: 0.55, raise: 0.72, bluff: 0.08, think: [900, 2600],  sizing: 0.55 },
+  3: { name: "เก่ง",     margin:  0.08, bet: 0.48, raise: 0.64, bluff: 0.16, think: [1100, 3400], sizing: 0.75 }
 };
+
+/* ความแข็งของชุดไพ่ที่ทำได้แล้ว แปลงเป็น "โอกาสชนะคร่าวๆ"
+   ⚠️ ค่าชุดล่างสำคัญกว่าที่คิด ของเดิมให้ One Pair แค่ 0.315 ซึ่งต่ำกว่าเกณฑ์ตามของทุกระดับ
+   ผลคือบอทพับวันแพร์ทิ้งทุกครั้งที่มีคนเดิมพัน แม้เดิมพัน 20 ในกอง 500
+   ซึ่งไม่มีคนเล่นจริงคนไหนทำ = ที่เจ้าของบอกว่า "action งงๆ ไม่ makesense" */
+const CAT_EQUITY = [0.16, 0.45, 0.62, 0.75, 0.84, 0.90, 0.95, 0.99, 1.0];
 
 function toNum(code) {
   const r = RANK_CHARS.indexOf(code.slice(0, -1));
@@ -44,8 +54,7 @@ function preflopStrength(cards) {
 function madeStrength(hole, board) {
   const cs = hole.concat(board).map(toNum).filter(x => x >= 0);
   if (cs.length < 5) return 0.4;
-  const cat = evaluate7(cs)[0];
-  return Math.min(1, 0.2 + cat * 0.115);
+  return CAT_EQUITY[evaluate7(cs)[0]] || 0.5;
 }
 
 export function createBotManager(room, broadcast) {
@@ -127,18 +136,45 @@ export function createBotManager(room, broadcast) {
 
     const pre = view.phase === "preflop";
     const base = pre ? preflopStrength(me.cards) : madeStrength(me.cards, view.board);
-    const bluff = Math.random() < lv.bluff;
-    const score = base + (bluff ? 0.28 : 0) + (Math.random() - 0.5) * 0.1;
+    const bluffing = Math.random() < lv.bluff;
+    let eq = base + (bluffing ? 0.24 : 0) + (Math.random() - 0.5) * 0.08;
+    eq = Math.max(0, Math.min(1, eq));
+
+    const toCall = view.toCall;
+    const potNow = typeof view.potForBet === "number" ? view.potForBet : view.pot;
+
+    /* ราคาที่ต้องจ่ายเทียบกับกอง — นี่คือสิ่งที่คนเล่นจริงคิด และของเดิมไม่มีเลย
+       ตาม 20 ในกอง 500 กับตาม 500 ในกอง 500 คนละเรื่องกันคนละโลก
+       ของเดิมดูแค่ "มือแข็งพอไหม" โดยไม่สนราคา จึงพับมือดีทิ้งเพราะเดิมพัน 20 */
+    const price = toCall > 0 ? toCall / (potNow + toCall) : 0;
+    const worthCalling = toCall === 0 || eq >= price + lv.margin;
+
+    /* ไม่เรซทับเดิมพันก้อนใหญ่ด้วยมือกลางๆ ไม่งั้นบอทจะสาดกันไปมาไม่จบ */
+    const facingBig = toCall > me.stack * 0.3;
+    const canRaise = me.stack > toCall &&
+                     eq >= lv.raise &&
+                     (!facingBig || eq >= 0.82);
 
     let msg;
-    if (score >= lv.raise && me.stack > view.currentBet) {
-      const potBase = typeof view.potForBet === "number" ? view.potForBet : view.pot;
-      const target = Math.min(me.bet + me.stack,
-        view.currentBet + view.minRaise + Math.round(potBase * lv.sizing * (0.6 + Math.random() * 0.8)));
+    if (canRaise) {
+      /* ขนาดเดิมพัน: อิงกองจริง ไม่ต่ำกว่าขั้นต่ำ และไม่เกินที่มี */
+      const want = view.currentBet + view.minRaise +
+                   Math.round(potNow * lv.sizing * (0.6 + Math.random() * 0.7));
+      const target = Math.max(view.currentBet + view.minRaise,
+                              Math.min(me.bet + me.stack, want));
       msg = { type: "act", action: "raise", amount: target };
-    } else if (view.toCall === 0) {
-      msg = { type: "act", action: "check" };
-    } else if (score >= lv.call) {
+    } else if (toCall === 0) {
+      /* ไม่มีใครเดิมพัน: มือดีพอก็เปิดเดิมพันเอง ไม่ใช่เคาะผ่านตลอด */
+      if (eq >= lv.bet && me.stack > view.blinds.bb) {
+        const want = view.currentBet + view.minRaise +
+                     Math.round(potNow * lv.sizing * (0.5 + Math.random() * 0.6));
+        msg = { type: "act", action: "raise",
+                amount: Math.max(view.currentBet + view.minRaise,
+                                 Math.min(me.bet + me.stack, want)) };
+      } else {
+        msg = { type: "act", action: "check" };
+      }
+    } else if (worthCalling) {
       msg = { type: "act", action: "call" };
     } else {
       msg = { type: "act", action: "fold" };
@@ -147,7 +183,7 @@ export function createBotManager(room, broadcast) {
     const out = room.table.action(seatId, msg);
     /* กันเหนียว: ถ้าคำสั่งไม่ผ่านด้วยเหตุใดก็ตาม อย่าปล่อยให้โต๊ะค้างรอบอท */
     if (out && out.error) {
-      const fb = room.table.action(seatId, { type: "act", action: view.toCall > 0 ? "call" : "check" });
+      const fb = room.table.action(seatId, { type: "act", action: toCall > 0 ? "call" : "check" });
       if (fb && fb.error) room.table.action(seatId, { type: "act", action: "fold" });
     }
   }
