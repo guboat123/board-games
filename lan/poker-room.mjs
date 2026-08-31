@@ -227,6 +227,10 @@ export function createTable(opts = {}) {
       stack: chips,
       boughtIn: chips,   /* รวมชิปที่ซื้อเข้ามาทั้งหมด ใช้คิดกำไรขาดทุน */
       busts: 0,          /* ชิปหมดแล้วเติมใหม่กี่ครั้ง (0 = ยังไม่เคยหมด) */
+      /* กระเป๋าเงินนอกโต๊ะ (ตอนนี้ใช้กับบอทเท่านั้น คนจริงเป็น null)
+         ชิปบนโต๊ะคือเงินที่ "เอามาเล่น" ส่วนนี่คือเงินที่ "มีอยู่จริง"
+         ห้องนี้แค่เก็บกับส่งต่อ ใครจะใช้ยังไงเป็นเรื่องของคนตั้งค่า (ดู bots.mjs) */
+      wallet: null,
       bet: 0,            /* ลงไปแล้วเท่าไหร่ในรอบเดิมพันนี้ */
       committed: 0,      /* ลงไปแล้วเท่าไหร่ในมือนี้ทั้งหมด */
       cards: [],
@@ -724,6 +728,7 @@ export function createTable(opts = {}) {
       .map(s => ({
         seatId: s.seatId, name: s.name,
         stack: s.stack, boughtIn: s.boughtIn, busts: s.busts || 0,
+        wallet: (typeof s.wallet === "number") ? s.wallet : null,
         net: s.stack - s.boughtIn
       }))
       .sort((a, b) => b.net - a.net);
@@ -821,6 +826,7 @@ export function createTable(opts = {}) {
         stack: s.stack,
         boughtIn: s.boughtIn,
         busts: s.busts || 0,
+        wallet: (typeof s.wallet === "number") ? s.wallet : null,
         net: s.stack - s.boughtIn,   /* บวก/ลบเทียบกับที่ซื้อเข้ามา */
         bet: s.bet,
         folded: s.folded,

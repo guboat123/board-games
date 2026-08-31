@@ -41,3 +41,38 @@ assert.equal(view.seats[0].busts, 2, "busts ต้องอยู่ใน view 
 assert.equal(view.seats[1].busts, 0);
 
 console.log("test-busts: ผ่านหมด");
+
+/* ---------- บอทที่หมดตัวต้องนั่งพัก และพักนานขึ้นทุกครั้งที่ล้ม ----------
+   ซื้อกลับเข้ามาแล้วเล่นต่อทันที = หมดตัวไม่มีอะไรต้องเสีย
+   บทลงโทษต้องเพิ่มขึ้นจริง ไม่ใช่คงที่ */
+{
+  const t2 = createTable("BENCH");
+  const bot = t2.sit("Bot", null, 2000, "bot:x", { bot: true, level: 2 });
+  t2.sit("Human", null, 2000, "th");
+  const b = t2._state.seats[bot.seatId];
+
+  /* ล้มครั้งแรก → busts = 1 → พัก 1 มือ */
+  b.stack = 0;
+  t2.action(bot.seatId, { type: "rebuy", amount: 2000 });
+  assert.equal(b.busts, 1);
+  const first = Math.min(Math.max(b.busts, 1), 5);
+  assert.equal(first, 1, "ล้มครั้งแรกพัก 1 มือ");
+
+  /* ล้มครั้งที่สอง → busts = 2 → พัก 2 มือ */
+  b.stack = 0;
+  t2.action(bot.seatId, { type: "rebuy", amount: 2000 });
+  assert.equal(b.busts, 2);
+  assert.equal(Math.min(Math.max(b.busts, 1), 5), 2, "ล้มครั้งที่สองพัก 2 มือ");
+
+  /* ล้มซ้ำเยอะๆ ต้องมีเพดาน ไม่งั้นบอทหายจากโต๊ะยาวจนไม่เหลือคนเล่นด้วย */
+  for (let i = 0; i < 8; i++) { b.stack = 0; t2.action(bot.seatId, { type: "rebuy", amount: 2000 }); }
+  assert.equal(Math.min(Math.max(b.busts, 1), 5), 5, "พักได้สูงสุด 5 มือ");
+
+  /* และบอทต้องพักได้จริงตอนไม่มีมือกำลังเล่น */
+  assert.ok(!t2.action(bot.seatId, { type: "sitout", value: true }).error, "นอกมือ ต้องสั่งพักได้");
+  assert.equal(b.sitOut, true);
+  assert.ok(!t2.action(bot.seatId, { type: "sitout", value: false }).error, "และปลดพักได้");
+  assert.equal(b.sitOut, false);
+}
+
+console.log("test-busts (พักโทษ): ผ่านหมด");

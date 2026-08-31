@@ -58,6 +58,74 @@ window.Cards = (function () {
     return e;
   }
 
+
+  /* ---------- หลังไพ่ลายมังกร (ธีมจีน) ----------
+     วาดเป็น SVG ในโค้ด ไม่มีไฟล์รูป ตามข้อจำกัดของโปรเจกต์ (เปิดด้วย file:// ต้องได้)
+     ใช้เป็น background-image ผ่าน data URI ใบเดียว เบราว์เซอร์ถอดรหัสครั้งเดียวแล้วใช้ซ้ำทุกใบ
+     ถ้าฝังเป็น <svg> ในทุกใบ ไพ่คว่ำ 18 ใบบนโต๊ะ = โหนดเพิ่มหลายร้อยโดยไม่จำเป็น
+
+     ⚠️ อย่าใส่ตัวอักษร # ดิบใน SVG (เช่น fill="#c8a"): data URI จะตัดที่ # เป็น fragment
+     สีต้องเขียนเป็น rgb() ไม่ใช่ #rrggbb
+     ส่วน url(#id) ที่อ้าง gradient/pattern เขียน # ตรงๆ ได้ encodeURIComponent จะแปลงเป็น %23 ให้เอง
+     (ถ้าเขียน %23 ไว้เองจะโดนเข้ารหัสซ้ำเป็น %2523 แล้วลายหายทั้งใบ) */
+  var DRAGON_SVG = [
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 140">',
+    '<defs>',
+      '<linearGradient id="g" x1="0" y1="0" x2="0" y2="1">',
+        '<stop offset="0" stop-color="rgb(212,166,86)"/>',
+        '<stop offset="0.5" stop-color="rgb(240,214,150)"/>',
+        '<stop offset="1" stop-color="rgb(186,138,64)"/>',
+      '</linearGradient>',
+      /* ลายเมฆจีนซ้ำเป็นพื้นหลังจางๆ ให้ไม่โล่งเกินไป */
+      '<pattern id="cl" width="20" height="20" patternUnits="userSpaceOnUse">',
+        '<path d="M3 14a3 3 0 016 0 3 3 0 016 0" fill="none" stroke="rgb(150,60,50)" stroke-width="1" opacity="0.5"/>',
+      '</pattern>',
+    '</defs>',
+    /* พื้นแดงเข้มเกือบดำ แบบไพ่สำรับจีน */
+    '<rect width="100" height="140" fill="rgb(24,10,12)"/>',
+    '<rect width="100" height="140" fill="url(#cl)"/>',
+    /* กรอบทองสองชั้น + ลายประแจจีนที่มุม */
+    '<rect x="5" y="5" width="90" height="130" rx="5" fill="none" stroke="url(#g)" stroke-width="1.6"/>',
+    '<rect x="9" y="9" width="82" height="122" rx="3" fill="none" stroke="url(#g)" stroke-width="0.5" opacity="0.75"/>',
+    '<path d="M13 13h8v3h-5v5h-3zM87 13h-8v3h5v5h3zM13 127h8v-3h-5v-5h-3zM87 127h-8v-3h5v-5h3z" fill="url(#g)" opacity="0.9"/>',
+    /* วงกลมกลางใบ */
+    '<circle cx="50" cy="70" r="31" fill="none" stroke="url(#g)" stroke-width="1.1" opacity="0.85"/>',
+    '<circle cx="50" cy="70" r="34" fill="none" stroke="url(#g)" stroke-width="0.5" opacity="0.5"/>',
+    /* ตัวมังกรขดเป็นวง หัวอยู่บน หางม้วนอยู่ล่าง */
+    '<g fill="none" stroke="url(#g)" stroke-linecap="round" stroke-linejoin="round">',
+      '<path d="M50 47c-13 0-21 10-21 21 0 13 10 22 21 22 10 0 18-7 18-16 0-8-6-14-14-14-7 0-12 5-12 11 0 5 4 9 9 9" stroke-width="3.4"/>',
+      /* เกล็ดบนหลัง */
+      '<path d="M50 47c-13 0-21 10-21 21 0 13 10 22 21 22" stroke-width="1" opacity="0.55" stroke-dasharray="1 3"/>',
+      /* หัว: ปาก เขา หนวด */
+      '<path d="M50 47l-9-6" stroke-width="3"/>',
+      '<path d="M41 41l-7-1 5 4z" stroke-width="1.2" fill="url(#g)"/>',
+      '<path d="M44 40c-2-4-6-6-10-5" stroke-width="1.4"/>',
+      '<path d="M47 43c-3-5-9-7-15-5" stroke-width="1.1" opacity="0.8"/>',
+      /* ขาและเล็บ */
+      '<path d="M32 62l-8-3m8 3l-7 3m7-3l-6-7" stroke-width="1.4"/>',
+      '<path d="M63 84l8 3m-8-3l6 6m-6-6l8-2" stroke-width="1.4"/>',
+      /* ลูกแก้วในกรงเล็บ */
+      '<circle cx="50" cy="70" r="4" stroke-width="1.2"/>',
+    '</g>',
+    '<circle cx="50" cy="70" r="1.8" fill="url(#g)"/>',
+    /* ตา */
+    '<circle cx="45.5" cy="44" r="1.1" fill="rgb(200,60,50)"/>',
+    '</svg>'
+  ].join("");
+
+  /* ใส่กฎ background-image เข้าไปครั้งเดียวตอนโหลด
+     ต้องทำใน JS เพราะ data URI ยาวมาก เขียนใน .css แล้วอ่าน/แก้ไม่ไหว */
+  function installBack() {
+    if (document.getElementById("pc-back-style")) return;
+    var st = document.createElement("style");
+    st.id = "pc-back-style";
+    st.textContent = ".pc--back{background-image:url(\"data:image/svg+xml," +
+      encodeURIComponent(DRAGON_SVG).replace(/'/g, "%27") +
+      "\");background-size:100% 100%;background-repeat:no-repeat;}";
+    document.head.appendChild(st);
+  }
+  installBack();
+
   /* มุมไพ่: แต้มอยู่บน ดอกอยู่ล่าง */
   function corner(rank, glyph, cls) {
     var c = el("span", "pc__corner " + cls);

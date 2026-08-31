@@ -695,11 +695,16 @@ button { font-family: inherit; }
   transform-origin: bottom center;
   box-shadow: 0 6px 16px rgba(0,0,0,.5);
 }
-/* ปกติไพ่คว่ำและกดจมอยู่ พอแง้มถึงเงยขึ้นมาเป็นมุม */
-/* ตอนแง้มต้องยกไพ่ให้พ้นปุ่มทอง ไม่งั้นปุ่มบังกลางไพ่ทั้งสองใบ
-   ซึ่งเป็นจังหวะเดียวที่ต้องอ่านไพ่ให้ชัดที่สุด (นิ้วก็บังอีกชั้นอยู่แล้ว) */
-.hole.is-peek .pc:nth-child(1) { transform: rotate(-11deg) translateY(-34px); }
-.hole.is-peek .pc:nth-child(2) { transform: rotate(7deg) translateY(-34px); }
+/* ปกติไพ่คว่ำและกดจมอยู่ พอแง้มถึงเงยขึ้นมาเป็นมุม
+   ⚠️ ยกได้แค่ประมาณ 10px เท่านั้น ห้ามกลับไป 34px
+   แถบไพ่ในมือสูง 140px ใส่ตัวหนังสือ ~22px + ไพ่ 109px แล้วเหลือช่องว่างแค่ ~2px
+   การหมุนอย่างเดียวก็กินไปอีก ~10px แล้ว (มุมไพ่เงยขึ้น)
+   ยก 34px ไพ่จึงโผล่พ้นขอบบนของแถบทุกครั้งที่แง้ม — ซึ่งเป็นจังหวะที่ต้องเห็นไพ่เต็มใบพอดี
+   ที่ยกได้ 10px เพราะตอนแง้ม ตัวหนังสือคำสั่งถูกล้างเป็นค่าว่าง (ดู paintHole)
+   ความสูงบรรทัดนั้นจึงคืนมาเป็นที่ว่างพอดี
+   ไม่ต้องยกให้พ้นปุ่มทองแล้ว เพราะปุ่มจางลงเหลือ .16 และยุบลงไปเองตอนแง้ม */
+.hole.is-peek .pc:nth-child(1) { transform: rotate(-11deg) translateY(-10px); }
+.hole.is-peek .pc:nth-child(2) { transform: rotate(7deg) translateY(-10px); }
 /* ตอนแง้ม นิ้วกดค้างอยู่บนปุ่มอยู่แล้ว ไม่ต้องเห็นปุ่มชัดอีก
    จึงหรี่ปุ่มลงและยุบลงไป เปิดทางให้อ่านไพ่ได้เต็มใบ
    (ยกไพ่สูงกว่านี้ไม่ได้ ไพ่จะโผล่ออกนอกแถบไพ่ในมือ) */
@@ -728,7 +733,15 @@ button { font-family: inherit; }
   flex: 0 0 auto; position: relative;
   padding: 9px 10px calc(9px + env(safe-area-inset-bottom));
   background: #082016; border-top: 1px solid #1d3a2b;
+  /* ⚠️ ต้องสูงคงที่ ไม่งั้นทุกอย่างข้างบน (แถบไพ่ในมือ · โต๊ะ) ขยับทุกครั้งที่สลับสถานะ
+     ตาเรา = ปุ่มแถวเดียว (Fold/Call/Raise)
+     รอคนอื่น = แถบ "รอ ..." + แถวตัดสินใจล่วงหน้าอีกแถว = สูงกว่าเกือบเท่าตัว
+     สลับไปมาทุกตา แถบไพ่ในมือจึงเด้งขึ้นลงตลอดเวลา และปุ่มแง้มดูไพ่ก็ย้ายที่ตาม
+     ตรึงความสูงไว้เท่าสถานะที่สูงกว่า แล้วจัดปุ่มชิดล่าง ตำแหน่งปุ่มจึงนิ่งเสมอ */
+  min-height: 178px;
+  display: flex; flex-direction: column; justify-content: flex-end;
 }
+@media (max-height: 700px) { .actions { min-height: 160px; } }
 /* ⚠️ ปุ่มการ์ดต่อเวลาต้องลอยอยู่เหนือแถวปุ่ม ไม่ใช่แทรกอยู่ในแถว
    ถ้าอยู่ในแถว พอมันโผล่มาตอนเหลือ 12 วินาที ปุ่ม Fold/Check/Bet จะเลื่อนที่
    ซึ่งเป็นจังหวะที่คนกำลังจะกดพอดี = กดผิดปุ่ม
@@ -2935,7 +2948,19 @@ button { font-family: inherit; }
           mid.className = "num buy";
           mid.textContent = st2.boughtIn.toLocaleString("th-TH") + " → " +
                             st2.stack.toLocaleString("th-TH") +
+                            (st2.busts ? "  (ล้ม " + st2.busts + ")" : "") +
                             (view.turnBudgetMs ? "  ⏱ " + (st2.timeCards || 0) : "");
+          /* กระเป๋าเงินนอกโต๊ะ (บอทเท่านั้น) — ชิปบนโต๊ะคือเงินที่หยิบมาเล่น
+             อันนี้คือเงินที่เหลืออยู่จริง ติดลบ = เป็นหนี้ ซึ่งกดดันการเล่นของบอทจริงๆ */
+          if (typeof st2.wallet === "number") {
+            var w = document.createElement("small");
+            w.style.cssText = "display:block; font-size:.62rem; opacity:.9";
+            w.textContent = st2.wallet < 0
+              ? "หนี้ " + Math.abs(st2.wallet).toLocaleString("th-TH")
+              : "กระเป๋า " + st2.wallet.toLocaleString("th-TH");
+            w.style.color = st2.wallet < 0 ? "#ff8f84" : "var(--muted)";
+            mid.appendChild(w);
+          }
           row.appendChild(mid);
 
           var net = document.createElement("b");

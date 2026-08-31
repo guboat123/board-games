@@ -12,8 +12,21 @@ import { evaluate7, cardCode, RANK_CHARS, SUIT_CHARS } from "./poker-engine.mjs"
 
 /* ⚠️ ชื่อบอทต้องเป็นอังกฤษล้วน เพื่อให้แยกออกจากคนไทยที่นั่งอยู่ด้วยตาเปล่า
    เดิมใช้ชื่อเล่นไทย (โบ๊ท แมท น้ำ ...) แล้วชนกับชื่อคนจริงบนโต๊ะ
-   มองปราดเดียวไม่รู้ว่ากำลังสู้กับคนหรือกับบอท */
-const NAMES = ["Ace", "Duke", "Rex", "Milo", "Vega", "Nico", "Kai", "Otto", "Zed"];
+   มองปราดเดียวไม่รู้ว่ากำลังสู้กับคนหรือกับบอท
+
+   ⚠️ และห้ามใช้คำที่เป็นศัพท์ไพ่ — เคยมีบอทชื่อ "Ace" แล้วอ่านผลมือแล้วงง
+   ("Ace ชนะด้วย High Card A" — Ace ตัวไหนคือคน ตัวไหนคือไพ่)
+   ห้ามใช้: Ace / King / Queen / Jack / Joker / Flush / Straight / Chip / Pot / Raise */
+const NAMES = ["Bruno", "Duke", "Rex", "Milo", "Vega", "Nico", "Kai", "Otto", "Zed"];
+
+/* ---------- กระเป๋าเงินของบอท ----------
+   ชิปบนโต๊ะไม่ใช่เงินของบอท มันคือเงินที่ "หยิบมาเล่น" จากกระเป๋า
+   ซื้อเข้าโต๊ะครั้งละ BUY_IN หักจากกระเป๋าจริง หมดตัวแล้วซื้อใหม่ก็หักอีก
+   กระเป๋าติดลบได้ = เป็นหนี้ ซึ่งบอทรู้ตัวและเล่นระวังขึ้นจริง (ดู decide)
+   ทำแบบนี้เพราะถ้าซื้อชิปใหม่ได้ฟรีไม่จำกัด การหมดตัวก็ไม่มีความหมายอะไรเลย
+   บอทจะไล่ all-in ทุกมือแล้วก็ยังอยู่ครบ ซึ่งไม่เหมือนคนเล่นจริงสักนิด */
+const WALLET_START = 10000;   /* เท่ากับซื้อเข้าได้ 5 ครั้งก่อนเริ่มเป็นหนี้ */
+const BUY_IN = 2000;
 
 /* margin = ต้องได้เปรียบกว่าราคาที่จ่ายเท่าไหร่ถึงจะตาม (ติดลบ = ตามแม้ราคาไม่คุ้ม)
    bet    = มือแข็งแค่ไหนถึงจะเปิดเดิมพันเองตอนไม่มีใครเดิมพัน
@@ -121,6 +134,7 @@ export function createBotManager(room, broadcast) {
   let lastSeenHand = -1;
   let showOffHand = -1;     /* ตัดสินใจขิงไปแล้วในมือไหน (กันทอยลูกเต๋าซ้ำ) */
   let seenThisHand = {};    /* เก็บไพ่ของใครไปแล้วบ้างในมือนี้ (กันนับซ้ำ) */
+  const bench = {};         /* seatId -> กลับมาเล่นได้ตอนจบมือที่เท่าไหร่ */
 
   function readOf(name) {
     return reads[name] || { n: 0, strong: 0, weak: 0 };
@@ -198,8 +212,11 @@ export function createBotManager(room, broadcast) {
     for (let i = 0; i < count; i++) {
       const used = room.table._state.seats.filter(Boolean).map(s => s.name);
       const name = NAMES.filter(n => used.indexOf(n) === -1)[0] || ("Bot" + (++seq));
-      const r = room.table.sit(name, null, 2000, "bot:" + (++seq), { bot: true, level: lv });
+      const r = room.table.sit(name, null, BUY_IN, "bot:" + (++seq), { bot: true, level: lv });
       if (!r.ok) break;
+      /* เปิดกระเป๋าให้ พร้อมหักค่าซื้อเข้าครั้งแรกทันที เงินบนโต๊ะมาจากกระเป๋าเสมอ */
+      const bs = room.table._state.seats[r.seatId];
+      if (bs) bs.wallet = WALLET_START - BUY_IN;
       added.push(r.name);
     }
     return { added, level: lv, levelName: LEVEL[lv].name };
@@ -209,6 +226,7 @@ export function createBotManager(room, broadcast) {
     for (const s of botSeats()) {
       clearTimeout(pending[s.seatId]);
       delete pending[s.seatId];
+      delete bench[s.seatId];
       room.table.leave(s.seatId);
     }
   }
@@ -226,14 +244,31 @@ export function createBotManager(room, broadcast) {
     observe(st);
     maybeShowOff(st);
 
-    /* บอทชิปหมดต้องซื้อกลับเข้ามาเอง ไม่งั้นโต๊ะค่อยๆ ว่างจนเหลือคนเดียว
-       แล้วคนที่เหลือก็เริ่มมือไม่ได้เพราะ "ต้องมีอย่างน้อย 2 คน"
-       เติมได้เฉพาะตอนไม่มีมือกำลังเล่น (เซิร์ฟเวอร์กันไว้อยู่แล้ว)
-       จำนวนครั้งที่ล้มถูกนับใน s.busts แล้วส่งกลับเข้าไปในหัวบอท (ดู decide) */
+    /* ---------- บอทหมดตัว: ซื้อกลับเข้ามา แต่ต้องนั่งพักก่อน ----------
+       ต้องซื้อกลับเอง ไม่งั้นโต๊ะค่อยๆ ว่างจนเหลือคนเดียว แล้วคนที่เหลือก็เริ่มมือไม่ได้
+       เพราะกติกา "ต้องมีอย่างน้อย 2 คน"
+
+       แต่ซื้อกลับแล้วเล่นต่อทันทีก็ไม่มีอะไรต้องเสีย หมดตัวก็แค่กดซื้อใหม่
+       จึงต้องนั่งพักด้วย และพักนานขึ้นทุกครั้งที่ล้ม: ครั้งแรก 1 มือ ครั้งที่สอง 2 มือ ...
+       (เพดาน 5 มือ ไม่งั้นบอทที่ซวยติดกันจะหายไปจากโต๊ะยาว จนไม่เหลือคนเล่นด้วย)
+
+       ⚠️ นี่ไม่ใช่แค่บทลงโทษให้ดูสมจริง — บอท "ไม่ชอบโดนพัก" จริงๆ
+       จำนวนครั้งที่ล้ม (s.busts) ถูกส่งเข้าไปในหัวบอทที่ decide แล้วกลายเป็น caution
+       ยิ่งเคยโดนพักบ่อย ยิ่งต้องการไพ่ดีกว่าเดิมถึงจะสู้ และบลัฟน้อยลง */
     if (st.phase === "waiting" || st.phase === "showdown") {
       for (const b of botSeats()) {
+        /* ครบกำหนดพักแล้ว กลับมาเล่นได้ */
+        if (bench[b.seatId] !== undefined && st.handNo >= bench[b.seatId]) {
+          delete bench[b.seatId];
+          if (b.sitOut) room.table.action(b.seatId, { type: "sitout", value: false });
+        }
         if (b.stack > 0) continue;
-        room.table.action(b.seatId, { type: "rebuy", amount: 2000 });
+        room.table.action(b.seatId, { type: "rebuy", amount: BUY_IN });
+        /* ซื้อชิปใหม่ = หยิบเงินออกจากกระเป๋าอีกก้อน ติดลบได้ นั่นคือเป็นหนี้ */
+        b.wallet = (typeof b.wallet === "number" ? b.wallet : WALLET_START) - BUY_IN;
+        const penalty = Math.min(Math.max(b.busts || 1, 1), 5);
+        room.table.action(b.seatId, { type: "sitout", value: true });
+        bench[b.seatId] = st.handNo + penalty;
       }
     }
 
@@ -291,6 +326,13 @@ export function createBotManager(room, broadcast) {
        จำกัดเพดานไว้ ไม่งั้นบอทที่ซวยติดกันจะกลายเป็นหมอบทุกมือจนไม่มีใครอยากเล่นด้วย */
     const busts = Math.min(me.busts || 0, 3);
 
+    /* ⚠️ หนี้กดดันการตัดสินใจจริง ไม่ใช่แค่ตัวเลขโชว์
+       คนที่เล่นด้วยเงินที่ยืมมา จะไม่กล้าลุยแบบคนที่ยังมีเงินเหลือในกระเป๋า
+       ยิ่งเป็นหนี้มาก ยิ่งต้องการไพ่ดีกว่าเดิมถึงจะสู้ และแทบไม่บลัฟ
+       เพดานที่ 0.07 เพื่อไม่ให้บอทที่จนกลายเป็นหมอบทุกมือจนเล่นด้วยไม่สนุก */
+    const debt = Math.max(0, -(typeof me.wallet === "number" ? me.wallet : 0));
+    const debtFear = Math.min(debt / 8000, 1) * 0.07;
+
     /* ---------- อ่านคนที่กำลังดันเราอยู่ ----------
        ต้องรู้ว่ากำลังสู้กับใคร ไม่ใช่สู้กับ "ราคา" เฉยๆ
        คนที่ดัน = คนที่วางเงินเท่ากับเงินสูงสุดบนโต๊ะตอนนี้ และท่าล่าสุดคือดัน */
@@ -310,9 +352,10 @@ export function createBotManager(room, broadcast) {
       respect = (pressureRead.strong - pressureRead.weak) / pressureRead.n * 0.09;
     }
 
-    const caution = busts * 0.03 + respect;
+    const caution = busts * 0.03 + respect + debtFear;
 
-    const bluffing = Math.random() < lv.bluff * crowdFactor * (1 - busts * 0.2);
+    const bluffing = Math.random() <
+      lv.bluff * crowdFactor * (1 - busts * 0.2) * (debt > 0 ? 0.4 : 1);
     let eq = base + draw + (bluffing ? 0.26 : 0) + (Math.random() - 0.5) * 0.08;
     eq = Math.max(0, Math.min(1, eq));
 

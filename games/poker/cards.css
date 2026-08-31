@@ -104,20 +104,17 @@
   font-size: 1.5em; line-height: 1; opacity: .9;
 }
 
-/* ---- ไพ่คว่ำ ---- */
+/* ---- ไพ่คว่ำ: ลายมังกรจีน ----
+   ตัวลายอยู่ใน cards.js (วาดเป็น SVG แล้วใส่เป็น background-image ตอนโหลด)
+   ที่นี่มีแค่สีพื้นกับเงา เผื่อกรณีรูปยังไม่ถูกใส่ ไพ่จะได้ไม่กลายเป็นแผ่นขาว */
 .pc--back {
-  background:
-    repeating-linear-gradient(45deg,  #2f5fae 0 3px, #24488a 3px 6px),
-    #24488a;
-  box-shadow: 0 2px 6px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.18);
+  background-color: #180a0c;
+  box-shadow: 0 2px 6px rgba(0,0,0,.45), inset 0 0 0 1px rgba(212,166,86,.35);
 }
-.pc--back .pc__pattern {
-  position: absolute; inset: 8%;
-  border: 1px solid rgba(255,255,255,.42);
-  border-radius: 3px;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(255,255,255,.22) 0 18%, transparent 19%);
-}
+/* ⚠️ ห้ามวาดลายทับตรงนี้อีก ลายจริงเป็นภาพพื้นหลังเต็มใบแล้ว
+   ของเดิมเป็นกรอบขาวกับจุดกลม ซึ่งจะไปนอนทับหัวมังกรพอดี
+   ปล่อยว่างไว้ แต่ยังคงตัวโหนดไว้เพราะ cards.js สร้างมันเสมอ */
+.pc--back .pc__pattern { display: none; }
 
 /* ---- ช่องว่างรอไพ่ ---- */
 .pc--slot {
