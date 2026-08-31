@@ -139,6 +139,22 @@ function decodeFrames(buf, onMessage, onClose, onPong) {
 
 let nextId = 1;
 const rooms = new Map();   /* code -> { code, table, clients:Set, reaper } */
+
+/* ตั้งคิวปิดห้องที่ไม่มีใครต่ออยู่ ต้องเรียกจากทุกทางที่ทำให้ห้องว่าง
+   (โซเก็ตหลุด และกดปุ่มออกจากโต๊ะ) ไม่งั้นทางใดทางหนึ่งจะทิ้งห้องร้างไว้ตลอดกาล */
+function scheduleReap(room) {
+  log("ห้อง", room.code, "ไม่มีใครต่ออยู่ รอ", ROOM_GRACE_MIN, "นาทีก่อนปิด");
+  clearTimeout(room.reaper);
+  room.reaper = setTimeout(() => {
+    if (room.clients.size === 0) {
+      rooms.delete(room.code);
+      log("ห้อง", room.code, "ไม่มีใครกลับมา ปิดห้องแล้ว");
+      /* ต้องบอกหน้ารวมโต๊ะด้วย ไม่งั้นคนจะเห็นห้องที่ไม่มีอยู่แล้ว
+         กดเข้าไปได้ห้องใหม่เอี่ยม พร้อมคำสัญญาเรื่องชิปเดิมที่ไม่มีจริง */
+      pushLobby();
+    }
+  }, ROOM_GRACE_MIN * 60000);
+}
 const ROOM_GRACE_MIN = 10; /* ไม่มีใครต่ออยู่กี่นาทีถึงจะปิดห้อง */
 const PING_MS = 15000;     /* เคาะถามทุกกี่มิลลิวินาที ว่าอีกฝั่งยังอยู่ไหม */
 const lobby = new Set();   /* เครื่องที่ยังไม่ได้นั่งโต๊ะ รอดูรายการโต๊ะ */
@@ -222,23 +238,8 @@ server.on("upgrade", (req, socket) => {
     if (client.room) {
       client.room.clients.delete(client);
       client.room.table.disconnect(client.seatId);
-      if (client.room.clients.size === 0) {
-        /* ไม่ปิดห้องทันที เผื่อทุกคนเน็ตหลุดพร้อมกัน ให้เวลากลับเข้ามา */
-        const room = client.room;
-        log("ห้อง", room.code, "ไม่มีใครต่ออยู่ รอ", ROOM_GRACE_MIN, "นาทีก่อนปิด");
-        clearTimeout(room.reaper);
-        room.reaper = setTimeout(() => {
-          if (room.clients.size === 0) {
-            rooms.delete(room.code);
-            log("ห้อง", room.code, "ไม่มีใครกลับมา ปิดห้องแล้ว");
-            /* ต้องบอกหน้ารวมโต๊ะด้วย ไม่งั้นคนจะเห็นห้องที่ไม่มีอยู่แล้ว
-               กดเข้าไปได้ห้องใหม่เอี่ยม พร้อมคำสัญญาเรื่องชิปเดิมที่ไม่มีจริง */
-            pushLobby();
-          }
-        }, ROOM_GRACE_MIN * 60000);
-      } else {
-        broadcastState(client.room);
-      }
+      if (client.room.clients.size === 0) scheduleReap(client.room);
+      else broadcastState(client.room);
       client.room = null;
     }
     pushLobby();
@@ -304,7 +305,10 @@ server.on("upgrade", (req, socket) => {
       client.room = null;
       client.seatId = null;
       lobby.add(client);
-      broadcastState(room);
+      /* คนสุดท้ายลุกออกไปแล้ว ต้องตั้งคิวปิดห้องด้วย
+         ไม่งั้นห้องร้างจะค้างในรายการตลอดกาล (เดิมตั้งคิวไว้เฉพาะตอนโซเก็ตหลุด) */
+      if (room.clients.size === 0) scheduleReap(room);
+      else broadcastState(room);
       pushLobby();
       send(client, { type: "left" });
       return;

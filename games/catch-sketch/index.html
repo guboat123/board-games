@@ -197,6 +197,7 @@
   .giveup:focus-visible { outline: var(--stroke) solid var(--ink-blue); outline-offset: 3px; }
   .giveup[disabled] { opacity: .35; cursor: not-allowed; }
 
+
   /* จอเตี้ย บีบทุกอย่างที่ไม่ใช่รายชื่อ จะได้เห็นชื่อได้มากที่สุดโดยไม่ต้องเลื่อนทั้งหน้า */
   @media (max-height: 700px) {
     /* padding ท้ายหน้าเป็นที่ว่างเปล่าบนหน้านี้ ตัดออกแล้วหน้าไม่ต้องเลื่อนเลย */
@@ -210,6 +211,23 @@
     .claim { padding: 10px 12px; font-size: 1rem; }
     .claims li { margin-bottom: 7px; }
     #claims-more { margin: 2px 0 5px; }
+  }
+
+  /* จอแนวนอน (สูง ≤ 480px) เนื้อหาทะลุเพดาน ปุ่มปิดรอบตกใต้จอ
+     เกมนี้วางเครื่องกลางโต๊ะ แนวนอนจึงเป็นท่าปกติ ต้องตัดทุกอย่างที่ไม่จำเป็นออก */
+  @media (max-height: 480px) {
+    #s-word .clock { display: none; }
+    #s-word .hint { display: none; }
+    .word { padding: 6px 12px; }
+    .word__main { font-size: 1.3rem; }
+    .word__lv { margin-bottom: 0; }
+    .word__sub { display: none; }
+    #s-word .claims { min-height: 44px; }
+    .claim { padding: 6px 10px; font-size: .92rem; }
+    .claims li { margin-bottom: 5px; }
+    #claims-more { margin: 0 0 3px; }
+    #claim-status { margin: 0 0 4px; font-size: .78rem; }
+    #s-word #btn-all-done { padding: 10px; font-size: .95rem; }
   }
 
   /* ---- หน้าทาย ---- */
@@ -1254,6 +1272,11 @@
     } else if (allSettled) {
       btn.textContent = "ทุกคนเสร็จแล้ว";
       btn.className = "btn btn--stick";
+    } else if (btn.disabled) {
+      /* ปุ่มเทาที่เขียนว่า "ปิดรอบเลย" หลอกคนว่ากดได้ พอกดแล้วเงียบ
+         ตอนกดไม่ได้ต้องบอกเหตุผลบนตัวปุ่มเอง */
+      btn.textContent = "ยังปิดรอบไม่ได้ ต้องมีคนคว้าคิวหรือยอมแพ้ก่อน";
+      btn.className = "btn btn--ghost btn--stick";
     } else {
       btn.textContent = "ปิดรอบเลย (อีก " + (drawers - settled) + " คนยังวาดอยู่)";
       btn.className = "btn btn--ghost btn--stick";
