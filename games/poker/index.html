@@ -924,18 +924,31 @@ button { font-family: inherit; }
    (บั๊กทรงเดียวกับตารางอันดับรอบ 7) ตอนนั้นกองจ่ายออกไปแล้ว ซ่อนบรรทัดกองได้
    แต่ไพ่กลางต้องเหลือไว้ ใช้อ่านชุดไพ่ของแต่ละคน */
 #t-result.is-many { max-height: 74%; }
-/* ⚠️ ต้องมีพื้นที่ขั้นต่ำให้แถวผลเสมอ ไม่งั้นของที่หดไม่ได้ (หัวกล่อง) กินหมด
-   แล้วแถวที่ต้องอ่านที่สุดกลับเหลือ 0px */
-#t-result .rows { min-height: 62px; }
+/* ⚠️ ห้ามตั้งพื้นขั้นต่ำให้แถวคนแพ้
+   ในกล่องนี้ .rows คือแถวของ "คนที่แพ้" ส่วนผู้ชนะอยู่ใน .win-box ซึ่งหดไม่ได้อยู่แล้ว
+   ตั้ง min-height ไว้ที่นี่เท่ากับบังคับให้กล่องสูงขึ้นอีก 62px บนจอที่ไม่มีที่จะให้
+   แล้วดันผู้ชนะทะลุออกนอกกล่อง — กลับหัวกับสิ่งที่ต้องการพอดี
+   ลำดับความสำคัญ: ผู้ชนะ > ไพ่กลาง > คนแพ้ > เงินสะสม */
+#t-result .rows { min-height: 0; }
 
 /* ---------- ไพ่กลางย่อในกล่องผล ----------
    ⚠️ กล่องผลบังโต๊ะเป็นเรื่องปกติ มันต้องใหญ่พอจะอ่านได้
    แต่การอ่านว่า "ชนะด้วยอะไร" ต้องเห็นไพ่กลางประกอบเสมอ
    แทนที่จะพยายามไม่บัง ก็ยกไพ่กลางเข้ามาไว้ในกล่องซะเลย ทุกอย่างอยู่ที่เดียว */
+/* ⚠️ ไพ่กลางในกล่องผลต้องใหญ่พออ่านแต้มกับดอกได้จริง
+   ใช้ขนาด sm (24px) แล้วเลขกับดอกเล็กจนมองไม่ออก ทั้งที่มันคือไพ่ที่ต้องใช้
+   เทียบว่าใครชนะด้วยชุดอะไร กล่องกว้าง ~308px ใส่ห้าใบ + ช่องไฟได้ถึงใบละ 58px */
 .res-board {
-  flex: 0 0 auto; display: flex; justify-content: center; gap: 3px;
+  flex: 0 0 auto; display: flex; justify-content: center; gap: 4px;
   margin: 0 0 8px; padding-bottom: 8px;
   border-bottom: 1px solid #1d3a2b;
+}
+.res-board .pc { width: 46px; font-size: 8.3px; border-radius: 4px; }
+@media (min-width: 400px) { .res-board .pc { width: 52px; font-size: 9.4px; } }
+/* จอเตี้ยไม่มีที่พอให้ทั้งไพ่กลางและแถวผู้ชนะ ย่อไพ่กลางลงก่อน */
+@media (max-height: 700px) {
+  .res-board { gap: 3px; margin-bottom: 6px; padding-bottom: 6px; }
+  .res-board .pc { width: 34px; font-size: 6.1px; }
 }
 
 /* ---------- กองซ้อนกล่องผล + โซนเงิน ----------
@@ -947,10 +960,10 @@ button { font-family: inherit; }
   position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%);
   width: min(92%, 400px); z-index: 40;
   display: flex; flex-direction: column; gap: 6px;
-  /* ⚠️ ห้ามเกิน 72% ของโต๊ะ ไม่งั้นกล่องผลบังไพ่กลางจนหมด
-     ไพ่กลางคือสิ่งที่ต้องใช้อ่านว่าใครชนะด้วยอะไร บังแล้วอ่านผลไม่ออก
-     (และกล่องผลเองก็มีแถวไพ่กลางย่อไว้ข้างในแล้ว ดูหัวข้อ res-board) */
-  max-height: 72%; pointer-events: none;
+  /* ⚠️ เพดานนี้ต้องพอให้ "หัวกล่อง + ไพ่กลางย่อ + แถวผู้ชนะ" อยู่ครบเสมอ
+     72% ไม่พอบนจอเตี้ย (โต๊ะสูง 227px → กองซ้อนได้ 164px แต่ของที่หดไม่ได้รวม 176px)
+     ไพ่กลางบนโต๊ะถูกยกมาไว้ในกล่องผลแล้ว การบังโต๊ะจึงไม่ใช่ปัญหาเท่าการอ่านผลไม่ได้ */
+  max-height: 88%; pointer-events: none;
 }
 .result-stack > .result {
   position: static; transform: none; width: 100%;
@@ -958,11 +971,13 @@ button { font-family: inherit; }
 }
 /* ⚠️ ต้องใช้ตัวเลือกที่มี id ด้วย ไม่งั้นแพ้ #t-result.is-many (1,1,0)
    แล้วเพดาน 74% เดิมจะกลับมาคุมทั้งที่กองซ้อนคุมความสูงให้แล้ว */
-.result-stack > #t-result { flex: 0 1 auto; min-height: 0; max-height: none; }
-/* ⚠️ โซนเงินหดไม่ได้ (0 0 auto) จึงต้องมีเพดานของตัวเองเสมอ
-   ถ้าปล่อยเป็น none พอมี 9 คนมันจะสูงจนกินที่ทั้งกอง แล้วกล่องผลเหลือน้อยกว่า
-   ขอบในของตัวเอง = แถวผู้ชนะหายเกลี้ยง ซึ่งเป็นบั๊กเดิมที่การแยกโซนตั้งใจจะแก้ */
-.result-stack > #t-money  { flex: 0 0 auto; max-height: 34%; overflow-y: auto; }
+/* ⚠️ กล่องผลต้องได้ที่ก่อนเสมอ (1 1 auto) ส่วนโซนเงินยอมหดได้ (0 1 auto)
+   ของเดิมกลับกัน: โซนเงินหดไม่ได้เลย พอมี 9 คนมันกิน 148px จากกองที่มี 164px
+   กล่องผลจึงเหลือ 34px ทั้งที่ของข้างในสูง 238px
+   ลูกทุกตัวยกเว้น .rows หดไม่ได้ มันจึงทะลุออกนอกกล่องแล้วโดน overflow:hidden ตัดทิ้ง
+   ผลที่คนเล่นเห็นคือ "จบมือแล้วไม่มีแถวผู้ชนะ" เหลือแค่หัวกล่องกับไพ่กลาง */
+.result-stack > #t-result { flex: 1 1 auto; min-height: 0; max-height: none; }
+.result-stack > #t-money  { flex: 0 1 auto; min-height: 0; max-height: 30%; overflow-y: auto; }
 
 /* ---------- โซนเงิน ----------
    ⚠️ ต้องเตี้ยไว้ ตัวมันหดไม่ได้ (flex 0 0 auto) ทุกพิกเซลที่มันกิน
@@ -3893,7 +3908,7 @@ button { font-family: inherit; }
     if (r.board && r.board.length) {
       var bw = document.createElement("div");
       bw.className = "res-board";
-      r.board.forEach(function (bc) { bw.appendChild(window.Cards.make(bc, "sm")); });
+      r.board.forEach(function (bc) { bw.appendChild(window.Cards.make(bc, "md")); });
       box.appendChild(bw);
     }
 
