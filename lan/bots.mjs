@@ -151,40 +151,78 @@ function madeStrength(hole, board) {
   return CAT_EQUITY[evaluate7(cs)[0]] || 0.5;
 }
 
-/* ---------- ไพ่ที่ "ยังไม่เข้าชุด แต่มีลุ้น" ----------
-   ขาดอีกใบเดียวจะเป็นฟลัชหรือสเตรท = มีสิทธิ์ชนะจริงถ้าไพ่ใบต่อไปเข้า
-   บลัฟด้วยมือแบบนี้ (semi-bluff) คือการบลัฟที่ถูกวิธี เพราะถ้าโดนตามก็ยังมีทาง
-   ต่างจากบลัฟด้วยไพ่ที่ไม่มีอะไรเลย ซึ่งได้ทางเดียวคือให้เขาหมอบ */
-function drawStrength(hole, board) {
-  /* ลุ้นได้เฉพาะตอนยังมีไพ่จะเปิดอีก ริเวอร์แล้วไม่มีอะไรให้ลุ้น */
+/* ---------- นับ "ไพ่ที่ยังลุ้นอยู่" (outs) ----------
+   ⚠️ ของเดิมให้คะแนนลุ้นเป็นตัวเลขตายตัว (ฟลัช +0.24 · สเตรทเปิดสองหัว +0.19)
+   ซึ่งไม่ตรงกับความจริง เพราะโอกาสจริงขึ้นกับสองอย่างที่ตัวเลขตายตัวมองไม่เห็น:
+     · เหลือไพ่จะเปิดอีกกี่ใบ — ที่ฟลอปเหลือสองใบ ที่เทิร์นเหลือใบเดียว โอกาสต่างกันเท่าตัว
+     · ลุ้นกี่ทาง — รอไพ่ 4 ใบ กับรอ 9 ใบ คนละเรื่องกัน
+   และมันไม่นับ "ลุ้นใบเดียวตรงกลาง" (gutshot) เลย ทั้งที่คนเล่นจริงนับ
+
+   นับ out จริงแล้วแปลงเป็นโอกาสด้วยกฎ 4 กับ 2 ที่คนเล่นใช้กันทั้งโลก:
+     เหลือเปิดสองใบ ≈ out × 4%   ·   เหลือเปิดใบเดียว ≈ out × 2%
+   ค่าที่ได้เทียบกับ "ราคาที่ต้องจ่าย" ได้ตรงๆ ซึ่งเป็นวิธีที่คนเล่นเป็นใช้ตัดสินว่าจะไล่ต่อไหม
+
+   ⚠️ ทุกอย่างต้องมีไพ่ในมือร่วมด้วย ฟลัชหรือสเตรทที่เกิดจากบอร์ดล้วน เราไม่ได้อะไร
+   (คนอื่นก็มีเหมือนกันหมด) นับรวมเข้ามาคือหลอกตัวเองว่ามีลุ้นทั้งที่ตายสนิท */
+function countOuts(hole, board) {
   if (!board || board.length < 3 || board.length > 4) return 0;
-  const cards = hole.concat(board).map(toNum).filter(x => x >= 0);
-  if (cards.length < 5) return 0;
+  const hs = hole.map(toNum).filter(x => x >= 0);
+  const bs = board.map(toNum).filter(x => x >= 0);
+  if (hs.length < 2 || bs.length < 3) return 0;
+  const all = hs.concat(bs);
 
-  /* ⚠️ ต้องมีไพ่ในมือร่วมด้วย ไม่ใช่นับจากไพ่กลางล้วน
-     ของเดิมรวมมือกับบอร์ดแล้วนับเฉยๆ บนบอร์ดที่มีดอกเดียวกันสี่ใบ
-     บอทที่ถือไพ่ไม่เกี่ยวเลยก็คิดว่าตัวเองมีลุ้นฟลัช +0.24 แล้วตามหรือบลัฟต่อ
-     ทั้งที่เป็นบอร์ดที่มันตายสนิท (คนอื่นถือดอกนั้นใบเดียวก็ชนะแล้ว) */
-  const holeNums = hole.map(toNum).filter(x => x >= 0);
-  const suits = [0, 0, 0, 0];
-  cards.forEach(c => suits[c & 3]++);
-  const flushDraw = suits.some((n, suit) =>
-    n === 4 && holeNums.some(c => (c & 3) === suit));
+  let outs = 0;
 
-  const has = new Array(13).fill(false);
-  cards.forEach(c => { has[c >> 2] = true; });
-  const holeRanks = holeNums.map(c => c >> 2);
-  let openEnded = false;
-  for (let i = 0; i <= 9; i++) {
-    if (!(has[i] && has[i + 1] && has[i + 2] && has[i + 3])) continue;
-    /* ต้องมีไพ่ในมืออย่างน้อยหนึ่งใบอยู่ในสี่ใบที่เรียงกันนั้น */
-    if (holeRanks.some(r => r >= i && r <= i + 3)) openEnded = true;
+  /* ---- ลุ้นฟลัช: ดอกหนึ่งมี 13 ใบ เห็นไปแล้ว 4 เหลือลุ้น 9 ---- */
+  const suitCount = [0, 0, 0, 0];
+  all.forEach(c => suitCount[c & 3]++);
+  let flushDraw = false;
+  for (let su = 0; su < 4; su++) {
+    if (suitCount[su] === 4 && hs.some(c => (c & 3) === su)) { outs += 9; flushDraw = true; }
   }
 
-  if (flushDraw && openEnded) return 0.34;
-  if (flushDraw) return 0.24;
-  if (openEnded) return 0.19;
-  return 0;
+  /* ---- ลุ้นสเตรท: ไล่ทีละแต้มว่า ถ้าใบนี้ออก จะเรียงห้าใบติดกันได้ไหม ---- */
+  const have = new Array(13).fill(false);
+  all.forEach(c => { have[c >> 2] = true; });
+  const holeRanks = hs.map(c => c >> 2);
+
+  let straightOuts = 0;
+  for (let r = 0; r < 13; r++) {
+    if (have[r]) continue;
+    const withIt = have.slice();
+    withIt[r] = true;
+    let made = false, usesHole = false;
+    for (let start = 0; start <= 8; start++) {
+      let run = true;
+      for (let k = 0; k < 5; k++) if (!withIt[start + k]) { run = false; break; }
+      if (!run) continue;
+      made = true;
+      if (holeRanks.some(x => x >= start && x <= start + 4)) usesHole = true;
+    }
+    /* A ใช้เป็นใบต่ำใน A-2-3-4-5 ได้ด้วย */
+    if (!made && withIt[12] && withIt[0] && withIt[1] && withIt[2] && withIt[3]) {
+      made = true;
+      if (holeRanks.some(x => x === 12 || x <= 3)) usesHole = true;
+    }
+    if (made && usesHole) straightOuts += 4;   /* แต้มนั้นเหลืออยู่ 4 ดอก */
+  }
+
+  /* ไพ่ที่นับซ้ำระหว่างลุ้นฟลัชกับลุ้นสเตรท ต้องหักออก ไม่งั้นโอกาสเกินจริง
+     โดยประมาณ ไพ่ที่ช่วยสเตรทหนึ่งในสี่ดอก จะเป็นดอกที่เราลุ้นฟลัชอยู่พอดี */
+  if (flushDraw && straightOuts > 0) straightOuts -= Math.round(straightOuts / 4);
+  outs += straightOuts;
+
+  return Math.min(outs, 15);   /* เกิน 15 out แทบไม่มีจริง */
+}
+
+/* โอกาสที่ไพ่ลุ้นจะเข้า แปลงจากจำนวน out ด้วยกฎ 4 กับ 2
+   ใช้เป็น "ส่วนเพิ่มของค่ามือ" — บลัฟด้วยมือที่มีลุ้น (semi-bluff) คือบลัฟที่ถูกวิธี
+   เพราะถ้าโดนตามก็ยังมีทางชนะ ต่างจากบลัฟด้วยไพ่ที่ไม่มีอะไรเลย */
+function drawStrength(hole, board) {
+  const outs = countOuts(hole, board);
+  if (!outs) return 0;
+  const toCome = board.length === 3 ? 2 : 1;
+  return Math.min(outs * (toCome === 2 ? 0.04 : 0.02), 0.55);
 }
 
 
@@ -929,6 +967,12 @@ export function createBotManager(room, broadcast) {
     const patienceGap = pre ? (trait.patience - 0.5) * 0.10 : 0;
     const caution = busts * 0.03 + respect + debtFear - boldness + patienceGap;
 
+    /* ⚠️ ต้องประเมินหน้าไพ่กลางก่อน "แผนประจำสตรีท" เพราะแผนใช้ค่านี้
+       เคยประกาศไว้ทีหลังแล้วชนกฎ temporal dead zone ของ const — บอทพังทั้งตัว
+       จับได้ตอนรันจำลอง ไม่ใช่ตอน node --check ซึ่งมองไม่เห็นลำดับการทำงาน
+       และต้องประเมินใหม่ทุกครั้งที่ตัดสินใจ ค่ามือขึ้นกับบอร์ดที่เปิดมา ไม่คงที่ทั้งมือ */
+    const wet = pre ? 0 : boardWetness(view.board);
+
     /* แผนของรอบเดิมพันนี้ ตัดสินครั้งเดียวแล้วเดินตาม (ดู planFor)
        ยังคูณด้วยสภาพจิตใจตอนนี้: ล้มมาเยอะหรือเป็นหนี้ ก็ไม่ค่อยกล้าบลัฟ */
     const plan = planFor(seatId, view, base, trait, lv, wet);
@@ -976,10 +1020,6 @@ export function createBotManager(room, broadcast) {
         threatCred = credibility(view, i, live);
       }
     });
-
-    /* ⚠️ ประเมินหน้าไพ่กลางใหม่ทุกครั้งที่ตัดสินใจ (คือทุกครั้งที่เปิดไพ่เพิ่มด้วย)
-       ค่ามือของเราขึ้นกับบอร์ดที่เปิดมา ไม่ใช่คงที่ทั้งมือ */
-    const wet = pre ? 0 : boardWetness(view.board);
 
     const facts = { pre, base, draw, live, me, view, seatId, lv, walletPressure, trait, wet, plan,
                     potNow, toCall, price, caution, crowdFactor, bluffing, cbet, actsLast,
