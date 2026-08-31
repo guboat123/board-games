@@ -233,7 +233,14 @@ node lan/tests/test-uncalled.mjs   # uncalled bet returns to its owner (+400-cas
 node lan/tests/test-room.mjs       # pot excludes uncalled money · seat takeover · host rights
 node tests/test-clue.mjs           # clue rules, extracted live from color-clues/index.html
 node lan/tests/test-history.mjs    # per-player history: no double counting, money totals, reload
+node lan/tests/test-split.mjs      # ties, side pots, odd-chip remainders, 500-case money fuzz
 ```
+
+`lan/tools/table-bot.mjs` fills a table with bots that play like people — they evaluate hands
+with the real engine, fold weak holdings, bluff occasionally, and take an uneven amount of time
+to decide. It exists because playtesting kept stalling on "no one is around to play". Five of
+them uncovered the round where three players were all-in for different amounts, which is the
+case side-pot code gets wrong.
 
 `test-clue.mjs` pulls the real code out of the HTML rather than copying the rules, so it fails if a
 constant is moved out of the rule block — that has already caught one mistake.

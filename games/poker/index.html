@@ -116,6 +116,13 @@ button { font-family: inherit; }
 .tbl__live { color: var(--live); }
 /* เลือกที่นั่ง */
 /* วงโต๊ะกินความกว้างเต็ม ปุ่ม "หาที่ว่างให้" อยู่ใต้วง */
+/* กล่องตั้งค่า "จบรอบเมื่อไหร่" ต้องเด่นกว่าช่องกรอกทั่วไป
+   เจ้าของบอกว่ามองไม่เห็นว่ามีตัวเลือกนี้อยู่ ทั้งที่เป็นสิ่งที่ต้องตัดสินใจก่อนเปิดโต๊ะ */
+.fld--limit {
+  background: #0f2c1e; border: 1px solid #2f5540;
+  border-radius: 12px; padding: 11px 12px; margin-bottom: 14px;
+}
+.fld--limit > label { color: var(--gold); font-weight: 700; }
 .seatpick { display: block; margin-top: 8px; }
 /* ---------- แผนผังโต๊ะแบบวง ----------
    คนดูรูปวงโต๊ะแล้วรู้ทันทีว่า "ว่างตรงไหน" และ "จะนั่งข้างใคร"
@@ -441,6 +448,8 @@ button { font-family: inherit; }
   to   { transform: scale(1); }
 }
 .pot.is-bump { animation: pot-bump .32s ease-out; }
+/* กองหลาย ๆ ชั้น เรียงบรรทัดลงมา ตัวเล็กลงนิดเพราะมีได้หลายบรรทัด */
+.pot__line { display: block; font-size: .82em; line-height: 1.35; white-space: nowrap; }
 .board { display: flex; gap: 5px; justify-content: center; }
 /* ไพ่กลางต้องแคบพอที่จะไม่ชนที่นั่งซ้าย/ขวา (อยู่ที่ 11% กับ 89% ของโต๊ะ)
    มุมไพ่ใบแรกกับใบที่ห้าคือที่พิมพ์เลขหน้าไพ่ไว้ ถ้าโดนทับก็อ่านไม่ออก
@@ -629,6 +638,14 @@ button { font-family: inherit; }
    ถ้าอยู่ในแถว พอมันโผล่มาตอนเหลือ 12 วินาที ปุ่ม Fold/Check/Bet จะเลื่อนที่
    ซึ่งเป็นจังหวะที่คนกำลังจะกดพอดี = กดผิดปุ่ม
    ตำแหน่ง absolute ทำให้มันไม่กินพื้นที่ในผัง ปุ่มอื่นจึงอยู่นิ่งเสมอ */
+/* ปุ่มเติมชิปลอยมุมซ้ายเหนือแถว คนละมุมกับปุ่มการ์ดต่อเวลา จะได้ไม่ทับกัน */
+#btn-rebuy {
+  position: absolute; left: 10px; bottom: 100%;
+  z-index: 5; flex: 0 0 auto; width: auto;
+  margin-bottom: 8px; padding: 8px 12px;
+  background: #123a26; border-color: var(--live); color: #bff0d2;
+  box-shadow: 0 4px 14px rgba(0,0,0,.55);
+}
 #btn-timecard {
   position: absolute; right: 10px; bottom: 100%;
   z-index: 5; flex: 0 0 auto; width: auto;
@@ -868,7 +885,7 @@ button { font-family: inherit; }
       <input id="f-room" type="text" maxlength="8" value="HOME" autocomplete="off">
     </div>
 
-    <div class="fld">
+    <div class="fld fld--pick">
       <label>ที่นั่ง</label>
       <div class="seatpick" id="seatpick"></div>
       <p class="hint-sm" id="seat-hint">ไม่เลือกก็ได้ ระบบจะหาที่ว่างให้เอง</p>
@@ -882,8 +899,8 @@ button { font-family: inherit; }
 
     <p class="hint-sm" id="rejoin-note" style="display:none"></p>
 
-    <div class="fld">
-      <label for="f-limit">รอบเล่นนี้จบเมื่อไหร่</label>
+    <div class="fld fld--limit">
+      <label for="f-limit">⏱ เล่นกี่มือ · จบรอบเมื่อไหร่</label>
       <div class="chips-row" id="limit-kind" style="margin:0 0 8px"></div>
       <input id="f-limit" type="number" min="1" step="1" value="20" style="display:none">
       <p class="hint-sm" id="limit-hint">เล่นไปเรื่อยๆ จนกดเลิกเอง</p>
@@ -2098,7 +2115,21 @@ button { font-family: inherit; }
     };
     $("t-phase").textContent = PHASE[view.phase] || "";
     var potEl = $("t-pot");
-    potEl.textContent = "Pot " + view.pot.toLocaleString("th-TH");
+    /* มีคนหมดตักด้วยเงินน้อยกว่าคนอื่น = กองแตกเป็นชั้น ต้องบอกให้เห็น
+       ไม่งั้นคนหมดตักจะเข้าใจว่าตัวเองมีสิทธิ์ชนะทั้งกอง ซึ่งไม่จริง */
+    if (view.pots && view.pots.length > 1) {
+      potEl.textContent = "";
+      view.pots.forEach(function (p, i) {
+        var line = document.createElement("span");
+        line.className = "pot__line";
+        line.textContent = (i === 0 ? "Main pot " : "Side pot " + i + "  ") +
+                           p.amount.toLocaleString("th-TH") +
+                           "  (" + p.eligible.length + " คน)";
+        potEl.appendChild(line);
+      });
+    } else {
+      potEl.textContent = "Pot " + view.pot.toLocaleString("th-TH");
+    }
     /* กองโตขึ้น = มีคนลงเงิน ให้ตัวเลขเด้งบอกหน่อย จะได้รู้สึกว่ามีอะไรเกิดขึ้น */
     if (view.pot > lastPot) {
       potEl.classList.remove("is-bump");
@@ -2732,9 +2763,35 @@ button { font-family: inherit; }
 
   /* ---------- ปุ่มลงมือ ---------- */
 
+  /* ⚠️ ปุ่มเติมชิปต้องอยู่ตราบใดที่ยังเติมได้ ไม่ใช่โผล่ๆ หายๆ
+     ของเดิมวางไว้ในแถวปุ่ม ซึ่งวาดใหม่ตามจังหวะโต๊ะ พอมือใหม่เริ่ม (ที่เราไม่ได้ร่วม)
+     แถวเปลี่ยนเป็นแถบ "รอ ..." ปุ่มเติมชิปก็หายไปทั้งที่ยังเติมได้อยู่
+     ตอนนี้ผูกกับสถานะของเราเอง (ชิปน้อย + ไม่ได้อยู่ในมือ) และลอยเหนือแถว
+     จึงไม่ดันปุ่มอื่น และไม่หายไปกับการวาดแถวใหม่ */
+  function paintRebuy() {
+    var old = document.getElementById("btn-rebuy");
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    if (!view || mySeat < 0) return;
+    var me2 = view.seats[mySeat];
+    if (!me2) return;
+    /* อยู่ในมืออยู่ เติมไม่ได้ (เซิร์ฟเวอร์ก็ปฏิเสธ) จึงไม่ต้องโชว์ให้กดเสียเที่ยว */
+    if (me2.inHand) return;
+    if (me2.stack >= view.blinds.bb * 10) return;
+
+    var b = mkBtn("act", "เติมชิป",
+      me2.stack === 0 ? "ชิปหมด เติมก่อนถึงจะเล่นต่อได้" : "เหลือ " + me2.stack.toLocaleString("th-TH"),
+      function () {
+        openAmount("เติมชิปเท่าไหร่", view.buyInRange.min, view.buyInRange.max,
+          view.buyInRange.suggested, function (v) { send({ type: "rebuy", amount: v }); });
+      });
+    b.id = "btn-rebuy";
+    $("t-actions").appendChild(b);
+  }
+
   function paintActions() {
     var row = $("act-row");
     row.innerHTML = "";
+    paintRebuy();
     /* ⚠️ ปุ่มการ์ดต่อเวลาอยู่นอกแถว (ลอยเหนือแถว) row.innerHTML="" จึงลบมันไม่ได้
        ต้องเก็บกวาดเองทุกครั้ง ไม่งั้นจะมีปุ่มซ้อนกันเพิ่มขึ้นเรื่อยๆ ทุกการวาดใหม่ */
     var oldTc = document.getElementById("btn-timecard");
@@ -2763,13 +2820,6 @@ button { font-family: inherit; }
       start.disabled = !!why;
       row.appendChild(start);
 
-      /* ชิปน้อยกว่า 10 บิ๊กบลายด์ ก็ควรเติมได้แล้ว ไม่ต้องรอให้หมดเกลี้ยง */
-      if (me.stack < view.blinds.bb * 10) {
-        row.appendChild(mkBtn("act", "เติมชิป", null, function () {
-          openAmount("เติมชิปเท่าไหร่", view.buyInRange.min, view.buyInRange.max,
-            view.buyInRange.suggested, function (v) { send({ type: "rebuy", amount: v }); });
-        }));
-      }
       return;
     }
 

@@ -643,6 +643,22 @@ export function createTable(opts = {}) {
 
   /* กองที่โชว์บนจอ = ชิปทั้งหมดที่อยู่บนโต๊ะจริง ตรงกับที่ตาเห็น
      (บอด 10/20 ตอนเปิดมือ = 30 ไม่ใช่ 20) */
+  /* กองหลัก/กองรอง ระหว่างที่ยังเล่นอยู่
+     คนที่หมดตักด้วยเงินน้อยกว่าคนอื่น มีสิทธิ์ชนะได้แค่กองที่ตัวเองลงถึง
+     เดิมคำนวณตอนจบมือเท่านั้น คนเล่นจึงไม่เห็นว่ากองแยกเป็นชั้นแล้ว
+     buildPots อ่านอย่างเดียวไม่แก้ข้อมูล จึงเรียกสดได้ปลอดภัย */
+  function livePots() {
+    const players = seated()
+      .filter(s => s.committed > 0)
+      .map(s => ({ id: s.seatId, contributed: s.committed, folded: s.folded || !s.inHand }));
+    if (players.length < 2) return [];
+    /* กองที่มีคนมีสิทธิ์คนเดียว = เงินที่ยังไม่มีใครตาม เดี๋ยวก็คืนเจ้าของ
+       ไม่ใช่กองที่แข่งกัน ถ้าโชว์จะทำให้เข้าใจผิดว่ามีกองให้ชิงเพิ่ม */
+    const pots = buildPots(players).filter(p => p.eligible.length >= 2);
+    if (pots.length < 2) return [];   /* กองเดียว ไม่ต้องแยกให้รก */
+    return pots.map(p => ({ amount: p.amount, eligible: p.eligible }));
+  }
+
   function potOnTable() {
     return seated().reduce((a, s) => a + s.committed, 0);
   }
@@ -672,6 +688,8 @@ export function createTable(opts = {}) {
       current: st.current,
       board: st.board.map(cardCode),
       pot: potOnTable(),
+      /* ว่างเปล่า = มีกองเดียว · มีสมาชิก = กองหลัก + กองรอง เรียงจากกองหลัก */
+      pots: livePots(),
       potForBet: potTotal(),
       currentBet: st.currentBet,
       minRaise: st.minRaise,
