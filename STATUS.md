@@ -1,6 +1,6 @@
 # STATUS — board-games (ก๊วนบอร์ดเกม)
 
-Last updated: 2026-08-31 · machine: BOAT-ZEPHYRUS
+Last updated: 2026-09-01 · machine: BOAT-ZEPHYRUS
 
 Public site: https://guboat123.github.io/board-games/ (GitHub Pages, branch `main`, root)
 
@@ -27,6 +27,93 @@ address other devices need for poker.
 
 Other ways in: the `board-games-lan` entry in `C:\ClaudeCode\.claude\launch.json`, or
 `node lan/server.mjs`.
+
+## Session 2026-08-31 → 09-01: poker hardening + bots with a bankroll
+
+The owner played the game and reported problems as they hit them; then asked for a read-only
+audit by three agents (layout/CSS · server correctness · UX dead ends) instead of one-at-a-time
+reporting. Everything below is shipped to `main` and covered by tests.
+
+### Bugs the audit found that were real and are now fixed
+
+Server (`lan/poker-room.mjs`, `lan/bots.mjs`, `lan/history-store.mjs`):
+- **Table froze permanently** when the blinds put every dealt player all-in — 299 of 3000
+  heads-up hands. `startHand` set `current` to -1 and nothing ran the board out; every command
+  was then rejected and `tick()` bailed. `nextPhase` already had the guard; `startHand` did not.
+- **Chips vanished** when a player left mid-hand and `finishHand` (running inside `leave()`) had
+  just credited them an uncalled bet — 980 chips off the table with no record. Seats now always
+  go through `cashOut()`, and the state carries `cashedOut`/`boughtOut` so
+  `stacks + pot + cashed-out == bought-in` is checkable.
+- **Hole cards leaked**: `st.shown` is keyed by seat index, but moving seats is allowed during
+  showdown. Whoever took a shower's old seat had their real cards broadcast. Now keyed by device
+  token as well.
+- Expired-seat reclaim could delete a player still in the hand (stack + pot contribution gone).
+- `sitout` was accepted on your own turn, hanging any table with no turn timer.
+- `endrun`/`newsession` had no host check; `newsession` irreversibly wipes everyone's P/L.
+- Bot seats used guessable tokens (`bot:1`) and could be claimed by anyone.
+- Profile "net" only ever added winnings — every player showed permanently green.
+
+Client (`games/poker/index.html`):
+- **`paintStandings` threw a ReferenceError** (`isWin`/`winBox` are `paintResult` locals). Under
+  `"use strict"` this killed `render()` on every state message once a session ended, freezing the
+  screen with no way back. The "เลิกเล่นรอบนี้" button led straight into it.
+- Every `.res-money` rule was dead after the money zone became `#t-money` — profit and loss were
+  the same colour.
+- The `โต๊ะ · เงิน` panel clipped its own money table and both buttons at 360px.
+- `winBox` was built and never appended, so the winner row was the first thing clipped.
+- `.hand-area` was shorter than its content; the peek instruction overflowed onto the log.
+- `#btn-timecard` overlapped the peek knob and stole its taps.
+
+### Bots
+
+Three genuinely different algorithms, not one routine with different constants
+(measured over 400 hands each — fold / call / check / raise):
+
+| ระดับ | Fold | Call | Check | Raise | how it thinks |
+|---|---|---|---|---|---|
+| มือใหม่ | 39.6% | 10.1% | 47.1% | 3.2% | "do I have something?", ignores price and draws |
+| นักพนัน | 15.3% | 52.6% | 8.4% | 23.6% | chases everything, will not fold once invested |
+| มืออาชีพ | 41.3% | 13.0% | 12.1% | 33.6% | pot odds, position, reads the player pressuring it |
+
+- **Bankrolls persist** in `lan/data/bot-bank.json` (gitignored), keyed by name, with a readable
+  `lan/data/bot-money.txt` beside it. Chips on the table come out of that wallet, so busting
+  costs something; balances are uncapped in both directions and bots drift into their own
+  histories. Start: 5,000 / 20,000 / 100,000 by level.
+- Fear and boldness are measured against each bot's **own** starting money — otherwise the pro's
+  large bankroll reads as "rich, play loose", which is backwards.
+- 10 bots per level, drafted at random. One name sits at one table at a time (the wallet is keyed
+  by name). Asking for bots when a level is fully seated says so.
+- A busted bot decides for itself: rebuy, or leave and let another bot of its level take the
+  seat. A thin wallet pushes every level toward leaving.
+- Bots never press "เริ่มเล่น"/"มือต่อไป" — the pause at the end of a hand belongs to the players.
+  **Do not add this back**, at any delay.
+- Table memory: bots remember which cards each player has revealed and let it inform later
+  decisions. They show off after winning uncontested, more often on a bluff.
+
+### Other
+
+- Card backs are a Chinese dragon drawn as SVG in `cards.js`, installed once as a data-URI
+  background. No image file (project rule), no per-card SVG DOM.
+- The join screen has a bot bankroll report (`💰 เงินติดตัวบอท`).
+- End-of-hand result and money are two separate zones in a `.result-stack`; the board is redrawn
+  small inside the result box because the box necessarily covers the felt.
+- The action area holds a fixed height so the hand zone and peek knob stop moving every turn.
+- "← ออก" returns to the poker join screen, not the board-games index.
+
+### Tests
+
+9 suites, all green: `test-payout` `test-room` `test-uncalled` `test-history` `test-split`
+`test-busts` `test-audit-fixes` `test-bot-bank` (lan) and `test-clue` (root).
+Run: `for t in lan/tests/test-*.mjs tests/test-*.mjs; do node "$t"; done`
+
+### Next / open
+
+- The three audit reports listed more findings that were **not** acted on (all lower severity):
+  pre-action `Pre-Check / Fold` stays armed across streets, no UI for `turnSeconds` / time cards
+  / buy-in range, rebuy button only appears below 10 BB, the join screen's hand-limit selector is
+  ignored when joining an existing table, only the last of 8 server log lines is shown, "All in"
+  vs "หมดตัก" vs "หมดหน้าตัก" naming split, buy-in silently clamped to 200.
+- Not verified on a phone yet — all measurement was emulated at 360x640 and 390x844.
 
 ## Current work: agent playtest loop
 
