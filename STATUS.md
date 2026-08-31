@@ -198,11 +198,15 @@ Playing a real game surfaced one hard stop and a list of wants. All done:
   holds. Knock, chips, deal, muck, turn alert, hurry-up, win. Mute button in the top bar,
   remembered in localStorage.
 - **Per-player history that survives restarts**, in `lan/data/` (gitignored — it is data, not
-  code). Keyed by **IP**, on the owner's rule that the same device is the same person; the
-  names that device has used are stored alongside so a rename does not split the record.
-  Written temp-then-rename so a crash cannot leave a half-written file. Caveats worth
-  repeating to players: DHCP can hand out a new IP, and two people sharing one device count
-  as one person.
+  code). Keyed by the **device token** the client already keeps in localStorage for seat
+  reclaim (`bg.poker.token.v1`), falling back to IP only when the browser cannot store it.
+  It was IP-keyed first; the token is better because moving between WiFi networks, or a
+  router handing out a new lease, no longer creates a second person. The names a device has
+  used are stored alongside, so a rename does not split the record. Written temp-then-rename
+  so a crash cannot leave a half-written file. Remaining caveats, stated in the UI rather
+  than hidden: clearing browser data, a private window, or a different device all read as a
+  new person, and two people sharing one device still count as one.
+  The earlier IP-keyed file is kept beside it as `players.ip-legacy.json`.
 
 ## Automated tests (must pass before any commit)
 

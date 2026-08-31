@@ -187,15 +187,15 @@ function persistNewHands(room) {
   /* แผนที่ ที่นั่ง -> IP จากคนที่ยังต่ออยู่ตอนนี้ · ชื่อ -> IP ไว้ใช้ตอนหาผู้ชนะ */
   const bySeat = {}, byName = {};
   for (const c of room.clients) {
-    if (c.seatId == null || !c.ip) continue;
-    bySeat[c.seatId] = c.ip;
+    if (c.seatId == null || !c.playerKey) continue;
+    bySeat[c.seatId] = c.playerKey;
     const seat = room.table._state.seats[c.seatId];
-    if (seat) byName[seat.name] = c.ip;
+    if (seat) byName[seat.name] = c.playerKey;
   }
   const keyOf = (seatIdx, name) => {
     if (seatIdx >= 0 && bySeat[seatIdx]) return bySeat[seatIdx];
     if (name && byName[name]) return byName[name];
-    /* คนที่หลุดไปแล้วไม่รู้ IP จึงยึดชื่อไว้ก่อน ดีกว่าทิ้งข้อมูลไปเฉยๆ */
+    /* คนที่หลุดไปแล้วไม่รู้ token จึงยึดชื่อไว้ก่อน ดีกว่าทิ้งข้อมูลไปเฉยๆ */
     return name ? "ชื่อ:" + name : "";
   };
   for (let i = room.savedHands || 0; i < all.length; i++) {
@@ -261,11 +261,12 @@ server.on("upgrade", (req, socket) => {
   );
   socket.setNoDelay(true);
 
-  /* "IP เดิม = คนเดิม" ตามที่เจ้าของกำหนด ใช้เป็นคีย์ประวัติรายคน
+  /* IP ใช้เป็นทางสำรองอย่างเดียว ตัวจริงคือ token ประจำเครื่อง (ดู playerKey ตอน join)
      ตัด ::ffff: ที่ Node เติมหน้า IPv4 ออก ไม่งั้นเครื่องเดียวจะกลายเป็นสองคน */
   let ip = "";
   try { ip = String(socket.remoteAddress || "").replace(/^::ffff:/, ""); } catch (e) {}
-  const client = { id: nextId++, socket, room: null, seatId: null, alive: true, ip: ip };
+  const client = { id: nextId++, socket, room: null, seatId: null, alive: true,
+                   ip: ip, playerKey: "" };
   lobby.add(client);
 
   /* โซเก็ตที่ตายแบบไม่ส่ง FIN (ปิด WiFi / แท็บถูกพักใน bfcache) จะค้างอยู่ตลอดกาล
@@ -332,6 +333,14 @@ server.on("upgrade", (req, socket) => {
         broadcastState(old);
       }
 
+      /* คีย์ประวัติรายคน = token ที่เครื่องนั้นเก็บไว้เอง
+         ดีกว่า IP เพราะย้าย WiFi หรือเราเตอร์แจก IP ใหม่แล้วยังเป็นคนเดิม
+         ถ้าเบราว์เซอร์เก็บ localStorage ไม่ได้ (โหมดส่วนตัว) จะไม่มี token ส่งมา
+         จึงถอยไปใช้ IP ไว้ก่อน ดีกว่าไม่เก็บอะไรเลย
+         ตัดความยาวกันไว้ ไม่ควรเชื่อความยาวของอะไรที่ส่งมาจากเครื่องอื่น */
+      const tok = String(msg.token || "").slice(0, 64);
+      client.playerKey = tok ? ("tok:" + tok) : (client.ip ? "ip:" + client.ip : "");
+
       client.room = room;
       room.clients.add(client);
       client.seatId = r.seatId;
@@ -354,7 +363,7 @@ server.on("upgrade", (req, socket) => {
     /* ประวัติสะสมรายคน ข้ามรอบเล่นและข้ามการปิดเปิดเซิร์ฟเวอร์ */
     if (msg.type === "profiles") {
       persistNewHands(client.room);
-      send(client, { type: "profiles", players: store.profiles(), me: client.ip });
+      send(client, { type: "profiles", players: store.profiles(), me: client.playerKey });
       return;
     }
 

@@ -1867,8 +1867,16 @@ button { font-family: inherit; }
   }
 
   /* ประวัติสะสมรายคน — เก็บไว้ที่เครื่องเซิร์ฟเวอร์ ข้ามรอบเล่นและข้ามการปิดเปิด
-     คีย์คือ IP ตามที่เจ้าของกำหนดว่า "IP เดิม = คนเดิม"
-     จึงต้องโชว์ชื่อที่เคยใช้จาก IP นั้นด้วย จะได้รู้ว่าใครเป็นใคร */
+     คีย์คือ token ประจำเครื่องที่เก็บใน localStorage ของเครื่องนั้นเอง
+     ดีกว่า IP เพราะย้าย WiFi หรือเราเตอร์แจก IP ใหม่แล้วยังเป็นคนเดิม
+     token เป็นสตริงยาวอ่านไม่รู้เรื่อง จึงโชว์แค่ท้าย 6 ตัวไว้อ้างอิง
+     และโชว์ชื่อที่เครื่องนั้นเคยใช้ทั้งหมด จะได้รู้ว่าใครเป็นใคร */
+  function shortKey(k) {
+    if (!k) return "—";
+    if (k.indexOf("ip:") === 0) return "ตามเครือข่าย " + k.slice(3);
+    var t = k.replace(/^tok:/, "");
+    return "…" + t.slice(-6);
+  }
   function paintProfilesInto(box) {
     var rows = document.createElement("div");
     rows.className = "rows";
@@ -1911,7 +1919,7 @@ button { font-family: inherit; }
                          " · เคาะ " + p.acts.check + " · หมอบ " + p.acts.fold;
         var l3 = document.createElement("div");
         l3.className = "prow__bot";
-        l3.textContent = "เครื่อง " + p.key;
+        l3.textContent = "รหัสเครื่อง " + shortKey(p.key);
 
         d.appendChild(top); d.appendChild(l1); d.appendChild(l2); d.appendChild(l3);
         rows.appendChild(d);
@@ -1924,8 +1932,9 @@ button { font-family: inherit; }
     var note = document.createElement("p");
     note.className = "hint-sm";
     note.style.margin = "0 0 8px";
-    /* ต้องบอกข้อจำกัดไว้ ไม่งั้นคนจะเชื่อตัวเลขเกินจริงตอนเราเตอร์แจก IP ใหม่ */
-    note.textContent = "นับคนจากเครื่อง (IP) ถ้าเปลี่ยน WiFi หรือเราเตอร์แจก IP ใหม่ จะถูกนับเป็นคนใหม่";
+    /* ต้องบอกข้อจำกัดไว้ ไม่งั้นคนจะเชื่อตัวเลขเกินจริง */
+    note.textContent = "นับคนจากรหัสที่เก็บไว้ในเครื่อง ย้าย WiFi ได้ไม่หาย " +
+                       "แต่ถ้าล้างข้อมูลเบราว์เซอร์ เปิดโหมดส่วนตัว หรือเปลี่ยนเครื่อง จะกลายเป็นคนใหม่";
     foot.appendChild(note);
     var close = document.createElement("button");
     close.type = "button";
