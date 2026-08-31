@@ -354,6 +354,18 @@ server.on("upgrade", (req, socket) => {
       const tok = String(msg.token || "").slice(0, 64);
       client.playerKey = tok ? ("tok:" + tok) : (client.ip ? "ip:" + client.ip : "");
 
+      /* ⚠️ เครื่องเดิมกลับมาทับที่นั่งเดิม ต้องตัดโซเก็ตเก่าออกจากที่นั่งนั้นด้วย
+         ไม่งั้นสองหน้าต่างจากเครื่องเดียวกันจะสั่งการที่นั่งเดียวกันพร้อมกัน
+         และหน้าเก่าจะยังเห็นไพ่ในมือของที่นั่งนั้นอยู่ */
+      for (const other of room.clients) {
+        if (other === client || other.seatId !== r.seatId) continue;
+        other.seatId = null;
+        room.clients.delete(other);
+        lobby.add(other);
+        send(other, { type: "replaced",
+                      message: "เปิดเกมนี้จากเครื่องเดิมที่หน้าอื่นแล้ว หน้านี้จึงออกจากโต๊ะ" });
+      }
+
       client.room = room;
       room.clients.add(client);
       client.seatId = r.seatId;

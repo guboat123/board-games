@@ -1669,6 +1669,15 @@ button { font-family: inherit; }
         $("game").classList.add("is-on");
         $("t-hand").textContent = "ห้อง " + msg.room;
         location.hash = msg.room;
+      } else if (msg.type === "replaced") {
+        /* เครื่องเดียวกันเปิดเกมที่หน้าอื่น หน้านี้ต้องถอยออกให้ชัด
+           ไม่ใช่ค้างอยู่บนโต๊ะแล้วกดอะไรก็ไม่ติด */
+        mySeat = -1;
+        $("game").classList.remove("is-on");
+        $("join-screen").style.display = "";
+        $("join-err").textContent = msg.message || "หน้านี้ออกจากโต๊ะแล้ว";
+        $("btn-join").disabled = false;
+        toast(msg.message || "หน้านี้ออกจากโต๊ะแล้ว");
       } else if (msg.type === "history") {
         historyData = msg.hands || [];
         paintTablePanel();

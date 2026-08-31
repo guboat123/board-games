@@ -318,5 +318,83 @@ head("หมดเวลาตัดสินใจ + การ์ดต่อ�
   ok(t2.tick() === false, "โต๊ะไม่จำกัดเวลา ห้ามเดินแทนเด็ดขาด");
 }
 
+/* --------------------------------------------------------------- */
+head("เปิดเกมซ้ำจากเครื่องเดิม ต้องได้ที่นั่งเดิม ไม่ใช่ที่นั่งใหม่");
+{
+  const t = createTable({ smallBlind: 10, bigBlind: 20, minBuyIn: 1, maxBuyIn: 100000 });
+  const a = t.sit("โบ๊ท", 0, 1000, "device-A");
+  t.sit("เพื่อน", 1, 1000, "device-B");
+  const st = t._state;
+  st.seats[a.seatId].stack = 1853;   /* เล่นไปสักพักแล้ว */
+
+  /* ที่นั่งยังขึ้นว่า "ต่ออยู่" เพราะโซเก็ตเก่ายังไม่ตาย แล้วเครื่องเดิมเปิดซ้ำ */
+  ok(st.seats[a.seatId].connected === true, "ที่นั่งเดิมยังขึ้นว่าต่ออยู่");
+  const again = t.sit("โบ๊ท", null, 1000, "device-A");
+  ok(again.ok && again.seatId === a.seatId,
+     "ต้องได้ที่นั่งเดิมคืน ไม่ใช่ช่องใหม่", { ได้ช่อง: again.seatId, ควรเป็น: a.seatId });
+  ok(again.stack === 1853, "ชิปต้องเป็นก้อนเดิม ไม่ใช่ซื้อเข้าใหม่", again.stack);
+  ok(t._state.seats.filter(x => x && x.token === "device-A").length === 1,
+     "เครื่องเดียวต้องมีที่นั่งเดียว ไม่แตกเป็นสอง");
+  ok(!t._state.seats.some(x => x && /โบ๊ท 2/.test(x.name)), "ต้องไม่มีชื่อต่อเลข");
+
+  /* เปลี่ยนชื่อแล้วกลับมา ก็ยังต้องเป็นที่นั่งเดิม */
+  const renamed = t.sit("Boat", null, 1000, "device-A");
+  ok(renamed.ok && renamed.seatId === a.seatId, "เปลี่ยนชื่อแล้วยังได้ที่นั่งเดิม", renamed.seatId);
+  ok(renamed.stack === 1853, "ชิปยังเป็นก้อนเดิมหลังเปลี่ยนชื่อ", renamed.stack);
+
+  /* คนละเครื่อง ห้ามแย่งที่นั่งที่มีคนต่ออยู่ */
+  const stranger = t.sit("โบ๊ท", null, 1000, "device-X");
+  ok(stranger.seatId !== a.seatId, "เครื่องอื่นต้องไม่ได้ที่นั่งของเรา", stranger.seatId);
+  ok(t._state.seats[a.seatId].stack === 1853, "ชิปของเราต้องไม่ถูกแตะ", t._state.seats[a.seatId].stack);
+}
+
+/* --------------------------------------------------------------- */
+head("หายไปนานเกินกำหนด ระบบพักมือให้");
+{
+  const t = createTable({ smallBlind: 10, bigBlind: 20, minBuyIn: 1, maxBuyIn: 100000,
+                          turnSeconds: 30, idleSitOutSeconds: 200 });
+  const a = t.sit("เอ", 0, 1000, "tokA");
+  const b = t.sit("บี", 1, 1000, "tokB");
+  const st = t._state;
+  t.action(a.seatId, { type: "start" });
+
+  const cur = st.current;
+  /* คนที่ถึงตา หายไปนานกว่า 200 วิ แล้วปล่อยให้หมดเวลา */
+  st.seats[cur].lastActAt = Date.now() - 250000;
+  st.turnAt = Date.now() - 31000;
+  ok(t.tick() === true, "หมดเวลาแล้วระบบเดินแทน");
+  ok(st.seats[cur].sitOut === true, "หายนานเกิน 200 วิ ต้องถูกพักมือให้", st.seats[cur].sitOut);
+
+  /* คนที่ยังลงมืออยู่เรื่อยๆ ห้ามโดนพักมือ แม้จะหมดเวลาสักครั้ง */
+  const t2 = createTable({ smallBlind: 10, bigBlind: 20, minBuyIn: 1, turnSeconds: 30, idleSitOutSeconds: 200 });
+  t2.sit("ซี", 0, 1000, "tokC"); t2.sit("ดี", 1, 1000, "tokD");
+  t2.action(0, { type: "start" });
+  const st2 = t2._state;
+  const cur2 = st2.current;
+  st2.seats[cur2].lastActAt = Date.now() - 5000;   /* เพิ่งลงมือไปเมื่อ 5 วิที่แล้ว */
+  st2.turnAt = Date.now() - 31000;
+  t2.tick();
+  ok(st2.seats[cur2].sitOut !== true, "เพิ่งลงมือไป ห้ามโดนพักมือแค่เพราะหมดเวลาครั้งเดียว");
+
+  /* คนที่นั่งดูเฉยๆ ไม่เคยถึงตา ต้องไม่โดนพักมือ */
+  const t3 = createTable({ smallBlind: 10, bigBlind: 20, minBuyIn: 1, turnSeconds: 30, idleSitOutSeconds: 200 });
+  const x = t3.sit("อี", 0, 1000, "tokE");
+  t3.sit("เอฟ", 1, 1000, "tokF");
+  t3._state.seats[x.seatId].lastActAt = Date.now() - 900000;   /* นั่งเงียบมา 15 นาที */
+  t3.tick();
+  ok(t3._state.seats[x.seatId].sitOut !== true,
+     "นั่งดูเฉยๆ ยังไม่เคยถึงตา ต้องไม่ถูกพักมือ");
+
+  /* ตั้งเป็น 0 = ปิดกติกานี้ */
+  const t4 = createTable({ smallBlind: 10, bigBlind: 20, minBuyIn: 1, turnSeconds: 30, idleSitOutSeconds: 0 });
+  t4.sit("จี", 0, 1000, "tokG"); t4.sit("เฮช", 1, 1000, "tokH");
+  t4.action(0, { type: "start" });
+  const st4 = t4._state, c4 = st4.current;
+  st4.seats[c4].lastActAt = Date.now() - 900000;
+  st4.turnAt = Date.now() - 31000;
+  t4.tick();
+  ok(st4.seats[c4].sitOut !== true, "ตั้งเป็น 0 = ไม่บังคับพักมือเลย");
+}
+
 console.log(fail === 0 ? "\n=== ผ่านทั้งหมด ===" : "\n=== พัง " + fail + " ข้อ ===");
 process.exit(fail ? 1 : 0);

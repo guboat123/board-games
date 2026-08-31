@@ -25,7 +25,11 @@ export const DEFAULTS = {
   turnSeconds: 30,
   /* การ์ดต่อเวลาแบบทัวร์นาเมนต์: คนละกี่ใบต่อรอบเล่น และใบละกี่วินาที */
   timeCards: 3,
-  timeCardSeconds: 30
+  timeCardSeconds: 30,
+  /* ไม่ตอบสนองนานเกินกี่วินาที ให้พักมือให้อัตโนมัติ (0 = ไม่บังคับ)
+     นับจาก "ครั้งสุดท้ายที่ลงมือเอง" ไม่ใช่เวลาที่นั่งอยู่เฉยๆ
+     คนที่นั่งดูคนอื่นเล่นอยู่ดีๆ จึงไม่โดนพักมือ */
+  idleSitOutSeconds: 200
 };
 
 export function createTable(opts = {}) {
@@ -126,14 +130,38 @@ export function createTable(opts = {}) {
          1) token ตรงกัน = เครื่องเดิมกลับมาเอง ผ่านได้เงียบๆ
          2) เจาะจงกดที่นั่งนั้นเอง = หน้าเว็บถามยืนยันตัวตนไปแล้ว
        ถ้าไม่เข้าทั้งสองข้อ ให้ถือเป็นคนใหม่ (ได้ช่องว่างกับชื่อต่อเลข) ซึ่งไม่กระทบชิปใคร */
+    /* ⚠️ token ตรงกัน = เครื่องเดิม ต้องได้ที่นั่งเดิมคืนเสมอ
+       ไม่ว่าที่นั่งนั้นจะยังขึ้นว่า "ต่ออยู่" หรือเปลี่ยนชื่อมาก็ตาม
+       ของเดิมข้ามที่นั่งที่ connected อยู่ พอเปิดเกมซ้ำจากเครื่องเดิม
+       (โซเก็ตเก่ายังไม่ทันตาย) จึงได้ที่นั่งใหม่ชื่อ "ชื่อเดิม 2"
+       กลายเป็นคนคนเดียวนั่งสองที่ ชิปแยกกันอยู่คนละกอง */
+    if (token) {
+      for (let i = 0; i < MAX_SEATS; i++) {
+        const s = st.seats[i];
+        if (!s || s.token !== token) continue;
+        s.connected = true;
+        s.awaySince = 0;
+        s.lastActAt = Date.now();   /* เพิ่งกลับเข้ามา = ยังอยู่ */
+        /* เปลี่ยนชื่อมาก็ให้ใช้ชื่อใหม่ แต่ต้องไม่ชนกับคนอื่นที่นั่งอยู่ */
+        if (name && name !== s.name) {
+          let want = name, n2 = 2;
+          while (seated().some(x => x !== s && x.name === want)) want = name + " " + n2++;
+          s.name = want;
+        }
+        note(s.name + " กลับเข้าโต๊ะ");
+        return { ok: true, seatId: i, name: s.name, stack: s.stack, tookOver: true };
+      }
+    }
+
+    /* ไม่มี token (เบราว์เซอร์เก็บไม่ได้) ยังกลับเข้าที่เดิมได้ถ้าเจาะจงกดที่นั่งนั้นเอง
+       ซึ่งหน้าเว็บถามยืนยันตัวตนไปแล้ว และต้องเป็นที่นั่งที่หลุดอยู่เท่านั้น */
     for (let i = 0; i < MAX_SEATS; i++) {
       const s = st.seats[i];
       if (!s || s.name !== name || s.connected) continue;
-      const sameDevice = !!token && s.token === token;
       const askedForIt = Number.isInteger(preferred) && preferred === i;
-      if (!sameDevice && !askedForIt) continue;
+      if (!askedForIt) continue;
       s.connected = true;
-      if (token) s.token = token;
+      s.awaySince = 0;
       note(name + " กลับเข้าโต๊ะ");
       return { ok: true, seatId: i, name, stack: s.stack };
     }
@@ -190,6 +218,7 @@ export function createTable(opts = {}) {
       sitOut: false,
       lastAction: "",
       lastKind: "",
+      lastActAt: Date.now(),   /* ครั้งสุดท้ายที่ "ลงมือเอง" ใช้จับคนหายไปเฉยๆ */
       isBot: !!(opts && opts.bot),
       botLevel: (opts && opts.level) || 0,
       timeCards: cfg.timeCards,   /* การ์ดต่อเวลาที่เหลือของคนนี้ */
@@ -457,6 +486,8 @@ export function createTable(opts = {}) {
 
     /* จดไว้หลังจากรู้ผลแล้ว จะได้รู้ว่าจ่ายไปเท่าไหร่จริง */
     record(seatId, msg.action, stackBefore - s.stack, thinkMs);
+    /* ลงมือเองแล้ว = ยังอยู่ ไม่ต้องโดนบังคับพักมือ */
+    s.lastActAt = Date.now();
 
     checkRoundEnd(seatId);
     return {};
@@ -775,7 +806,11 @@ export function createTable(opts = {}) {
     }
     if (msg.type === "sitout") {
       const s = st.seats[seatId];
-      if (s) { s.sitOut = !!msg.value; note(s.name + (s.sitOut ? " ขอพักมือ" : " กลับมาเล่นต่อ")); }
+      if (s) {
+        s.sitOut = !!msg.value;
+        s.lastActAt = Date.now();   /* กดปุ่มเอง = ยังอยู่ นับเวลาใหม่ */
+        note(s.name + (s.sitOut ? " ขอพักมือ" : " กลับมาเล่นต่อ"));
+      }
       return {};
     }
     if (msg.type === "rebuy") {
@@ -905,7 +940,21 @@ export function createTable(opts = {}) {
     const toCall = st.currentBet - s2.bet;
     const auto = (toCall <= 0 || inHand().length <= 1) ? "check" : "fold";
     note(s2.name + " หมดเวลา ระบบ" + (auto === "check" ? "เคาะ" : "พับ") + "ให้");
-    playerAction(st.current, { action: auto });
+    const who = st.current;
+    /* ⚠️ ต้องอ่านเวลาก่อนเดินแทน เพราะ playerAction มาร์คว่า "ลงมือแล้ว" เสมอ
+       ถ้าอ่านทีหลัง ตัวจับเวลาจะถูกรีเซ็ตด้วยการเดินแทนของระบบเอง
+       แล้วจะไม่มีวันถึง 200 วินาที ต่อให้คนนั้นหายไปทั้งคืน */
+    const idleSince = s2.lastActAt;
+    playerAction(who, { action: auto });
+
+    /* หายไปนานจริงๆ ให้พักมือให้ ไม่งั้นทั้งโต๊ะต้องรอครบเวลาทุกมือ
+       ⚠️ ต้องเช็คหลังลงมือแทนแล้ว และเฉพาะคนที่ "หมดเวลา" เท่านั้น
+       คนที่นั่งดูอยู่เฉยๆ ไม่เคยถึงตา ต้องไม่โดนพักมือ */
+    const idleMs = cfg.idleSitOutSeconds * 1000;
+    if (idleMs && !s2.isBot && !s2.sitOut && now - idleSince > idleMs) {
+      s2.sitOut = true;
+      note(s2.name + " ไม่ตอบสนองเกิน " + cfg.idleSitOutSeconds + " วิ ระบบให้พักมือไว้ก่อน");
+    }
     return true;
   }
 
