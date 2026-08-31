@@ -277,6 +277,27 @@ function boardWetness(board) {
   return Math.max(0, Math.min(1, w));
 }
 
+/* ---------- ต้องกลัวการ "ตาม" ที่กินตักด้วย ไม่ใช่กลัวแค่ตอนเดิมพันเอง ----------
+   ⚠️ นี่คือช่องโหว่ที่ทำให้บอทดูไม่กลัวอะไรเลย
+   เพดานการลงเงิน (commitCap) คุมแค่ตอน "เรซ" ตอน "ตาม" ไม่มีอะไรคุมเลย
+   บอทจึงตามหมดหน้าตักได้ ถ้าราคาเทียบกองดูคุ้ม — วัดจากบันทึกจริง 80 มือ:
+   บอทหมดหน้าตัก 9 ครั้ง และ "ทั้ง 9 ครั้งเป็นการตาม ไม่ใช่การไล่"
+
+   ทำไมราคาที่คุ้มถึงยังไม่พอ:
+     · ตามหมดตักแล้วชนะ ก็ได้แค่กองนั้น ไม่มีทางเก็บเพิ่มในสตรีทถัดไป
+     · แพ้แล้วไม่ใช่แค่เสียกองนี้ แต่ต้องโดนพักและควักเงินจากกระเป๋าซื้อเข้าใหม่
+     · เงินในกระเป๋ามีจำกัด ความเสี่ยงที่ "ถูกในระยะยาว" ไม่ช่วยถ้าล้มก่อน
+   คนเล่นจริงจึงต้องการไพ่ดีกว่าปกติมาก เวลาต้องเอาทั้งตักไปแลก
+   ยิ่งใจถึงน้อย และยิ่งกระเป๋าบาง ยิ่งต้องการมากขึ้นอีก */
+function stackFear(toCall, stack, nerve, walletPressure) {
+  if (toCall <= 0 || stack <= 0) return 0;
+  const frac = Math.min(1, toCall / stack);
+  /* ยกกำลังทำให้ตามน้อยๆ แทบไม่โดนหัก แต่ตามเกือบทั้งตักโดนเต็มๆ */
+  const shape = Math.pow(frac, 1.6);
+  const base = 0.16 + (walletPressure || 0) * 0.12;
+  return shape * base * (1.4 - (nerve === undefined ? 0.5 : nerve));
+}
+
 /* ---------- เพดานการลงเงินต่อหนึ่งท่า ----------
    ⚠️ นี่คือสิ่งที่ทำให้ "เงินรู้สึกเป็นเงินจริง" มากกว่าเกณฑ์ตัดสินใจทั้งหมดรวมกัน
    ของเดิมไม่มีเพดานเลย ขนาดเดิมพัน = เงินสูงสุดบนโต๊ะ + ขั้นต่ำ + สัดส่วนของกอง
@@ -333,9 +354,14 @@ function decideBeginner(f) {
     return { type: "act", action: "check" };
   }
   /* เดิมพันก้อนโตทำให้กลัว ต่อให้มือดี — ตัดสินจาก "ก้อนใหญ่แค่ไหนเทียบตักเรา"
-     ไม่ใช่เทียบกอง ซึ่งเป็นวิธีที่ผิดและเป็นจุดที่ถูกไล่ออกจากมือได้ง่ายที่สุด */
+     ไม่ใช่เทียบกอง ซึ่งเป็นวิธีที่ผิดและเป็นจุดที่ถูกไล่ออกจากมือได้ง่ายที่สุด
+     ⚠️ และยิ่งเข้าใกล้ทั้งตัก ยิ่งกลัวมากขึ้นอีก มือใหม่กลัวเรื่องนี้ที่สุดในสามระดับ */
   const scary = f.toCall > f.me.stack * 0.25;
+  const nearAllIn = f.toCall > f.me.stack * 0.7;
   if (f.base >= 0.90) return bet();
+  /* เกือบทั้งตัก มือใหม่ต้องมั่นใจจริงๆ เท่านั้นถึงจะกล้า */
+  if (nearAllIn) return f.base >= 0.85 ? { type: "act", action: "call" }
+                                       : { type: "act", action: "fold" };
   if (got && !scary) return { type: "act", action: "call" };
   if (got && scary && f.base >= 0.72) return { type: "act", action: "call" };
   return { type: "act", action: "fold" };
@@ -367,8 +393,14 @@ function decideGambler(f) {
   /* นักพนันก็พอเดาออกเหมือนกัน แต่ให้น้ำหนักน้อยมาก เพราะความอยากอยู่ในมือชนะเหตุผลเสมอ
      (ตั้งใจให้เป็นแบบนี้ ไม่ใช่ลืมใส่) */
   const wary = Math.min(Math.max(0, f.threat - eq), 0.4) * 0.08;
+  /* ⚠️ แม้แต่นักพนันก็ยังลังเลตอนต้องเอาทั้งตักไปแลก แค่ลังเลน้อยกว่าคนอื่น
+     ให้แค่ครึ่งเดียวของความกลัวปกติ — มากกว่านี้ก็ไม่ใช่นักพนันแล้ว */
+  const risk = stackFear(f.toCall, f.me.stack, f.trait.nerve, f.walletPressure) * 0.5;
   /* ตามกว้างกว่าราคาที่ควรมาก ยอมจ่ายแพงเพื่อจะได้อยู่ในมือต่อ */
-  if (eq >= f.price - 0.18 - committed + wary) return { type: "act", action: "call" };
+  /* นักพนันก็มีเส้นของตัวเอง แค่ต่ำกว่าคนอื่นมาก — เอาทั้งตักลงด้วยไพ่ที่ไม่มีอะไรเลย
+     ไม่ใช่การพนัน เป็นการทิ้งเงิน */
+  if (f.toCall >= f.me.stack * 0.8 && eq < 0.42) return { type: "act", action: "fold" };
+  if (eq >= f.price - 0.18 - committed + wary + risk) return { type: "act", action: "call" };
   return { type: "act", action: "fold" };
 }
 
@@ -397,7 +429,11 @@ function decidePro(f) {
      ซึ่งแพ้ทางคนที่บลัฟเป็นแบบไม่มีทางสู้ */
   const catchBluff = Math.max(0, 0.6 - f.threatCred) * 0.22;
 
-  const margin = (f.pre ? lv.preMargin : lv.margin) + f.caution + latePos + readGap - catchBluff;
+  /* ⚠️ ต้องรวมความกลัวการเสียทั้งตักเข้าไปด้วย ไม่งั้นจะตามหมดตักด้วยไพ่กลางๆ
+     เพราะ "ราคาคุ้ม" อย่างเดียว ซึ่งเป็นเหตุผลที่มันดูไม่กลัวอะไรเลย */
+  const risk = stackFear(f.toCall, f.me.stack, f.trait.nerve, f.walletPressure);
+  const margin = (f.pre ? lv.preMargin : lv.margin) + f.caution + latePos + readGap
+                 - catchBluff + risk;
   const raiseAt = f.pre ? lv.preRaise : lv.raise;
   const worthCalling = f.toCall === 0 || eq >= f.price + margin;
 
@@ -424,9 +460,10 @@ function decidePro(f) {
      คนจริงไม่หมอบทิ้งเงินครึ่งตักที่ลงไปแล้วเพราะไพ่ขาดไปนิดเดียว
      ของเดิมคิดจาก "คุ้มไหมถ้าเริ่มนับใหม่ตอนนี้" ซึ่งถูกในทางทฤษฎี
      แต่ทำให้บอทหมอบในจังหวะที่ไม่มีคนไหนหมอบ = ดูไม่เหมือนคน */
-  const potCommitted = f.me.bet + (f.me.stack > 0 ? 0 : 0) >= 0 &&
-                       f.toCall > 0 && f.toCall <= f.me.stack &&
+  /* ลงไปเกินตักตัวเองแล้ว = ถอยไม่ได้แล้วจริงๆ ตรงนี้ตามได้โดยไม่ต้องคิดมาก */
+  const potCommitted = f.toCall > 0 && f.toCall <= f.me.stack &&
                        f.me.bet >= f.me.stack * 0.9 && f.price < 0.45;
+  f.potCommittedHard = f.me.bet >= f.me.stack * 1.5;
 
   if (canRaise && !f.plan.trap) {
     return sized(eq >= 0.72 ? valueMult() : lv.sizing * (0.6 + Math.random() * 0.7));
@@ -438,6 +475,15 @@ function decidePro(f) {
       return sized(eq >= 0.72 ? valueMult() : lv.sizing * (0.5 + Math.random() * 0.6));
     }
     return { type: "act", action: "check" };
+  }
+  /* ⚠️ เพดานเด็ดขาด: ห้ามเอาเกินสามในสี่ของตักไปแลกด้วยไพ่กลางๆ
+     ต่อให้ราคาเทียบกองดูคุ้มแค่ไหนก็ตาม
+     เหตุผลไม่ได้อยู่ในมือนี้ แต่อยู่ที่ว่าหมดตัวแล้วต้องโดนพักและควักกระเป๋าซื้อใหม่
+     ซึ่งราคาเทียบกองไม่เคยมองเห็น — นี่คือส่วนที่ทำให้ "รู้สึกว่าเป็นเงินจริง"
+     ตัวเลข 0.58 ประมาณสองคู่ขึ้นไป ซึ่งเป็นเกณฑ์ที่คนเล่นเป็นใช้จริงเวลาต้องเอาทั้งตักลง */
+  const stackingOff = f.toCall >= f.me.stack * 0.75;
+  if (stackingOff && eq < 0.58 && !f.potCommittedHard) {
+    return { type: "act", action: "fold" };
   }
   if (worthCalling || potCommitted) return { type: "act", action: "call" };
   /* บลัฟแล้วโดนสู้กลับ ต้องรู้จักเลิก ไม่ใช่ยิงต่อจนหมดตัว */

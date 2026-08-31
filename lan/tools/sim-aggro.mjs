@@ -19,6 +19,11 @@ for (const lv of [1, 2, 3]) {
     const st = t._state.seats[seat];
     if (msg.type === "act" && st && st.isBot) {
       s.acts++;
+      if (msg.action === "call" && msg.amount === undefined) {
+        // ตามหมดตัก = ตามด้วยเงินที่เหลือทั้งหมด
+        const need = t._state.currentBet - st.bet;
+        if (need >= st.stack) s.allInCalls = (s.allInCalls || 0) + 1;
+      }
       if (msg.action === "raise") {
         s.raises++;
         const pot = t._state.seats.reduce((a, x) => a + (x ? x.committed : 0), 0);
@@ -51,6 +56,7 @@ for (const lv of [1, 2, 3]) {
     avgBetVsPot: avg(s.potFrac).toFixed(2) + "x",
     avgBetVsStack: (avg(s.stackFrac) * 100).toFixed(1) + "%",
     shovePer100Acts: (s.shoves / Math.max(1, s.acts) * 100).toFixed(1),
+    allInCallsPer100: ((s.allInCalls || 0) / Math.max(1, s.acts) * 100).toFixed(1),
     allInPerHand: (s.allInSeen / Math.max(1, s.hands)).toFixed(2)
   };
 }

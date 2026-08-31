@@ -1072,6 +1072,21 @@ button { font-family: inherit; }
 /* ⚠️ ต้องเห็นได้หมด ไม่ใช่ตัดที่ 46vh แล้วเดาเอาว่ายังมีต่อ
    เลื่อนในกล่องตัวเองได้ และการ์ดหน้าเข้าร่วมก็เลื่อนได้ทั้งใบอยู่แล้ว */
 #bank-list { max-height: 62vh; overflow-y: auto; padding-right: 2px; }
+/* บรรทัดเดียวบอกผลของทุกคนในมือนี้ รวมคนที่หมอบไปแล้วด้วย
+   ⚠️ ต้องเตี้ยและหดได้ ไม่งั้นจะไปเบียดแถวผู้ชนะเหมือนที่โซนเงินเคยทำ */
+.res-handnet {
+  flex: 0 1 auto; min-height: 0; overflow-y: auto;
+  max-height: 3.4em; margin: 0 0 6px;
+  font-size: .68rem; line-height: 1.5; text-align: left;
+  color: var(--muted);
+}
+.res-handnet .hn-lbl { color: #7f9a8b; letter-spacing: .03em; }
+.res-handnet .hn { font-family: var(--mono); }
+.res-handnet .hn--up { color: var(--good); }
+.res-handnet .hn--dn { color: #ff8f84; }
+.res-handnet .hn--me { font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.res-handnet .hn-dot { margin: 0 4px; opacity: .5; }
+
 /* บรรทัดอธิบายใต้ชื่อ ใช้ตอบคำถาม "ทำไมชนะแล้วชิปลด" */
 .res-why { font-size: .64rem; color: var(--muted); margin-top: 2px; line-height: 1.35; }
 .row--win .res-why { color: #e8cf9a; }
@@ -4200,6 +4215,45 @@ button { font-family: inherit; }
          ซึ่งตรงข้ามกับที่คอมเมนต์ข้างบนบอกไว้เป๊ะๆ */
       (isWin ? winBox : rows).appendChild(row);
     });
+    /* ---------- ผลของ "ทุกคน" ในมือนี้ ----------
+       ⚠️ กล่องผลข้างบนแสดงเฉพาะคนที่เปิดไพ่หรือกดโชว์เอง
+       คนที่หมอบไปแล้ว (ซึ่งมักเป็นส่วนใหญ่ของโต๊ะ) จึงไม่ปรากฏที่ไหนเลย
+       ทั้งที่เขาก็เสียเงินไปในมือนี้เหมือนกัน
+       บรรทัดเดียวจบ ไม่ใช่ตารางเต็ม — ยอดสะสมทั้งโต๊ะอยู่ในแผง "โต๊ะ · เงิน"
+       ตัวเลขนี้คือ "มือนี้" เท่านั้น: ได้จากกอง − ที่ลงไป */
+    var hn = [];
+    view.seats.forEach(function (sx, ix) {
+      if (!sx) return;
+      var putI = putOf(ix, 0);
+      var gotI = wonBy[ix] || 0;
+      if (!putI && !gotI) return;   /* ไม่ได้ลงเงินในมือนี้ ไม่ต้องขึ้น */
+      hn.push({ name: sx.name, net: gotI - putI, me: ix === mySeat });
+    });
+    if (hn.length) {
+      hn.sort(function (a, b) { return b.net - a.net; });
+      var line = document.createElement("div");
+      line.className = "res-handnet";
+      var lbl = document.createElement("span");
+      lbl.className = "hn-lbl";
+      lbl.textContent = "มือนี้ ";
+      line.appendChild(lbl);
+      hn.forEach(function (x, i) {
+        var e = document.createElement("span");
+        e.className = "hn" + (x.net > 0 ? " hn--up" : (x.net < 0 ? " hn--dn" : "")) +
+                      (x.me ? " hn--me" : "");
+        e.textContent = x.name + " " + (x.net > 0 ? "+" : (x.net < 0 ? "−" : "")) +
+                        Math.abs(x.net).toLocaleString("th-TH");
+        line.appendChild(e);
+        if (i < hn.length - 1) {
+          var dot = document.createElement("span");
+          dot.className = "hn-dot";
+          dot.textContent = "·";
+          line.appendChild(dot);
+        }
+      });
+      box.appendChild(line);
+    }
+
     box.appendChild(winBox);
     if (rows.childNodes.length) {
       /* ป้ายคั่นบอกว่าที่เหลือคือคนที่แพ้ ไม่งั้นแถวล่างดูเหมือนผู้ชนะคนที่สอง */
