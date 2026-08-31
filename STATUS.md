@@ -207,6 +207,23 @@ Playing a real game surfaced one hard stop and a list of wants. All done:
   than hidden: clearing browser data, a private window, or a different device all read as a
   new person, and two people sharing one device still count as one.
   The earlier IP-keyed file is kept beside it as `players.ip-legacy.json`.
+- **A diagnostics screen**, so a problem in a real game can be screenshotted instead of
+  described. Open it with `?debug=1` or by tapping the blinds five times (phones cannot
+  easily edit a URL). It shows socket state and drop count, how long the longest gap between
+  server updates was, the current hand, every seat, the last ten commands sent, non-state
+  server messages, and any JavaScript errors — captured from the first line of the script,
+  including unhandled promise rejections.
+
+### Verified with a bot swarm, since no players were available
+
+`swarm.mjs` (in the session scratchpad, not the repo) opens N real WebSocket connections and
+audits **every** state frame. Full table, 9 players, 40 hands, 29,827 frames:
+chip conservation never violated, no hole card ever visible to another seat, and 2,804
+out-of-turn or invalid commands correctly rejected by the server.
+
+Note for whoever repeats this: the first version of that auditor reported 164 false money
+errors because it compared against a buy-in total that was still being filled in while bots
+were joining. Gate the audit on all seats being occupied before believing it.
 
 ## Automated tests (must pass before any commit)
 

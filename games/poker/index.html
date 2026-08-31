@@ -234,6 +234,22 @@ button { font-family: inherit; }
 .hand-log__a { font-family: var(--mono); font-size: .78rem; padding-left: 8px; }
 .hand-log__w { font-family: var(--mono); font-size: .78rem; color: var(--good); padding-left: 8px; margin-top: 3px; }
 /* ทางสำรองตอนคลิปบอร์ดใช้ไม่ได้ ต้องยังเอาข้อความออกไปได้ */
+/* ---------- หน้าตรวจอาการ ----------
+   ไว้ให้ถ่ายจอส่งมาตอนเล่นจริงแล้วมีปัญหา จะได้ไม่ต้องเดาว่าเกิดอะไรขึ้น
+   ปกติซ่อนอยู่ เปิดด้วย ?debug=1 หรือแตะที่บอดมุมซ้ายบน 5 ครั้ง */
+.dbg {
+  display: none; position: fixed; inset: 6% 4%; z-index: 95;
+  flex-direction: column; padding: 12px;
+  background: rgba(3,12,8,.97); border: 1px solid var(--gold); border-radius: 12px;
+}
+.dbg.is-on { display: flex; }
+.dbg h3 { margin: 0 0 8px; font-size: 1rem; color: var(--gold); }
+.dbg pre {
+  flex: 1 1 auto; min-height: 0; overflow: auto; margin: 0 0 10px;
+  font-family: var(--mono); font-size: .72rem; line-height: 1.45;
+  color: var(--text); white-space: pre-wrap; word-break: break-word;
+}
+.dbg .two { display: flex; gap: 8px; }
 .log-raw {
   display: none; position: fixed; inset: 8% 5%; z-index: 90;
   width: 90%; height: 84%; padding: 12px;
@@ -864,6 +880,16 @@ button { font-family: inherit; }
 
 <div class="toast" id="toast"></div>
 
+<!-- หน้าตรวจอาการ เปิดด้วย ?debug=1 หรือแตะบอดมุมซ้ายบน 5 ครั้ง -->
+<div class="dbg" id="dbg">
+  <h3>ตรวจอาการ</h3>
+  <pre id="dbg-body"></pre>
+  <div class="two">
+    <button type="button" class="act" id="dbg-copy">คัดลอก</button>
+    <button type="button" class="act" id="dbg-close">ปิด</button>
+  </div>
+</div>
+
 <script src="cards.js"></script>
 <script>
 (function () {
@@ -942,6 +968,28 @@ button { font-family: inherit; }
 
   var lobbyWs = null;
   var lobbyWanted = false, lobbyRetry = 0, lobbyTimer = null;
+
+  /* ---------- ตัวเก็บอาการ ----------
+     เก็บไว้เป็นวงแหวนขนาดจำกัด เล่นทั้งคืนแล้วหน่วยความจำต้องไม่บวม
+     ดัก error ตั้งแต่บรรทัดแรกของสคริปต์ ไม่งั้น error ตอนเริ่มจะหลุดไป */
+  var dbg = {
+    errors: [], msgs: [], sent: [],
+    opened: 0, closed: 0, joins: 0,
+    lastStateAt: 0, gapMax: 0, states: 0,
+    startedAt: Date.now()
+  };
+  function dbgPush(arr, item) { arr.push(item); if (arr.length > 25) arr.shift(); }
+  function dbgTime() {
+    var s2 = Math.floor((Date.now() - dbg.startedAt) / 1000);
+    return String(Math.floor(s2 / 60)) + ":" + ("0" + (s2 % 60)).slice(-2);
+  }
+  window.addEventListener("error", function (e) {
+    dbgPush(dbg.errors, dbgTime() + " " + (e.message || "error") +
+            " @" + (e.filename || "").split("/").pop() + ":" + (e.lineno || 0));
+  });
+  window.addEventListener("unhandledrejection", function (e) {
+    dbgPush(dbg.errors, dbgTime() + " promise: " + String(e.reason).slice(0, 120));
+  });
 
   /* รหัสประจำเครื่อง ใช้พิสูจน์ว่าเป็นเจ้าของที่นั่งเดิมจริงตอนกลับเข้ามา
      ชื่ออย่างเดียวใช้ไม่ได้ เพราะคนอื่นก็เห็นชื่อเราในหน้ารวมโต๊ะ */
@@ -1234,6 +1282,79 @@ button { font-family: inherit; }
   var audioCtx = null, soundOn = true;
   try { soundOn = localStorage.getItem("bg.poker.sound") !== "off"; } catch (e) {}
 
+  /* ---------- หน้าตรวจอาการ ----------
+     ให้เจ้าของถ่ายจอส่งมาได้ตอนเจอปัญหาจริง แทนที่จะต้องอธิบายด้วยคำพูด */
+  function dbgText() {
+    var v = view || {};
+    var me = (v.seats && v.seats[mySeat]) || {};
+    var tokTail = "—";
+    try { var t = localStorage.getItem("bg.poker.token.v1") || ""; tokTail = t ? "…" + t.slice(-6) : "เก็บไม่ได้"; } catch (e) { tokTail = "เก็บไม่ได้"; }
+    var L = [];
+    L.push("เวลาเปิดหน้านี้มาแล้ว " + dbgTime());
+    L.push("ห้อง " + roomCode + " · ที่นั่ง " + (mySeat >= 0 ? mySeat + 1 : "—") + " · รหัสเครื่อง " + tokTail);
+    L.push("โซเก็ต " + (ws ? ["กำลังต่อ", "ต่ออยู่", "กำลังปิด", "ปิดแล้ว"][ws.readyState] : "ไม่มี") +
+           " · ต่อสำเร็จ " + dbg.opened + " ครั้ง · หลุด " + dbg.closed + " ครั้ง");
+    L.push("ได้ state มา " + dbg.states + " ครั้ง · ขาดช่วงนานสุด " + (dbg.gapMax / 1000).toFixed(1) + " วิ");
+    L.push("");
+    var PH = { waiting: "รอเริ่ม", preflop: "พรีฟลอป", flop: "ฟลอป",
+               turn: "เทิร์น", river: "ริเวอร์", showdown: "เปิดไพ่" };
+    L.push("รอบนี้: " + (PH[v.phase] || v.phase || "—") + " · มือที่ " + (v.handNo || 0) +
+           " · กอง " + (v.pot || 0) + " · ถึงตาช่อง " + ((v.current >= 0 ? v.current + 1 : "—")));
+    L.push("ชิปเรา " + (me.stack != null ? me.stack : "—") +
+           " · ต้องตาม " + (v.toCall || 0) +
+           " · การ์ดต่อเวลา " + (me.timeCards != null ? me.timeCards : "—"));
+    L.push("เวลาต่อตา " + ((v.turnBudgetMs || 0) / 1000) + " วิ · เสียง " + (soundOn ? "เปิด" : "ปิด"));
+    if (v.seats) {
+      L.push("");
+      L.push("ที่นั่ง:");
+      v.seats.forEach(function (x, i) {
+        if (x) L.push("  " + (i + 1) + " " + x.name + " ชิป " + x.stack +
+                      (x.connected ? "" : " (หลุด)") + (x.folded ? " หมอบ" : "") +
+                      (x.allIn ? " หมดตัก" : ""));
+      });
+    }
+    L.push("");
+    L.push("คำสั่งที่ส่งไปล่าสุด:");
+    L.push(dbg.sent.length ? "  " + dbg.sent.slice(-10).join("\n  ") : "  (ยังไม่มี)");
+    L.push("");
+    L.push("ข้อความจากเซิร์ฟเวอร์ (ไม่นับ state):");
+    L.push(dbg.msgs.length ? "  " + dbg.msgs.slice(-10).join("\n  ") : "  (ยังไม่มี)");
+    L.push("");
+    L.push("อาการผิดปกติ:");
+    L.push(dbg.errors.length ? "  " + dbg.errors.slice(-12).join("\n  ") : "  ไม่พบ");
+    L.push("");
+    L.push("เครื่อง: " + navigator.userAgent);
+    L.push("จอ: " + innerWidth + "x" + innerHeight);
+    return L.join("\n");
+  }
+
+  function dbgOpen() {
+    $("dbg-body").textContent = dbgText();
+    $("dbg").classList.add("is-on");
+  }
+
+  $("dbg-close").addEventListener("click", function () { $("dbg").classList.remove("is-on"); });
+  $("dbg-copy").addEventListener("click", function () {
+    var txt = dbgText();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(function () { toast("คัดลอกแล้ว"); },
+                                              function () { showRawLog(txt); });
+    } else showRawLog(txt);
+  });
+
+  /* เปิดได้สองทาง: ใส่ ?debug=1 ท้าย URL หรือแตะที่ตัวเลขบอดมุมซ้ายบน 5 ครั้ง
+     ต้องมีทางที่ทำได้บนมือถือด้วย เพราะพิมพ์ URL บนมือถือลำบาก */
+  if (/[?&]debug=1/.test(location.search)) dbgOpen();
+  (function () {
+    var taps = 0, last = 0;
+    $("t-blinds").addEventListener("click", function () {
+      var now = Date.now();
+      taps = (now - last < 900) ? taps + 1 : 1;
+      last = now;
+      if (taps >= 5) { taps = 0; dbgOpen(); }
+    });
+  })();
+
   /* ปุ่มเปิด/ปิดเสียง จำค่าไว้ในเครื่อง (ห่อ try/catch ตามข้อจำกัดของโปรเจกต์) */
   function paintSoundBtn() {
     var b = document.getElementById("btn-sound");
@@ -1291,7 +1412,9 @@ button { font-family: inherit; }
     var proto = location.protocol === "https:" ? "wss://" : "ws://";
     ws = new WebSocket(proto + location.host);
 
+    dbg.joins++;
     ws.onopen = function () {
+      dbg.opened++;
       ws.send(JSON.stringify({
         type: "join", room: room, name: name, buyIn: chips, token: myToken(),
         seatId: seatWanted === null ? undefined : seatWanted
@@ -1313,7 +1436,23 @@ button { font-family: inherit; }
 
     ws.onmessage = function (ev) {
       var msg;
-      try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      try { msg = JSON.parse(ev.data); }
+      catch (e) { dbgPush(dbg.errors, dbgTime() + " อ่านข้อความจากเซิร์ฟเวอร์ไม่ออก"); return; }
+
+      /* จดไว้ว่าได้อะไรมาบ้าง และ state ขาดช่วงนานสุดกี่วินาที
+         ถ้าเน็ตในบ้านสะดุด ตัวเลขนี้จะบอกได้ว่าสะดุดจริงไม่ใช่เกมค้าง */
+      if (msg.type === "state") {
+        dbg.states++;
+        var now = Date.now();
+        if (dbg.lastStateAt) {
+          var gap = now - dbg.lastStateAt;
+          if (gap > dbg.gapMax) dbg.gapMax = gap;
+        }
+        dbg.lastStateAt = now;
+      } else {
+        dbgPush(dbg.msgs, dbgTime() + " " + msg.type +
+                (msg.message ? ": " + String(msg.message).slice(0, 60) : ""));
+      }
 
       if (msg.type === "joined") {
         mySeat = msg.seatId;
@@ -1339,6 +1478,8 @@ button { font-family: inherit; }
     };
 
     ws.onclose = function () {
+      dbg.closed++;
+      dbgPush(dbg.errors, dbgTime() + " โซเก็ตปิด");
       $("btn-join").disabled = false;
       if ($("game").classList.contains("is-on")) toast("หลุดจากโต๊ะ ลองเปิดหน้านี้ใหม่");
       else $("join-err").innerHTML = hostedHint();
@@ -1362,7 +1503,11 @@ button { font-family: inherit; }
   }
 
   function send(obj) {
+    dbgPush(dbg.sent, dbgTime() + " " + (obj.type || "?") +
+            (obj.action ? " " + obj.action : "") + (obj.amount ? " " + obj.amount : ""));
     if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+    else dbgPush(dbg.errors, dbgTime() + " ส่งไม่ได้ โซเก็ตไม่พร้อม (state " +
+                 (ws ? ws.readyState : "ไม่มี") + ") ขณะสั่ง " + (obj.type || "?"));
   }
 
   /* ---------- แง้มดูไพ่ ---------- */
