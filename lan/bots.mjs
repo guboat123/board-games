@@ -10,7 +10,10 @@
    =========================================================== */
 import { evaluate7, RANK_CHARS, SUIT_CHARS } from "./poker-engine.mjs";
 
-const NAMES = ["โบ๊ท", "แมท", "น้ำ", "ปุ๊ก", "ต้น", "แนน", "เจ", "มิ้น", "ก้อง"];
+/* ⚠️ ชื่อบอทต้องเป็นอังกฤษล้วน เพื่อให้แยกออกจากคนไทยที่นั่งอยู่ด้วยตาเปล่า
+   เดิมใช้ชื่อเล่นไทย (โบ๊ท แมท น้ำ ...) แล้วชนกับชื่อคนจริงบนโต๊ะ
+   มองปราดเดียวไม่รู้ว่ากำลังสู้กับคนหรือกับบอท */
+const NAMES = ["Ace", "Duke", "Rex", "Milo", "Vega", "Nico", "Kai", "Otto", "Zed"];
 
 /* margin = ต้องได้เปรียบกว่าราคาที่จ่ายเท่าไหร่ถึงจะตาม (ติดลบ = ตามแม้ราคาไม่คุ้ม)
    bet    = มือแข็งแค่ไหนถึงจะเปิดเดิมพันเองตอนไม่มีใครเดิมพัน
@@ -63,6 +66,33 @@ function madeStrength(hole, board) {
   return CAT_EQUITY[evaluate7(cs)[0]] || 0.5;
 }
 
+/* ---------- ไพ่ที่ "ยังไม่เข้าชุด แต่มีลุ้น" ----------
+   ขาดอีกใบเดียวจะเป็นฟลัชหรือสเตรท = มีสิทธิ์ชนะจริงถ้าไพ่ใบต่อไปเข้า
+   บลัฟด้วยมือแบบนี้ (semi-bluff) คือการบลัฟที่ถูกวิธี เพราะถ้าโดนตามก็ยังมีทาง
+   ต่างจากบลัฟด้วยไพ่ที่ไม่มีอะไรเลย ซึ่งได้ทางเดียวคือให้เขาหมอบ */
+function drawStrength(hole, board) {
+  /* ลุ้นได้เฉพาะตอนยังมีไพ่จะเปิดอีก ริเวอร์แล้วไม่มีอะไรให้ลุ้น */
+  if (!board || board.length < 3 || board.length > 4) return 0;
+  const cards = hole.concat(board).map(toNum).filter(x => x >= 0);
+  if (cards.length < 5) return 0;
+
+  const suits = [0, 0, 0, 0];
+  cards.forEach(c => suits[c & 3]++);
+  const flushDraw = suits.some(n => n === 4);
+
+  const has = new Array(13).fill(false);
+  cards.forEach(c => { has[c >> 2] = true; });
+  let openEnded = false;
+  for (let i = 0; i <= 9; i++) {
+    if (has[i] && has[i + 1] && has[i + 2] && has[i + 3]) openEnded = true;
+  }
+
+  if (flushDraw && openEnded) return 0.34;
+  if (flushDraw) return 0.24;
+  if (openEnded) return 0.19;
+  return 0;
+}
+
 export function createBotManager(room, broadcast) {
   const pending = {};     /* seatId -> timer ที่ตั้งไว้ */
   let seq = 0;
@@ -76,7 +106,7 @@ export function createBotManager(room, broadcast) {
     const added = [];
     for (let i = 0; i < count; i++) {
       const used = room.table._state.seats.filter(Boolean).map(s => s.name);
-      const name = NAMES.filter(n => used.indexOf(n) === -1)[0] || ("บอท" + (++seq));
+      const name = NAMES.filter(n => used.indexOf(n) === -1)[0] || ("Bot" + (++seq));
       const r = room.table.sit(name, null, 2000, "bot:" + (++seq), { bot: true, level: lv });
       if (!r.ok) break;
       added.push(r.name);
@@ -100,8 +130,11 @@ export function createBotManager(room, broadcast) {
     /* ไม่มีคนจริงอยู่แล้ว บอทไม่ต้องเล่นต่อ ปล่อยให้ห้องถูกเก็บไป */
     if (!room.table.anyConnected()) return;
 
-    /* ยังไม่เริ่มมือ และมีบอทอยู่ ให้บอทกดเริ่มให้ จะได้ไม่ต้องรอคนกด */
-    if ((st.phase === "waiting" || st.phase === "showdown") && botSeats().length) {
+    /* ⚠️ ถ้ามีคนจริงที่พร้อมเล่นอยู่ ห้ามบอทกดเริ่มมือให้
+       จังหวะจบมือเป็นของคนเล่น เขาอาจกำลังดูไพ่ที่เปิด ดูว่าใครได้เท่าไหร่ หรือกดโชว์ไพ่
+       บอทกดเริ่มตัดจังหวะนั้นทิ้งหมด — บอทเริ่มให้เฉพาะตอนไม่มีคนจริงที่กดได้ */
+    const humanReady = st.seats.some(x => x && !x.isBot && x.connected && !x.sitOut && x.stack > 0);
+    if ((st.phase === "waiting" || st.phase === "showdown") && botSeats().length && !humanReady) {
       const starter = botSeats()[0];
       if (!pending["start"]) {
         pending["start"] = setTimeout(() => {
@@ -132,6 +165,9 @@ export function createBotManager(room, broadcast) {
     }, wait);
   }
 
+  /* ต้องอ่าน toCall ก่อนประกาศตัวแปรจริง จึงแยกเป็นฟังก์ชันเล็กๆ ไว้ */
+  function toCallNow(v) { return v.toCall; }
+
   function decide(seatId, lv) {
     const view = room.table.viewFor(seatId);
     const me = view.seats[seatId];
@@ -142,16 +178,32 @@ export function createBotManager(room, broadcast) {
 
     const pre = view.phase === "preflop";
     const base = pre ? preflopStrength(me.cards) : madeStrength(me.cards, view.board);
-    const bluffing = Math.random() < lv.bluff;
-    let eq = base + (bluffing ? 0.24 : 0) + (Math.random() - 0.5) * 0.08;
+
+    /* คนที่ยังสู้อยู่กี่คน — บลัฟได้ผลกับคนน้อย ยิ่งหลายคนยิ่งมีคนตามแน่ */
+    let live = 0;
+    view.seats.forEach(function (x, i) { if (x && x.inHand && !x.folded && i !== seatId) live++; });
+    const crowdFactor = live <= 1 ? 1.7 : (live === 2 ? 1 : 0.3);
+
+    /* ไพ่ที่มีลุ้น = บลัฟแล้วยังมีทางชนะจริง ไม่ใช่ได้ทางเดียวคือให้เขาหมอบ */
+    const draw = pre ? 0 : drawStrength(me.cards, view.board);
+
+    const bluffing = Math.random() < lv.bluff * crowdFactor;
+    let eq = base + draw + (bluffing ? 0.26 : 0) + (Math.random() - 0.5) * 0.08;
     eq = Math.max(0, Math.min(1, eq));
 
-    const toCall = view.toCall;
+    /* เดิมพันต่อเนื่อง: คนที่เป็นคนไล่ก่อนฟลอป มักยิงต่อในฟลอปไม่ว่าไพ่จะออกยังไง
+       เพราะเขาแสดงความแข็งไปแล้ว คนอื่นที่ไม่ได้อะไรก็มักทิ้ง
+       ใช้ได้เฉพาะตอนคนเหลือน้อย ยิงใส่สามคนคือเผาเงินเปล่า
+       รู้ว่าเราเป็นคนไล่จาก lastKind ซึ่งยังค้างจากรอบก่อนจนกว่าจะลงมือใหม่ */
+    const cbet = !pre && view.phase === "flop" && toCallNow(view) === 0 &&
+                 me.lastKind === "raise" && live <= 2 && Math.random() < 0.62;
+
     const potNow = typeof view.potForBet === "number" ? view.potForBet : view.pot;
 
     /* ราคาที่ต้องจ่ายเทียบกับกอง — นี่คือสิ่งที่คนเล่นจริงคิด และของเดิมไม่มีเลย
        ตาม 20 ในกอง 500 กับตาม 500 ในกอง 500 คนละเรื่องกันคนละโลก
        ของเดิมดูแค่ "มือแข็งพอไหม" โดยไม่สนราคา จึงพับมือดีทิ้งเพราะเดิมพัน 20 */
+    const toCall = view.toCall;
     const price = toCall > 0 ? toCall / (potNow + toCall) : 0;
     const margin = pre ? lv.preMargin : lv.margin;
     const raiseAt = pre ? lv.preRaise : lv.raise;
@@ -173,7 +225,7 @@ export function createBotManager(room, broadcast) {
       msg = { type: "act", action: "raise", amount: target };
     } else if (toCall === 0) {
       /* ไม่มีใครเดิมพัน: มือดีพอก็เปิดเดิมพันเอง ไม่ใช่เคาะผ่านตลอด */
-      if (eq >= lv.bet && me.stack > view.blinds.bb) {
+      if ((eq >= lv.bet || cbet) && me.stack > view.blinds.bb) {
         const want = view.currentBet + view.minRaise +
                      Math.round(potNow * lv.sizing * (0.5 + Math.random() * 0.6));
         msg = { type: "act", action: "raise",

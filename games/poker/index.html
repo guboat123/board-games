@@ -191,7 +191,10 @@ button { font-family: inherit; }
 }
 .topbar .blinds { font-family: var(--mono); font-size: .9rem; color: var(--gold); }
 .topbar .hand { font-family: var(--mono); font-size: .72rem; color: var(--muted); }
-.topbar a { color: var(--muted); text-decoration: none; font-size: .85rem; }
+.topbar a,
+.topbar #btn-leave { color: var(--muted); text-decoration: none; font-size: .85rem; }
+/* ปุ่มออกเคยเป็นลิงก์ ต้องรีเซ็ตหน้าตาปุ่มให้เหมือนเดิม */
+.topbar #btn-leave { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: .85rem; }
 .topbtn {
   flex: 0 0 auto; padding: 6px 10px; font-family: inherit;
   font-size: .8rem; font-weight: 700;
@@ -604,7 +607,10 @@ button { font-family: inherit; }
 
 /* ---------- แถบไพ่ในมือ + แง้มดู ---------- */
 .hand-area {
-  flex: 0 0 auto; position: relative;
+  /* ⚠️ ต้องอยู่เหนือที่นั่ง (z-index:2) ไม่งั้นตอนกดค้างแง้มดูไพ่
+     ไพ่ถูกยกขึ้น 34px แล้วไปมุดใต้กล่องที่นั่งของเราเอง
+     ตอนไม่ได้แง้มจะไม่เห็นปัญหา เพราะไพ่ยังไม่ถูกยก */
+  flex: 0 0 auto; position: relative; z-index: 5;
   height: 132px;
   background: linear-gradient(#0d3a25, #08281a);
   border-top: 3px solid var(--rail-light);
@@ -973,7 +979,7 @@ button { font-family: inherit; }
 <!-- ============ โต๊ะ ============ -->
 <div id="game">
   <div class="topbar">
-    <a href="../../index.html" id="btn-leave">← ออก</a>
+    <button type="button" id="btn-leave">← ออก</button>
     <div>
       <div class="blinds" id="t-blinds">10 / 20</div>
       <div class="hand" id="t-hand">ห้อง —</div>
@@ -1662,14 +1668,22 @@ button { font-family: inherit; }
     paintTablePanel();
   });
 
-  $("btn-leave").addEventListener("click", function (e) {
+  $("btn-leave").addEventListener("click", function () {
     if (view && view.phase !== "waiting" && view.phase !== "showdown") {
-      if (!confirm("ยังเล่นมือนี้อยู่ ออกตอนนี้จะถือว่าหมอบและเสียเงินในกอง ออกเลยไหม")) {
-        e.preventDefault();
-        return;
-      }
+      if (!confirm("ยังเล่นมือนี้อยู่ ออกตอนนี้จะถือว่าหมอบและเสียเงินในกอง ออกเลยไหม")) return;
     }
     leaveTable();
+    /* ⚠️ ลุกจากโต๊ะแล้วกลับ "หน้าเข้าร่วมโป๊กเกอร์" ไม่ใช่หน้ารวมบอร์ดเกม
+       เดิมเป็นลิงก์ไป ../../index.html คนที่แค่อยากเปลี่ยนโต๊ะหรือเข้าใหม่
+       ต้องเดินย้อนกลับเข้ามาทั้งเส้นทาง ทั้งที่จุดหมายจริงอยู่ห่างแค่หน้าเดียว */
+    mySeat = -1;
+    view = null;
+    $("game").classList.remove("is-on");
+    $("join-screen").style.display = "";
+    $("btn-join").disabled = false;
+    $("join-err").textContent = "";
+    location.hash = "";
+    openLobby();
   });
   $("f-name").addEventListener("keydown", function (e) { if (e.key === "Enter") join(); });
 
@@ -2988,6 +3002,18 @@ button { font-family: inherit; }
 
     var me = view.seats[mySeat];
     if (!me) return;
+
+    /* ⚠️ กำลังพักมืออยู่ ต้องมีปุ่มกลับมาเล่นตรงนี้ ไม่ใช่ซ่อนในแผงสรุปโต๊ะ
+       เดิมปุ่มอยู่ในแผงที่ต้องกดเปิดก่อนแล้วเลื่อนหา คนที่โดนพักอัตโนมัติ
+       (นิ่งครบ 3 ตา) จึงนั่งดูอยู่อย่างนั้นโดยไม่รู้ว่าจะกลับเข้าเล่นยังไง */
+    if (me.sitOut) {
+      var back = mkBtn("act act--raise", "กลับมาเล่น",
+        view.phase === "waiting" || view.phase === "showdown"
+          ? "รับไพ่มือถัดไป" : "รับไพ่เมื่อมือนี้จบ",
+        function () { send({ type: "sitout", value: false }); });
+      back.style.flexBasis = "100%";
+      row.appendChild(back);
+    }
 
     /* ยังไม่เริ่มมือ หรือมือเพิ่งจบ */
     if (view.phase === "waiting" || view.phase === "showdown") {

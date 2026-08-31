@@ -48,7 +48,9 @@
 /* ดอกต้องใหญ่ใกล้เคียงเลข ไม่ใช่เล็กกว่าครึ่งหนึ่ง
    บนไพ่ใบเล็กและใบกลาง ดอกคือสิ่งที่อ่านยากที่สุด */
 .pc__cr { font-size: 1.55em; letter-spacing: -.05em; }
-.pc__cs { font-size: 1.45em; margin-top: -.16em; }
+/* ดอกใหญ่กว่าเลขเล็กน้อย — บนไพ่ใบเล็กมันคือตัวที่อ่านยากที่สุด
+   ไม่ใช่เลข ซึ่งรูปทรงต่างกันชัดอยู่แล้ว */
+.pc__cs { font-size: 1.75em; margin-top: -.2em; }
 
 /* ไพ่ 10: เลขมุมย่อลงกับขยับชิดขอบ จะได้ไม่กินพื้นที่ดอก */
 .pc--wide .pc__cr { font-size: 1.05em; letter-spacing: -.12em; }
@@ -60,11 +62,11 @@
 
 /* ไพ่ใบเล็กโชว์แค่มุมบนซ้าย พื้นที่ไม่พอ */
 .pc--sm { font-size: 5.5px; }
-.pc--md { font-size: 8.6px; }
-.pc--lg { font-size: 13px; }
+.pc--md { font-size: 9.4px; }
+.pc--lg { font-size: 14px; }
 @media (min-width: 480px) {
-  .pc--md { font-size: 9.6px; }
-  .pc--lg { font-size: 15px; }
+  .pc--md { font-size: 10.4px; }
+  .pc--lg { font-size: 16px; }
 }
 .pc--sm .pc__corner--br { display: none; }
 .pc--sm .pc__face { display: none; }
@@ -73,7 +75,7 @@
 /* ⚠️ ไพ่ใบเล็กเหลือแค่ "แต้ม+ดอก" กลางใบ ดอกจึงต้องใหญ่กว่าสัดส่วนปกติ
    สัดส่วนของไพ่จริง (ดอก 1.2em) ทำให้ดอกเล็กจนแยกไม่ออกว่า โพดำหรือดอกจิก
    โดยเฉพาะคนสายตาไม่ดี ซึ่งเป็นคนที่ต้องอ่านออกที่สุด */
-.pc--sm .pc__cs { font-size: 1.65em; margin-top: -.06em; line-height: .9; }
+.pc--sm .pc__cs { font-size: 2em; margin-top: -.1em; line-height: .85; }
 .pc--sm .pc__cr { font-size: 1.5em; }
 
 /* ---- หน้าไพ่ ----
