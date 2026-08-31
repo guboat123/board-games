@@ -41,7 +41,25 @@ dead-code grep), so B/C findings never run out. Severity, by contrast, did conve
 | 4 | 6 | 7 | — | every round-3 fix held (100%); poker agent was stopped mid-run, no result |
 | 5 | 5 (A2) | 5 (A3) | 13 (A6) | first agent check of the poker fixes: 6 of 8 held, 2 failed |
 | 6 | 5 (A1) | 5 (**A0**) | 10 (A5) | first round judged by the new criterion; เดาสี is the first game to reach A=0 |
-| 7 | running | 3 (A1) | running | |
+| 7 | 2 (**A0 B0**) | 3 (A1) | 4 (A1) | วาดให้ทาย reached A=0 *and* B=0 |
+| 8 | running | running | running | final round — see "How this ended" |
+
+## How this ended
+
+The owner called it after round 8: **fix whatever round 8 reports as category A, then stop** — do
+not keep going for the "A=0 twice running" condition.
+
+That was the right call, and the reason is visible in the data above. From round 6 onward, a large
+share of each round's findings were regressions introduced by the *previous* round's fixes — 5 of
+poker's 10 in round 6, all 3 of เดาสี's in round 7, poker's A1 in round 7. The games stopped being
+the bottleneck several rounds earlier; the loop was mostly chasing churn I was creating myself.
+Insisting on two consecutive clean rounds across three games would have required six consecutive
+flawless fix passes, which the history says was not a good bet.
+
+State at close: the site has been playable since round 3. Every defect that made a game unplayable
+(a round that froze dead, chips paid to the wrong player, a poker page that failed to boot, scores
+counted twice, a table stuck waiting for someone who had left) is fixed and, where it involved money
+or ownership, locked behind a test in `lan/tests/`.
 
 Round 6 is where the cost of my own fixes showed clearly: 5 of poker's 10 findings were regressions
 from the round-5 fixes, including a real money bug (chips vanished from the table whenever someone
