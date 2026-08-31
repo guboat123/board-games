@@ -115,7 +115,42 @@ button { font-family: inherit; }
 }
 .tbl__live { color: var(--live); }
 /* เลือกที่นั่ง */
-.seatpick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 8px; }
+/* วงโต๊ะกินความกว้างเต็ม ปุ่ม "หาที่ว่างให้" อยู่ใต้วง */
+.seatpick { display: block; margin-top: 8px; }
+/* ---------- แผนผังโต๊ะแบบวง ----------
+   คนดูรูปวงโต๊ะแล้วรู้ทันทีว่า "ว่างตรงไหน" และ "จะนั่งข้างใคร"
+   ตารางสี่เหลี่ยมบังคับให้แปลเลขช่องเป็นตำแหน่งในหัวเอง ซึ่งคนส่วนใหญ่ไม่ทำ
+   ใช้ที่เดียวกันทั้งตอนเลือกที่นั่งก่อนเข้า และตอนย้ายที่นั่งบนโต๊ะ */
+.ring { position: relative; width: 100%; padding-top: 64%; margin: 10px 0 2px; }
+.ring__felt {
+  /* วงรีแนวนอน ไม่ใช่วงกลม โต๊ะโป๊กเกอร์จริงเป็นทรงรี คนจึงอ่านออกทันทีว่านี่คือโต๊ะ */
+  position: absolute; left: 13%; right: 13%; top: 15%; bottom: 15%;
+  background: radial-gradient(ellipse at 50% 34%, #1c6b45, #0f4a2f 72%);
+  border: 3px solid #6b4a1e; border-radius: 50%;
+  box-shadow: inset 0 0 26px rgba(0,0,0,.45);
+}
+.ring__mid {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: 46%; text-align: center; pointer-events: none;
+  font-family: var(--mono); font-size: .72rem; line-height: 1.35; color: rgba(255,255,255,.72);
+}
+.rseat {
+  position: absolute; transform: translate(-50%,-50%);
+  width: clamp(56px, 20%, 88px); padding: 5px 4px;
+  font-family: inherit; font-size: .7rem; line-height: 1.2; text-align: center;
+  color: var(--text); background: #12301f;
+  border: 2px solid #2f5540; border-radius: 9px; cursor: pointer;
+}
+.rseat__n { display: block; font-family: var(--mono); font-size: .8rem; font-weight: 700; color: var(--gold); }
+.rseat__nm { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rseat.is-free { border-style: dashed; color: var(--muted); }
+.rseat.is-taken { background: #0b2416; color: var(--muted); cursor: not-allowed; }
+.rseat.is-away { border-color: #7a5a1e; color: #e2b866; }
+.rseat.is-me { border-color: var(--gold); background: #26401f; }
+.rseat.is-picked { background: var(--gold); border-color: var(--gold); color: #06170f; }
+.rseat.is-picked .rseat__n { color: #06170f; }
+.rseat:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+.rseat[disabled] { cursor: not-allowed; }
 .sp {
   padding: 9px 4px; text-align: center;
   font-family: var(--mono); font-size: .8rem;
@@ -259,6 +294,66 @@ button { font-family: inherit; }
 }
 /* ยอดเงินที่ได้เด้งตามมาทีหลังไพ่นิดหนึ่ง จะได้อ่านทันว่าใครได้เท่าไหร่ */
 .result.is-pop .row b { display: inline-block; animation: win-pop .5s .2s cubic-bezier(.2,.85,.3,1) backwards; }
+/* แถบแสงกวาดผ่านกล่องผล ต้อง overflow:hidden ไม่งั้นแถบจะโผล่ออกนอกขอบมน
+   (แถวผลเลื่อนใน .rows ของตัวเองอยู่แล้ว การ clip ตรงนี้จึงไม่กินเนื้อหา) */
+.result.is-pop { overflow: hidden; }
+.result.is-pop::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 34%, rgba(255,255,255,.20) 47%, transparent 60%);
+  animation: fx-shine 1s .25s ease-out 1 backwards;
+}
+@keyframes fx-shine { from { transform: translateX(-115%); } to { transform: translateX(115%); } }
+
+/* ---------- ฉลองตอนชนะ ----------
+   ทำจาก div กับ CSS ล้วน ไม่มีไฟล์ภาพ ไม่มีไลบรารี ตามข้อจำกัดของโปรเจกต์
+   ชั้นนี้ต้อง pointer-events:none เสมอ ไม่งั้นมันจะกินการแตะของปุ่มที่อยู่ข้างใต้ */
+#fx { position: absolute; inset: 0; pointer-events: none; z-index: 55; overflow: hidden; }
+.fx-bit { position: absolute; top: -18px; border-radius: 2px; animation: fx-fall linear forwards; }
+@keyframes fx-fall {
+  from { transform: translateY(0) rotate(0deg); opacity: 1; }
+  to   { transform: translateY(115%) rotate(720deg); opacity: .08; }
+}
+.fx-chip {
+  position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #ffe9ad, var(--gold) 62%, #9a6f18);
+  box-shadow: 0 0 0 2px rgba(255,255,255,.32) inset, 0 4px 10px rgba(0,0,0,.5);
+  transition: transform .62s cubic-bezier(.3,.7,.3,1), opacity .62s ease-out;
+}
+/* วงแหวนรอบที่นั่งคนชนะ ใช้ box-shadow ไม่ใช่ transform
+   เพราะ .seat ใช้ transform จัดตำแหน่งตัวเองอยู่แล้ว ถ้าไปทับกัน ที่นั่งจะเลื่อนหลุด */
+@keyframes fx-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(216,164,65,.85), 0 0 18px 4px rgba(216,164,65,.5); }
+  70%  { box-shadow: 0 0 0 15px rgba(216,164,65,0), 0 0 26px 8px rgba(216,164,65,.26); }
+  100% { box-shadow: 0 0 0 0 rgba(216,164,65,0), 0 0 0 0 rgba(216,164,65,0); }
+}
+.seat.is-winner .seat__box { animation: fx-ring 1.1s ease-out 2; border-color: var(--gold); }
+/* ---------- ท่าทางเหมือนโต๊ะจริง ----------
+   หมอบ = ปาไพ่ทิ้ง · ลงเงิน = ชิปไหลไปกองกลาง · เคาะ = เคาะโต๊ะ */
+@keyframes fx-muck {
+  from { transform: none; opacity: 1; }
+  to   { transform: translate(var(--mx, 0), var(--my, -70px)) rotate(var(--mr, -38deg)) scale(.8); opacity: 0; }
+}
+.seat__cards.is-muck > * { animation: fx-muck .5s cubic-bezier(.35,.1,.7,1) forwards; }
+.seat__cards.is-muck > *:nth-child(2) { animation-delay: .06s; }
+@keyframes fx-knock {
+  0%, 100% { transform: none; }
+  30%      { transform: translateY(3px) scale(.97); }
+  60%      { transform: translateY(-1px) scale(1.01); }
+}
+.seat.is-knock .seat__box { animation: fx-knock .34s ease-in-out 2; }
+.fx-banner {
+  position: absolute; left: 50%; top: 27%;
+  font-size: clamp(1.5rem, 7.5vw, 2.5rem); font-weight: 800; white-space: nowrap;
+  color: var(--gold); text-shadow: 0 2px 0 #4a3208, 0 0 26px rgba(216,164,65,.75);
+  animation: fx-banner 1.7s cubic-bezier(.2,.9,.3,1) forwards;
+}
+@keyframes fx-banner {
+  0%   { opacity: 0; transform: translate(-50%,-50%) scale(.4); }
+  20%  { opacity: 1; transform: translate(-50%,-50%) scale(1.14); }
+  34%  { transform: translate(-50%,-50%) scale(1); }
+  76%  { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%,-64%) scale(1); }
+}
 @keyframes pot-bump {
   from { transform: scale(1); }
   45%  { transform: scale(1.16); }
@@ -884,6 +979,70 @@ button { font-family: inherit; }
   var wantSeat = null;   /* null = ที่ไหนก็ได้ */
   var rejoinSeat = -1;   /* ที่นั่งของคนชื่อเดียวกันที่หลุดอยู่ ใช้ถามยืนยันตอนกดนั่งโต๊ะ */
 
+  /* ตำแหน่ง 9 ที่นั่งรอบวงรี เป็นเปอร์เซ็นต์ของกรอบ
+     ⚠️ ต้องประกาศตรงนี้ (ก่อนหน้าเลือกที่นั่ง) ไม่ใช่ไปประกาศในส่วนโต๊ะข้างล่าง
+     เพราะ paintSeatPicker ถูกเรียกตั้งแต่ตอนโหลดหน้า ซึ่งเป็นก่อนโค้ดส่วนโต๊ะจะรัน
+     ชุดเดียวกันนี้ใช้ทั้งวงเลือกที่นั่งและวงจริงบนโต๊ะ จะได้ตรงกันเสมอ */
+  var RING_SPOTS = [
+    [50, 90],                      /* ล่างสุด (บนโต๊ะจริง = ตัวเราเสมอ) */
+    [17, 78], [11, 54], [17, 26], [38, 11],
+    [62, 11], [83, 26], [89, 54], [83, 78]
+  ];
+
+  /* ---------- แผนผังโต๊ะแบบวง ----------
+     ใช้ร่วมกันสองที่: เลือกที่นั่งก่อนเข้า และย้ายที่นั่งตอนอยู่บนโต๊ะ
+     seats = อาเรย์ 9 ช่อง (null = ว่าง) · opts.order = ลำดับช่องจริงในแต่ละตำแหน่ง
+     ชื่อผู้เล่นมาจากคนอื่น จึงต้องใส่ด้วย textContent เท่านั้น ห้าม innerHTML */
+  function buildSeatRing(seats, opts) {
+    opts = opts || {};
+    var order = opts.order || [0, 1, 2, 3, 4, 5, 6, 7, 8];
+    var wrap = document.createElement("div");
+    wrap.className = "ring";
+
+    var felt = document.createElement("div");
+    felt.className = "ring__felt";
+    wrap.appendChild(felt);
+
+    if (opts.centerText) {
+      var mid = document.createElement("div");
+      mid.className = "ring__mid";
+      mid.textContent = opts.centerText;
+      wrap.appendChild(mid);
+    }
+
+    order.forEach(function (seatId, slot) {
+      var s2 = seats[seatId];
+      var free = !s2;
+      var away = !!(s2 && s2.connected === false);
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "rseat"
+        + (free ? " is-free" : (away ? " is-away" : " is-taken"))
+        + (opts.mySeat === seatId ? " is-me" : "")
+        + (opts.picked === seatId ? " is-picked" : "");
+      b.style.left = RING_SPOTS[slot][0] + "%";
+      b.style.top = RING_SPOTS[slot][1] + "%";
+
+      var num = document.createElement("span");
+      num.className = "rseat__n";
+      num.textContent = String(seatId + 1);
+      var nm = document.createElement("span");
+      nm.className = "rseat__nm";
+      nm.textContent = free ? "ว่าง"
+                     : (s2.name + (away ? " (หลุด)" : (opts.mySeat === seatId ? " (คุณ)" : "")));
+      b.appendChild(num);
+      b.appendChild(nm);
+
+      /* ช่องที่มีคนต่ออยู่ กดไม่ได้ · ช่องคนหลุดยังเป็นของเขา ต้องยืนยันก่อน */
+      if (s2 && !away) b.disabled = true;
+      else if (opts.locked) { b.disabled = true; b.title = opts.lockedWhy || ""; }
+      else b.addEventListener("click", function () { opts.onPick(seatId, s2, away); });
+
+      wrap.appendChild(b);
+    });
+    return wrap;
+  }
+
   function currentRoom() {
     var code = ($("f-room").value || "").toUpperCase();
     return (window.__rooms || []).filter(function (r) { return r.code === code; })[0] || null;
@@ -898,48 +1057,30 @@ button { font-family: inherit; }
     /* ที่นั่งที่เลือกไว้ดันมีคนมานั่งแล้ว ให้ล้างค่า */
     if (wantSeat !== null && seats[wantSeat] && seats[wantSeat].connected) wantSeat = null;
 
+    /* วงโต๊ะจริง ไม่ใช่ตารางสี่เหลี่ยม คนจะได้เห็นทันทีว่าว่างตรงไหนและจะนั่งข้างใคร */
+    host.appendChild(buildSeatRing(seats, {
+      picked: wantSeat,
+      centerText: room ? "โต๊ะ " + room.code : "โต๊ะใหม่",
+      onPick: function (idx, s2, away) {
+        /* กดที่นั่งของคนที่หลุด = สวมสิทธิ์เขา ต้องยืนยันก่อน
+           ไม่งั้นใครก็เดินมานั่งทับชิปเพื่อนได้ */
+        if (away) {
+          if (!confirm("ที่นั่งนี้เป็นของ " + s2.name + " ที่หลุดไป · " +
+                       "กดตกลงถ้าคุณคือ " + s2.name + " จะได้ชิปเดิมคืน")) return;
+          $("f-name").value = s2.name;
+        }
+        wantSeat = idx;
+        paintSeatPicker();
+      }
+    }));
+
     var any = document.createElement("button");
     any.type = "button";
     any.className = "sp" + (wantSeat === null ? " is-on" : "");
-    any.innerHTML = "ที่ไหนก็ได้";
+    any.style.width = "100%";
+    any.textContent = "ให้ระบบหาที่ว่างให้";
     any.addEventListener("click", function () { wantSeat = null; paintSeatPicker(); });
     host.appendChild(any);
-
-    for (var i = 0; i < 9; i++) {
-      (function (idx) {
-        var s = seats[idx];
-        var b = document.createElement("button");
-        b.type = "button";
-        var cls = "sp";
-        if (s && s.connected) cls += " is-taken";
-        else if (s && !s.connected) cls += " is-away";
-        if (wantSeat === idx) cls += " is-on";
-        b.className = cls;
-
-        if (s) {
-          b.innerHTML = (idx + 1) + "<small>" + s.name + (s.connected ? "" : " (หลุด)") + "</small>";
-        } else {
-          b.innerHTML = (idx + 1) + "<small>ว่าง</small>";
-        }
-
-        if (s && s.connected) {
-          b.disabled = true;
-        } else {
-          b.addEventListener("click", function () {
-            /* กดที่นั่งของคนที่หลุด = สวมสิทธิ์เขา ต้องยืนยันก่อน
-               ไม่งั้นใครก็เดินมานั่งทับชิปเพื่อนได้ */
-            if (s && !s.connected) {
-              if (!confirm("ที่นั่งนี้เป็นของ " + s.name + " ที่หลุดไป · " +
-                           "กดตกลงถ้าคุณคือ " + s.name + " จะได้ชิปเดิมคืน")) return;
-              $("f-name").value = s.name;
-            }
-            wantSeat = idx;
-            paintSeatPicker();
-          });
-        }
-        host.appendChild(b);
-      })(i);
-    }
 
     refreshBuyIn();
 
@@ -1211,6 +1352,111 @@ button { font-family: inherit; }
     });
   }
 
+  /* ---------- เอฟเฟกต์บนโต๊ะ ----------
+     ทำจาก div กับ CSS ล้วน ไม่มีไฟล์ภาพ ไม่มีไลบรารี ตามข้อจำกัดของโปรเจกต์
+     ทุกชิ้นลบตัวเองทิ้ง ไม่งั้นเล่นหลายมือแล้วจะมีขยะค้างเป็นพันชิ้น */
+  var lastActs = {}, lastCelebHand = -1;
+
+  function reducedMotion() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+
+  function fxLayer() {
+    var fx = document.getElementById("fx");
+    if (!fx) {
+      fx = document.createElement("div");
+      fx.id = "fx";
+      $("table-area").appendChild(fx);
+    }
+    return fx;
+  }
+
+  /* จุดกึ่งกลางของอะไรสักอย่าง เทียบกับมุมซ้ายบนของพื้นโต๊ะ */
+  function centerIn(el) {
+    var a = $("table-area").getBoundingClientRect();
+    var r = el.getBoundingClientRect();
+    if (!r.width && !r.height) return { x: a.width / 2, y: a.height / 2 };
+    return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height / 2 };
+  }
+
+  function makeChip(from) {
+    var c = document.createElement("i");
+    c.className = "fx-chip";
+    c.style.left = from.x + "px";
+    c.style.top = from.y + "px";
+    fxLayer().appendChild(c);
+    return c;
+  }
+
+  function moveChip(c, dx, dy, delay, scale) {
+    setTimeout(function () {
+      c.style.transform = "translate(" + dx + "px," + dy + "px) scale(" + (scale || 0.72) + ")";
+      c.style.opacity = "0";
+    }, delay);
+    setTimeout(function () { if (c.parentNode) c.parentNode.removeChild(c); }, delay + 900);
+  }
+
+  /* ชิปไหลจากที่นั่งไปกองกลาง เรียกตอนมีคนตาม/เพิ่ม/หมดหน้าตัก */
+  function flyChip(seatId) {
+    /* ต้องรอให้ที่นั่งถูกวางลง DOM ก่อน ไม่งั้นวัดตำแหน่งไม่ได้ */
+    setTimeout(function () {
+      var seatEl = document.querySelector('.seat[data-seat="' + seatId + '"]');
+      var pot = document.getElementById("t-pot");
+      if (!seatEl || !pot) return;
+      var from = centerIn(seatEl), to = centerIn(pot);
+      for (var k = 0; k < 3; k++) {
+        var c = makeChip({ x: from.x + (Math.random() * 10 - 5), y: from.y + (Math.random() * 10 - 5) });
+        moveChip(c, to.x - from.x + (Math.random() * 14 - 7), to.y - from.y + (Math.random() * 12 - 6),
+                 k * 60, 0.62);
+      }
+    }, 0);
+  }
+
+  /* ฉลองตอนจบมือ: ชิปจากกองวิ่งไปหาคนชนะ + เศษกระดาษ + ป้ายตอนเราชนะเอง */
+  function celebrate(payouts) {
+    if (!payouts || !payouts.length || reducedMotion()) return;
+    var fx = fxLayer();
+    var iWon = payouts.some(function (p) { return p.seatId === mySeat; });
+
+    var colors = ["#d8a441", "#ffe9ad", "#f0cd72", "#ffffff", "#c98f2a"];
+    var n = iWon ? 54 : 24;
+    for (var i = 0; i < n; i++) {
+      var d = document.createElement("i");
+      d.className = "fx-bit";
+      d.style.left = (Math.random() * 100) + "%";
+      d.style.background = colors[i % colors.length];
+      d.style.width = (5 + Math.random() * 6) + "px";
+      d.style.height = (8 + Math.random() * 9) + "px";
+      d.style.animationDuration = (1.1 + Math.random() * 0.9) + "s";
+      d.style.animationDelay = (Math.random() * 0.4) + "s";
+      fx.appendChild(d);
+    }
+
+    var pot = document.getElementById("t-pot");
+    payouts.forEach(function (p, pi) {
+      var seatEl = document.querySelector('.seat[data-seat="' + p.seatId + '"]');
+      if (!seatEl || !pot) return;
+      var from = centerIn(pot), to = centerIn(seatEl);
+      for (var k = 0; k < 5; k++) {
+        var c = makeChip({ x: from.x, y: from.y });
+        moveChip(c, to.x - from.x + (Math.random() * 18 - 9), to.y - from.y + (Math.random() * 16 - 8),
+                 90 + pi * 90 + k * 70, 0.8);
+      }
+    });
+
+    if (iWon) {
+      var b = document.createElement("div");
+      b.className = "fx-banner";
+      b.textContent = "คุณชนะ!";
+      fx.appendChild(b);
+      setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 1900);
+    }
+    /* กวาดเศษกระดาษทิ้งรอบเดียวตอนจบ ชิปลบตัวเองไปแล้ว */
+    setTimeout(function () {
+      Array.prototype.slice.call(fx.querySelectorAll(".fx-bit")).forEach(function (x) { x.remove(); });
+    }, 2600);
+  }
+
   /* ---------- วางที่นั่งรอบโต๊ะ ---------- */
 
   /* ตำแหน่ง 9 ที่นั่งรอบวงรี เป็นเปอร์เซ็นต์ของพื้นที่โต๊ะ
@@ -1218,11 +1464,8 @@ button { font-family: inherit; }
   /* ที่นั่งข้างโต๊ะต้องไม่ตรงแถวเดียวกับไพ่กลาง (ไพ่กลางอยู่ราว 40-52%)
      และตัวเราต้องไม่ล้นลงไปทับแถบข้อความล่าง */
   /* ที่นั่งข้างโต๊ะต้องห่างกันพอ และไม่ล้ำแถวไพ่กลาง (ราว 40-56%) */
-  var SPOTS = [
-    [50, 90],                      /* ตัวเราอยู่ล่างสุดเสมอ */
-    [17, 78], [11, 54], [17, 26], [38, 11],
-    [62, 11], [83, 26], [89, 54], [83, 78]
-  ];
+  /* ใช้ชุดเดียวกับวงเลือกที่นั่ง ประกาศไว้ข้างบนสุดแล้ว จะได้ไม่มีสองชุดให้หลุดจากกัน */
+  var SPOTS = RING_SPOTS;
 
   function seatOrder() {
     /* เรียงที่นั่งจริงให้ตัวเราอยู่ช่องแรก (ล่างสุด) */
@@ -1305,6 +1548,12 @@ button { font-family: inherit; }
     paintResult();
     paintStandings();
     paintTablePanel();
+
+    /* ฉลองครั้งเดียวต่อมือ และต้องเรียกหลัง paintSeats แล้ว เพราะต้องวัดตำแหน่งที่นั่งจริง */
+    if (view.phase === "showdown" && view.lastResult && view.handNo !== lastCelebHand) {
+      lastCelebHand = view.handNo;
+      celebrate(view.lastResult.payouts);
+    }
     justRevealed = false;
   }
 
@@ -1535,6 +1784,24 @@ button { font-family: inherit; }
 
     if (panelTab === "log") { paintHistoryInto(box); box.classList.add("is-on"); return; }
 
+    /* ย้ายที่นั่งกลางมือไม่ได้ ลำดับการเดินตาผูกกับเลขช่อง */
+    var canMove = view.phase === "waiting" || view.phase === "showdown";
+
+    /* วงโต๊ะเรียงแบบเดียวกับที่เห็นจริง (ตัวเราอยู่ล่างสุด) จะได้รู้ว่าย้ายไปแล้วนั่งข้างใคร
+       ช่องว่างในวงนี้คือปุ่มย้ายที่นั่ง ไม่ต้องมีปุ่มซ้ำในตารางเงินอีก */
+    box.appendChild(buildSeatRing(view.seats, {
+      order: seatOrder(),
+      mySeat: mySeat,
+      locked: !canMove,
+      lockedWhy: "รอมือนี้จบก่อน",
+      centerText: canMove ? "แตะช่องว่างเพื่อย้ายไปนั่ง" : "ย้ายที่นั่งได้ตอนจบมือ",
+      onPick: function (idx) {
+        send({ type: "moveseat", seatId: idx });
+        tablePanelOn = false;
+        paintTablePanel();
+      }
+    }));
+
     var head = document.createElement("div");
     head.className = "mhead";
     head.innerHTML = "<span>ที่นั่ง</span><span>ซื้อเข้า → ชิปตอนนี้</span><span>ได้ / เสีย</span>";
@@ -1542,8 +1809,6 @@ button { font-family: inherit; }
 
     var rows = document.createElement("div");
     rows.className = "rows";
-    /* ย้ายที่นั่งกลางมือไม่ได้ ลำดับการเดินตาผูกกับเลขช่อง */
-    var canMove = view.phase === "waiting" || view.phase === "showdown";
     var totalBuy = 0, totalStacks = 0;
 
     for (var i = 0; i < view.seats.length; i++) {
@@ -1574,18 +1839,13 @@ button { font-family: inherit; }
                           : (st2.net < 0 ? "#ff8f84" : "var(--muted)");
           row.appendChild(net);
         } else {
+          /* ช่องว่างไม่ต้องมีปุ่มซ้ำ ย้ายที่นั่งทำที่วงโต๊ะข้างบนแล้ว
+             ตารางนี้มีหน้าที่เดียวคือบอกเรื่องเงิน */
+          var sp = document.createElement("span");
+          sp.className = "num buy";
+          sp.textContent = "—";
+          row.appendChild(sp);
           row.appendChild(document.createElement("span"));
-          var mv = document.createElement("button");
-          mv.type = "button";
-          mv.className = "mseat";
-          mv.textContent = "มานั่งตรงนี้";
-          mv.disabled = !canMove || idx === mySeat;
-          mv.addEventListener("click", function () {
-            send({ type: "moveseat", seatId: idx });
-            tablePanelOn = false;
-            paintTablePanel();
-          });
-          row.appendChild(mv);
         }
         rows.appendChild(row);
       })(i);
@@ -1599,8 +1859,7 @@ button { font-family: inherit; }
     sum.style.margin = "0 0 8px";
     /* ชิปที่ลงกองไปแล้วยังเป็นของโต๊ะ ต้องนับรวม ไม่งั้นกลางมือยอดจะดูเหมือนหาย */
     sum.textContent = "ซื้อเข้ารวม " + totalBuy.toLocaleString("th-TH") +
-                      " · ชิปบนโต๊ะรวม " + (totalStacks + view.pot).toLocaleString("th-TH") +
-                      (canMove ? "" : " · ย้ายที่นั่งได้ตอนจบมือ");
+                      " · ชิปบนโต๊ะรวม " + (totalStacks + view.pot).toLocaleString("th-TH");
     foot.appendChild(sum);
     var close = document.createElement("button");
     close.type = "button";
@@ -1619,6 +1878,21 @@ button { font-family: inherit; }
     /* ลบที่นั่งเดิมออกก่อน (เก็บ felt / center / result ไว้) */
     Array.prototype.slice.call(area.querySelectorAll(".seat")).forEach(function (n) { n.remove(); });
 
+    /* ใครเพิ่งลงมืออะไรในรอบวาดนี้ ใช้สั่งท่าทางครั้งเดียวต่อการกระทำ
+       ไม่ใช่ทุกครั้งที่หน้าจอวาดใหม่ (เซิร์ฟเวอร์ส่ง state หลายรอบต่อหนึ่งการกด) */
+    var freshAct = {};
+    view.seats.forEach(function (s2, i2) {
+      if (!s2) { delete lastActs[i2]; return; }
+      var a = s2.lastAction || "";
+      if (a && a !== lastActs[i2]) { freshAct[i2] = a.split(" ")[0]; }
+      lastActs[i2] = a;
+    });
+
+    var winners = {};
+    if (view.lastResult && view.phase === "showdown") {
+      (view.lastResult.payouts || []).forEach(function (w) { winners[w.seatId] = true; });
+    }
+
     var order = seatOrder();
     order.forEach(function (seatId, slotIdx) {
       var s = view.seats[seatId];
@@ -1629,14 +1903,21 @@ button { font-family: inherit; }
       el.className = "seat"
         + (seatId === view.current ? " is-turn" : "")
         + (s.folded ? " is-folded" : "")
-        + (seatId === mySeat ? " is-me" : "");
+        + (seatId === mySeat ? " is-me" : "")
+        + (winners[seatId] ? " is-winner" : "")
+        + (freshAct[seatId] === "เคาะ" ? " is-knock" : "");
+      /* ใช้หาที่นั่งตอนยิงชิปกับวงแหวนคนชนะ */
+      el.setAttribute("data-seat", seatId);
       el.style.left = spot[0] + "%";
       el.style.top = spot[1] + "%";
 
       /* ไพ่คว่ำเล็กๆ ข้างชื่อ */
       var cards = document.createElement("div");
       cards.className = "seat__cards";
-      if (s.cards.length && !s.folded) {
+      /* ⚠️ ตอนหมอบ s.folded เป็นจริงแล้ว ถ้าไม่วาดไพ่เลยก็ไม่มีอะไรให้ปาทิ้ง
+         จังหวะที่เพิ่งหมอบจึงต้องวาดไพ่ไว้ก่อน แล้วปล่อยให้แอนิเมชันพามันหายไปเอง */
+      var justMuck = freshAct[seatId] === "หมอบ" && !reducedMotion();
+      if (s.cards.length && (!s.folded || justMuck)) {
         s.cards.forEach(function (c, ci) {
           /* ไพ่ตัวเองบนโต๊ะคว่ำตลอด ดูได้จากแถบล่างที่บังมือเท่านั้น
              ถ้าผูกกับ peeking ไพ่จะค้างหงายกลางจอหลังปล่อยปุ่ม */
@@ -1651,7 +1932,21 @@ button { font-family: inherit; }
           cards.appendChild(cel);
         });
       }
+      /* หมอบ = ปาไพ่ทิ้ง ทิศทางพุ่งออกจากกลางโต๊ะ จะได้ดูเหมือนโยนออกไปจริงๆ */
+      if (justMuck) {
+        cards.classList.add("is-muck");
+        var away = spot[0] < 50 ? -1 : 1;
+        cards.style.setProperty("--mx", (away * (26 + Math.random() * 16)) + "px");
+        cards.style.setProperty("--my", (spot[1] < 50 ? 46 : -52) + "px");
+        cards.style.setProperty("--mr", (away * (28 + Math.random() * 26)) + "deg");
+      }
       el.appendChild(cards);
+
+      /* ลงเงิน = ชิปไหลจากที่นั่งไปกองกลาง */
+      if (!reducedMotion() &&
+          (freshAct[seatId] === "ตาม" || freshAct[seatId] === "เพิ่มเป็น" || freshAct[seatId] === "หมดหน้าตัก")) {
+        flyChip(seatId);
+      }
 
       var box = document.createElement("div");
       box.className = "seat__box";
@@ -1937,6 +2232,10 @@ button { font-family: inherit; }
   }
 
   function closeRaise() {
+    /* ต้องล้าง betOnConfirm ด้วยเสมอ ไม่ใช่แค่ซ่อนแผง
+       ถ้ายกเลิกตอนเติมชิปแล้วปล่อยค้างไว้ กติกา "ไม่ปิดแผงเติมชิปอัตโนมัติ"
+       จะถูกเปิดค้างตลอดทั้ง session แผงเดิมพันก็จะไม่ยอมปิดเองอีกเลย */
+    betOnConfirm = null;
     $("bet-sheet").classList.remove("is-on");
     paintActions();
   }
