@@ -1165,8 +1165,11 @@ button { font-family: inherit; }
       <p class="hint-sm" id="limit-hint">เล่นไปเรื่อยๆ จนกดเลิกเอง</p>
     </div>
 
+    <!-- ⚠️ ค่าพวกนี้เซิร์ฟเวอร์รับมาตลอด แต่ไม่เคยมีช่องให้ตั้ง
+         เจ้าภาพที่อยากได้โต๊ะไม่มีนาฬิกา (เล่นกันสบายๆ) จึงทำไม่ได้เลย
+         และไม่มีใครรู้ด้วยซ้ำว่ามีกติกา "หมดเวลาแล้วระบบพับให้" อยู่ -->
     <details style="margin:2px 0 14px">
-      <summary style="cursor:pointer; color:var(--muted); font-size:.84rem">ตั้งค่าบอด (คนแรกที่เข้าห้องเป็นคนตั้ง)</summary>
+      <summary style="cursor:pointer; color:var(--muted); font-size:.84rem">ตั้งค่าโต๊ะ (คนแรกที่เข้าห้องเป็นคนตั้ง)</summary>
       <div class="two" style="margin-top:10px">
         <div class="fld" style="margin:0">
           <label for="f-sb">บอดเล็ก</label>
@@ -1175,6 +1178,21 @@ button { font-family: inherit; }
         <div class="fld" style="margin:0">
           <label for="f-bb">บอดใหญ่</label>
           <input id="f-bb" type="number" min="1" step="1" value="20">
+        </div>
+      </div>
+      <div class="fld" style="margin:12px 0 0">
+        <label for="f-turn">เวลาคิดต่อตา</label>
+        <div class="chips-row" id="turn-kind" style="margin:0 0 6px"></div>
+        <p class="hint-sm" id="turn-hint" style="margin:0"></p>
+      </div>
+      <div class="two" style="margin-top:12px">
+        <div class="fld" style="margin:0">
+          <label for="f-timecards">การ์ดต่อเวลา (ใบ/คน)</label>
+          <input id="f-timecards" type="number" min="0" max="9" step="1" value="3">
+        </div>
+        <div class="fld" style="margin:0">
+          <label for="f-minbuy">ซื้อเข้าต่ำสุด</label>
+          <input id="f-minbuy" type="number" min="1" step="1" value="200">
         </div>
       </div>
     </details>
@@ -1550,6 +1568,34 @@ button { font-family: inherit; }
     var code = ($("f-room").value || "").toUpperCase();
     return (window.__rooms || []).filter(function (r) { return r.code === code; })[0] || null;
   }
+
+  /* ---------- ตัวเลือกเวลาคิดต่อตา ----------
+     ⚠️ ค่า 0 = ไม่มีนาฬิกา ซึ่งเป็นโหมดที่คนเล่นกันเองสบายๆ อยากได้
+     แต่ต้องบอกด้วยว่ามีทางออกถ้ามีคนหายไป (ขอนาฬิกาได้) ไม่งั้นโต๊ะค้าง */
+  var turnSeconds = 30;
+  (function () {
+    var host = $("turn-kind");
+    if (!host) return;
+    var OPTS = [
+      [30, "30 วินาที", "หมดเวลาแล้วระบบเคาะหรือพับให้"],
+      [60, "1 นาที",    "หมดเวลาแล้วระบบเคาะหรือพับให้"],
+      [0,  "ไม่จำกัด",  "ไม่มีนาฬิกากดดัน · ถ้ามีคนหายไป คนอื่นขอนาฬิกาได้"]
+    ];
+    OPTS.forEach(function (o) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "qbtn" + (o[0] === turnSeconds ? " is-on" : "");
+      b.textContent = o[1];
+      b.addEventListener("click", function () {
+        turnSeconds = o[0];
+        Array.prototype.forEach.call(host.children, function (c) { c.classList.remove("is-on"); });
+        b.classList.add("is-on");
+        $("turn-hint").textContent = o[2];
+      });
+      host.appendChild(b);
+    });
+    $("turn-hint").textContent = OPTS[0][2];
+  })();
 
   function paintSeatPicker() {
     var host = $("seatpick");
@@ -2028,6 +2074,24 @@ button { font-family: inherit; }
 
     if (!name) { $("join-err").textContent = "ใส่ชื่อก่อน"; $("f-name").focus(); return; }
     if (!isFinite(chips) || chips <= 0) { $("join-err").textContent = "ใส่จำนวนชิปที่จะซื้อ"; return; }
+    /* ⚠️ เซิร์ฟเวอร์ปรับค่าที่ต่ำหรือสูงเกินให้เข้าช่วงโดยไม่บอกอะไร
+       คนพิมพ์ 50 แล้วนั่งลงด้วย 200 โดยไม่รู้ตัว แล้วยอดได้-เสียก็คิดจาก 200 ที่เขาไม่ได้เลือก
+       บอกก่อนตรงนี้ จะได้ไม่ต้องไปงงเอาตอนอยู่บนโต๊ะ */
+    var known0 = (window.__rooms || []).filter(function (r) { return r.code === room; })[0];
+    var lo = known0 ? (known0.minBuyIn || 200) : Math.max(1, Math.floor(Number($("f-minbuy").value)) || 1);
+    var hi = known0 ? (known0.maxBuyIn || 100000) : 100000;
+    if (chips < lo || chips > hi) {
+      /* ⚠️ ปรับตัวเลขในช่องให้ตรงกับที่จะได้จริง แล้วหยุดไว้ให้กดยืนยันอีกที
+         ของเดิมเซิร์ฟเวอร์ปรับให้เงียบๆ คนพิมพ์ 50 แล้วนั่งลงด้วย 200 โดยไม่รู้ตัว
+         (จะเขียนเตือนใน join-err เฉยๆ ก็ไม่ได้ เพราะบรรทัดถัดไปทับด้วย "กำลังต่อ...") */
+      var fixed = Math.max(lo, Math.min(hi, chips));
+      $("f-chips").value = fixed;
+      $("join-err").textContent =
+        "โต๊ะนี้ซื้อเข้าได้ " + lo.toLocaleString("th-TH") + "-" + hi.toLocaleString("th-TH") +
+        " ชิป · ปรับให้เป็น " + fixed.toLocaleString("th-TH") + " แล้ว กดนั่งโต๊ะอีกครั้งถ้าโอเค";
+      $("f-chips").focus();
+      return;
+    }
 
     try {
       localStorage.setItem("bg.poker.v1", JSON.stringify({ name: name, room: room, chips: chips }));
@@ -2065,9 +2129,19 @@ button { font-family: inherit; }
           type: "config",
           smallBlind: Math.floor(Number($("f-sb").value)) || 10,
           bigBlind: Math.floor(Number($("f-bb").value)) || 20,
+          turnSeconds: turnSeconds,
+          timeCards: Math.max(0, Math.min(9, Math.floor(Number($("f-timecards").value)) || 0)),
+          minBuyIn: Math.max(1, Math.floor(Number($("f-minbuy").value)) || 1),
           limitType: limitType,
           limitValue: Math.floor(Number($("f-limit").value)) || 20
         }));
+      } else {
+        /* ⚠️ เข้าโต๊ะที่มีอยู่แล้ว ค่าที่ตั้งไว้จะไม่ถูกส่ง เพราะเจ้าภาพเป็นคนตั้ง
+           ของเดิมเงียบสนิท คนเลือก "ครบ 20 ตา" แล้วกดนั่ง โต๊ะไม่จบสักที
+           โดยไม่มีอะไรบอกว่าที่เลือกไปไม่ได้ถูกใช้ */
+        setTimeout(function () {
+          toast("เข้าโต๊ะที่เปิดอยู่แล้ว · ใช้กติกาที่เจ้าภาพตั้งไว้");
+        }, 900);
       }
     };
 

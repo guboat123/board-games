@@ -1169,6 +1169,12 @@ export function createTable(opts = {}) {
       /* ไม่ส่งชิปของแต่ละคนออกไปนอกโต๊ะ คนที่ยังไม่ได้นั่งไม่ควรเห็น */
       seats: st.seats.map(s => s ? { name: s.name, connected: s.connected, isBot: s.isBot } : null),
       blinds: cfg.smallBlind + "/" + cfg.bigBlind,
+      /* ⚠️ ต้องบอกช่วงซื้อเข้าออกไปด้วย ตั้งแต่ตอนยังไม่ได้นั่ง
+         ไม่งั้นคนพิมพ์ 50 แล้วเซิร์ฟเวอร์ปรับเป็น 200 เงียบๆ
+         แล้วยอดได้-เสียของเขาก็คิดจากเลขที่เขาไม่ได้เลือก */
+      minBuyIn: cfg.minBuyIn,
+      maxBuyIn: cfg.maxBuyIn,
+      turnSeconds: cfg.turnSeconds,
       phase: st.phase,
       handNo: st.handNo,
       /* ที่นั่งร้างที่คืนได้แล้ว ไม่นับว่าเต็ม ไม่งั้นคนใหม่จะเห็นป้าย "เต็ม" ทั้งที่เข้าได้ */
