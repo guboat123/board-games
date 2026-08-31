@@ -75,20 +75,59 @@ window.Cards = (function () {
   var FRAME_SVG = [
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 140">',
     '<defs>',
+      /* ทองไล่เฉด เอียงทแยงให้ดูเหมือนแสงตกกระทบ ไม่ใช่ทองแบนๆ */
       '<linearGradient id="g" x1="0" y1="0" x2="1" y2="1">',
-        '<stop offset="0" stop-color="rgb(196,150,74)"/>',
-        '<stop offset="0.45" stop-color="rgb(245,222,163)"/>',
-        '<stop offset="1" stop-color="rgb(172,124,56)"/>',
+        '<stop offset="0" stop-color="rgb(163,116,48)"/>',
+        '<stop offset="0.3" stop-color="rgb(232,198,124)"/>',
+        '<stop offset="0.52" stop-color="rgb(255,240,196)"/>',
+        '<stop offset="0.74" stop-color="rgb(214,168,86)"/>',
+        '<stop offset="1" stop-color="rgb(150,102,42)"/>',
       '</linearGradient>',
-      '<pattern id="cl" width="22" height="22" patternUnits="userSpaceOnUse">',
-        '<path d="M2 15a4 4 0 018 0 4 4 0 018 0" fill="none" stroke="rgb(126,44,38)" stroke-width="1.1" opacity="0.55"/>',
+      /* พื้นแดงชาด สว่างตรงกลางมืดที่ขอบ เหมือนกล่องไม้ลงรักปิดทอง */
+      '<radialGradient id="bg" cx="50%" cy="42%" r="76%">',
+        '<stop offset="0" stop-color="rgb(74,19,19)"/>',
+        '<stop offset="0.52" stop-color="rgb(43,11,13)"/>',
+        '<stop offset="1" stop-color="rgb(17,6,7)"/>',
+      '</radialGradient>',
+      /* ตารางขนมเปียกปูนจางๆ ให้พื้นมีเนื้อ ไม่ใช่สีเรียบ */
+      '<pattern id="lat" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">',
+        '<path d="M0 0H9M0 0V9" fill="none" stroke="rgb(150,66,52)" stroke-width="0.5" opacity="0.3"/>',
       '</pattern>',
+      /* ลายประแจจีน (回紋) เดินรอบขอบทั้งสี่ด้าน */
+      '<pattern id="key" width="9" height="9" patternUnits="userSpaceOnUse">',
+        '<path d="M1.4 7.6V2.2h5.4v3.2H4.2" fill="none" stroke="url(#g)" stroke-width="0.85" opacity="0.95"/>',
+      '</pattern>',
+
+      /* แสงทองนวลหลังตัวมังกร ให้ตัวมังกรลอยขึ้นจากพื้น */
+      '<radialGradient id="halo" cx="50%" cy="50%" r="50%">',
+        '<stop offset="0" stop-color="rgb(255,214,138)" stop-opacity="0.20"/>',
+        '<stop offset="0.65" stop-color="rgb(255,196,110)" stop-opacity="0.07"/>',
+        '<stop offset="1" stop-color="rgb(255,196,110)" stop-opacity="0"/>',
+      '</radialGradient>',
     '</defs>',
-    '<rect width="100" height="140" fill="rgb(26,10,11)"/>',
-    '<rect width="100" height="140" fill="url(#cl)"/>',
-    '<rect x="5" y="5" width="90" height="130" rx="5" fill="none" stroke="url(#g)" stroke-width="1.7"/>',
-    '<rect x="9.5" y="9.5" width="81" height="121" rx="3" fill="none" stroke="url(#g)" stroke-width="0.55" opacity="0.7"/>',
-    '<path d="M13 13h9v3.2h-5.8v5.8H13zM87 13h-9v3.2h5.8v5.8H87zM13 127h9v-3.2h-5.8v-5.8H13zM87 127h-9v-3.2h5.8v-5.8H87z" fill="url(#g)" opacity="0.92"/>',
+
+    '<rect width="100" height="140" fill="url(#bg)"/>',
+    '<rect width="100" height="140" fill="url(#lat)"/>',
+    '<ellipse cx="50" cy="70" rx="36" ry="42" fill="url(#halo)"/>',
+
+    /* ⚠️ แถบลายประแจจีนวาดด้วย "เส้นขอบที่ระบายด้วยลาย" ไม่ใช่สี่เหลี่ยมทึบแล้วเจาะรูด้วยหน้ากาก
+       วิธีหน้ากากให้ผลไม่แน่นอนเวลาย่อลงเหลือ 12px (ลายหายเป็นหย่อมๆ)
+       ระบายลายลงบนเส้นขอบหนา 7 หน่วยตรงๆ ลายจึงอยู่ในแถบพอดีทุกขนาด */
+    '<rect x="9.5" y="9.5" width="81" height="121" rx="3" fill="none" stroke="url(#key)" stroke-width="7"/>',
+
+    /* เส้นทองคู่ นอกและใน */
+    '<rect x="3.2" y="3.2" width="93.6" height="133.6" rx="5" fill="none" stroke="url(#g)" stroke-width="1.5"/>',
+    '<rect x="6.2" y="6.2" width="87.6" height="127.6" rx="3.6" fill="none" stroke="url(#g)" stroke-width="0.5" opacity="0.75"/>',
+    '<rect x="12.2" y="12.2" width="75.6" height="115.6" rx="2.4" fill="none" stroke="url(#g)" stroke-width="0.5" opacity="0.75"/>',
+    '<rect x="14.6" y="14.6" width="70.8" height="110.8" rx="1.8" fill="none" stroke="url(#g)" stroke-width="1" opacity="0.9"/>',
+
+    /* เมฆมงคลสี่มุม */
+    '<g fill="none" stroke="url(#g)" stroke-width="0.8" opacity="0.8" stroke-linecap="round">',
+      '<path d="M18 21c0-2.2 3-2.6 3.4-0.6 1.6-1.2 3.4 0.2 3 1.9"/>',
+      '<path d="M82 21c0-2.2-3-2.6-3.4-0.6-1.6-1.2-3.4 0.2-3 1.9"/>',
+      '<path d="M18 119c0 2.2 3 2.6 3.4 0.6 1.6 1.2 3.4-0.2 3-1.9"/>',
+      '<path d="M82 119c0 2.2-3 2.6-3.4 0.6-1.6 1.2-3.4-0.2-3-1.9"/>',
+    '</g>',
     '</svg>'
   ].join("");
 
