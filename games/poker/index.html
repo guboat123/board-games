@@ -364,13 +364,28 @@ button { font-family: inherit; }
   to   { transform: none; opacity: 1; }
 }
 .pc.is-flip { animation: flip-in .46s cubic-bezier(.2,.85,.3,1) backwards; }
-/* ⚠️ ต้องคง translateX(-50%) ไว้ทุกเฟรม กล่องผลจัดกลางด้วย transform
-   ถ้าเฟรมไหนไม่ใส่ กล่องจะกระโดดไปชิดซ้ายระหว่างวิ่ง */
+/* ⚠️ ห้ามใส่ translateX(-50%) ในคีย์เฟรมอีกแล้ว
+   กล่องผลเคยจัดกลางด้วย transform ตอนที่มันเป็น absolute เอง
+   ตอนนี้มันอยู่ในกองซ้อน (.result-stack) ซึ่งเป็นตัวจัดกลางแทน
+   ถ้ายังใส่ -50% ไว้ กล่องจะถูกเลื่อนไปทางซ้ายอีกครึ่งความกว้าง (วัดได้ -165px)
+   และแอนิเมชันชนะ transform:none ที่เขียนไว้ในกฎปกติเสมอ ตามลำดับความสำคัญของ CSS
+   (กฎเดิมเคยเขียนไว้ว่า "ต้องคง translateX(-50%) ไว้ทุกเฟรม" ซึ่งจริงตอนนั้น
+    แต่ไม่จริงอีกแล้วหลังย้ายมาอยู่ในกองซ้อน) */
 @keyframes result-pop {
-  from { opacity: 0; transform: translateX(-50%) translateY(16px) scale(.94); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  /* ⚠️ ห้ามมี transform ในคีย์เฟรมนี้
+     กล่องผลถูกใส่คลาส is-pop ตอนที่ยัง display:none แอนิเมชันจึงไม่ได้เริ่มจริง
+     แล้ว fill-mode ตรึงเฟรมแรกไว้ถาวร = กล่องค้างที่ "เลื่อนลง 16px ย่อ .94"
+     ทับโซนเงินตลอดเวลา วัดได้ทับ 6-7px ทุกครั้ง
+     ค่อยๆ จางเข้ามาอย่างเดียวก็พอ ส่วนความรู้สึก "เด้ง" ยังมีอยู่ที่ยอดเงินของผู้ชนะ
+     (win-pop ซึ่งวิ่งบนลูก ไม่ใช่บนกล่อง จึงไม่กระทบผัง) */
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
-.result.is-pop { animation: result-pop .4s cubic-bezier(.2,.85,.3,1) backwards; }
+/* ⚠️ ต้องเป็น both ไม่ใช่ backwards
+   backwards ตรึงเฟรมแรกไว้ก่อนเริ่มวิ่ง แต่กล่องนี้ถูกใส่คลาสตอนยัง display:none
+   แอนิเมชันจึงไม่ได้เริ่มจริง แล้วค้างอยู่ที่เฟรมแรก (เลื่อนลง 16px ย่อ .94) ตลอด
+   ผลคือกล่องผลเลื่อนลงไปทับโซนเงิน 6px both ตรึงเฟรมสุดท้ายด้วย = จบที่สถานะปกติเสมอ */
+.result.is-pop { animation: result-pop .4s cubic-bezier(.2,.85,.3,1) both; }
 @keyframes win-pop {
   from { transform: scale(.55); opacity: 0; }
   60%  { transform: scale(1.18); opacity: 1; }
@@ -859,6 +874,50 @@ button { font-family: inherit; }
    (บั๊กทรงเดียวกับตารางอันดับรอบ 7) ตอนนั้นกองจ่ายออกไปแล้ว ซ่อนบรรทัดกองได้
    แต่ไพ่กลางต้องเหลือไว้ ใช้อ่านชุดไพ่ของแต่ละคน */
 #t-result.is-many { max-height: 74%; }
+/* ⚠️ ต้องมีพื้นที่ขั้นต่ำให้แถวผลเสมอ ไม่งั้นของที่หดไม่ได้ (หัวกล่อง) กินหมด
+   แล้วแถวที่ต้องอ่านที่สุดกลับเหลือ 0px */
+#t-result .rows { min-height: 62px; }
+
+/* ---------- ไพ่กลางย่อในกล่องผล ----------
+   ⚠️ กล่องผลบังโต๊ะเป็นเรื่องปกติ มันต้องใหญ่พอจะอ่านได้
+   แต่การอ่านว่า "ชนะด้วยอะไร" ต้องเห็นไพ่กลางประกอบเสมอ
+   แทนที่จะพยายามไม่บัง ก็ยกไพ่กลางเข้ามาไว้ในกล่องซะเลย ทุกอย่างอยู่ที่เดียว */
+.res-board {
+  flex: 0 0 auto; display: flex; justify-content: center; gap: 3px;
+  margin: 0 0 8px; padding-bottom: 8px;
+  border-bottom: 1px solid #1d3a2b;
+}
+
+/* ---------- กองซ้อนกล่องผล + โซนเงิน ----------
+   ⚠️ ตัวที่ absolute คือกองซ้อน ไม่ใช่กล่องลูก
+   ถ้าลูกยัง absolute อยู่ ทั้งสองกล่องจะไปกองที่ bottom:6px จุดเดียวกันแล้วทับกันสนิท
+   pointer-events: none ที่กองซ้อน เพื่อไม่ให้ช่องว่างระหว่างกล่องไปกินการกดบนโต๊ะ
+   แล้วเปิดคืนที่ลูกซึ่งเป็นของจริงที่ต้องกดได้ */
+.result-stack {
+  position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%);
+  width: min(92%, 400px); z-index: 40;
+  display: flex; flex-direction: column; gap: 6px;
+  /* ⚠️ ห้ามเกิน 72% ของโต๊ะ ไม่งั้นกล่องผลบังไพ่กลางจนหมด
+     ไพ่กลางคือสิ่งที่ต้องใช้อ่านว่าใครชนะด้วยอะไร บังแล้วอ่านผลไม่ออก
+     (และกล่องผลเองก็มีแถวไพ่กลางย่อไว้ข้างในแล้ว ดูหัวข้อ res-board) */
+  max-height: 72%; pointer-events: none;
+}
+.result-stack > .result {
+  position: static; transform: none; width: 100%;
+  z-index: auto; box-shadow: none; pointer-events: auto;
+}
+/* ⚠️ ต้องใช้ตัวเลือกที่มี id ด้วย ไม่งั้นแพ้ #t-result.is-many (1,1,0)
+   แล้วเพดาน 74% เดิมจะกลับมาคุมทั้งที่กองซ้อนคุมความสูงให้แล้ว */
+.result-stack > #t-result { flex: 0 1 auto; min-height: 0; max-height: none; }
+.result-stack > #t-money  { flex: 0 0 auto; max-height: none; }
+
+/* ---------- โซนเงิน ----------
+   ⚠️ ต้องเตี้ยไว้ ตัวมันหดไม่ได้ (flex 0 0 auto) ทุกพิกเซลที่มันกิน
+   คือพิกเซลที่หายไปจากแถวผู้ชนะ ซึ่งเป็นของสำคัญกว่า
+   จึงไม่มีหัวข้อแยก ใช้ป้ายบรรทัดเดียว และลดขอบในลงจาก 16px */
+#t-money.is-on { display: block; overflow-y: auto; cursor: pointer; padding: 8px 10px; }
+#t-money .lbl { display: block; font-size: .66rem; color: var(--muted); margin-bottom: 5px; }
+#t-money .chip { font-size: .72rem; padding: 2px 6px; }
 .table-area.is-many .pot { visibility: hidden; }
 #t-standings .rows { min-height: 64px; }
 /* ต้องเป็น flex ไม่ใช่ block ไม่งั้น flex ของลูกไม่ทำงาน
@@ -901,7 +960,11 @@ button { font-family: inherit; }
   display: block; font-size: .68rem; color: var(--muted);
   margin-bottom: 5px; letter-spacing: .02em;
 }
-.res-money .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+/* จัดกลาง ไม่ชิดซ้าย — จำนวนคนบนโต๊ะไม่คงที่ (2-9 คน) แถวสุดท้ายจึงไม่เต็มเสมอ
+   ชิดซ้ายแล้วแถวสุดท้ายห้อยอยู่ข้างเดียว ดูเหมือนวางไม่เสร็จ */
+.res-money .chips { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+#t-money { text-align: center; }
+#t-money .chips { justify-content: center; }
 .res-money .chip {
   display: flex; align-items: baseline; gap: 5px;
   background: #0d2519; border: 1px solid #1d3a2b; border-radius: 7px;
@@ -1048,7 +1111,18 @@ button { font-family: inherit; }
       <div class="board" id="t-board"></div>
       <div class="pot" id="t-pot">กองกลาง 0</div>
     </div>
-    <div class="result" id="t-result"></div>
+    <!-- ⚠️ สองโซนนี้ต้องอยู่ในกองซ้อนเดียวกัน
+         .result ทุกกล่องเป็น position:absolute; bottom:6px เหมือนกันหมด
+         ถ้าปล่อยไว้เฉยๆ สองกล่องจะทับกันสนิทที่จุดเดียวกัน
+         กองซ้อนนี้เป็นตัว absolute แทน ส่วนลูกกลับไปเป็น static แล้วเรียงลงมาตามปกติ -->
+    <div class="result-stack" id="result-stack">
+      <div class="result" id="t-result"></div>
+      <!-- โซนเงินต้องเป็นกล่องแยก ไม่ใช่ส่วนท้ายของกล่องผล
+           ตอนอยู่ในกล่องเดียวกัน .rows (แถวผู้ชนะ) ถูกตั้งไว้ให้ยืด-หดได้
+           ส่วนแถบเงินหดไม่ได้ พอที่ไม่พอ แถวผู้ชนะจึงถูกบีบเหลือ 0px
+           = จบมือแล้วไม่มีอะไรบอกว่าชนะด้วยชุดอะไร ซึ่งเป็นหัวใจของกล่องผล -->
+      <div class="result money-zone" id="t-money"></div>
+    </div>
     <div class="result" id="t-standings"></div>
     <div class="result" id="t-table"></div>
   </div>
@@ -2378,6 +2452,7 @@ button { font-family: inherit; }
     paintHole();
     paintActions();
     paintResult();
+    paintMoneyZone();
     paintStandings();
     paintTablePanel();
 
@@ -3523,35 +3598,42 @@ button { font-family: inherit; }
 
     var sub = document.createElement("p");
     sub.style.cssText = "margin:0 0 8px; font-size:.8rem; color:var(--muted)";
+    /* ⚠️ จบรอบได้สามทาง ครบตา · ครบเวลา · กดเลิกเอง
+       เดิมเขียนไว้สองทาง ทางที่สามจึงไปตกที่ประโยคเวลาแล้วขึ้น "ครบ 0 นาทีแล้ว" */
     sub.textContent = view.limit.type === "hands"
       ? "ครบ " + view.limit.value + " ตาแล้ว"
-      : "ครบ " + view.limit.value + " นาทีแล้ว";
+      : (view.limit.type === "minutes"
+          ? "ครบ " + view.limit.value + " นาทีแล้ว"
+          : "ปิดรอบเอง");
     box.appendChild(sub);
 
-    /* อันดับ 9 คนเลื่อนในกล่องของมันเอง ส่วนปุ่มอยู่กับที่เสมอ
-       ของเดิมปุ่มจมอยู่ใต้ขอบล่าง คนอันดับ 6-9 ก็ไม่เห็นผลตัวเอง */
+    /* ⚠️ ที่หนึ่งต้องอยู่นอกส่วนที่เลื่อนได้ เหมือนแถวผู้ชนะในกล่องผลมือ
+       ถ้าอยู่ในกล่องเลื่อนรวมกับคนอื่น พอมี 9 คนมันจะโดนตัดหัวทันที
+       ซึ่งพังจุดประสงค์ทั้งหมดของตารางอันดับ
+
+       ⚠️ ห้ามอ้าง isWin / winBox ตรงนี้ สองตัวนั้นเป็นของ paintResult
+       เคยถูกคัดลอกข้ามฟังก์ชันมา ทำให้ ReferenceError ทุกครั้งที่จบรอบ (โค้ดอยู่ใน strict mode)
+       ผลคือ render() ตายกลางคัน จอค้างที่โต๊ะเปล่า และปุ่ม "เริ่มรอบเล่นใหม่"
+       ซึ่งเป็นทางออกทางเดียว ไม่เคยถูกวาดเลย */
+    var topBox = document.createElement("div");
+    topBox.className = "win-box";
     var rows = document.createElement("div");
     rows.className = "rows";
     view.standings.forEach(function (p, i) {
       var row = document.createElement("div");
-      row.className = "row";
+      row.className = "row" + (i === 0 ? " row--win" : "");
       var left = document.createElement("span");
-      left.textContent = (i + 1) + ". " + p.name;
+      left.textContent = (i + 1) + ". " + p.name +
+                         (p.busts ? " (ล้ม " + p.busts + ")" : "");
       var right = document.createElement("b");
-      right.textContent = (p.net >= 0 ? "+" : "") + p.net.toLocaleString("th-TH");
-      right.style.color = p.net > 0 ? "var(--good)" : (p.net < 0 ? "#ff8f84" : "var(--muted)");
+      right.className = "res-amt" + (p.net < 0 ? " res-amt--lose" : "");
+      right.textContent = (p.net >= 0 ? "+" : "−") + Math.abs(p.net).toLocaleString("th-TH");
       row.appendChild(left);
       row.appendChild(right);
-      (isWin ? winBox : rows).appendChild(row);
+      (i === 0 ? topBox : rows).appendChild(row);
     });
-    box.appendChild(winBox);
-    if (rows.childNodes.length) {
-      var moreLbl = document.createElement("div");
-      moreLbl.className = "res-more";
-      moreLbl.textContent = "คนอื่นที่เปิดไพ่";
-      box.appendChild(moreLbl);
-      box.appendChild(rows);
-    }
+    box.appendChild(topBox);
+    if (rows.childNodes.length) box.appendChild(rows);
 
     var foot = document.createElement("div");
     foot.className = "foot";
@@ -3588,6 +3670,17 @@ button { font-family: inherit; }
     var h = document.createElement("h3");
     h.textContent = r.showdown ? "เปิดไพ่" : "จบมือ";
     box.appendChild(h);
+
+    /* ไพ่กลางย่อ วางไว้บนสุดของกล่อง
+       ⚠️ กล่องผลบังไพ่กลางบนโต๊ะเสมอ (มันต้องใหญ่พอจะอ่านชื่อกับชุดไพ่ได้)
+       ถ้าไม่มีแถวนี้ คนอ่านว่า "Two Pair Ks & Qs" แล้วเทียบกับอะไรไม่ได้เลย
+       เพราะไพ่กลางที่ใช้ประกอบชุดอยู่ใต้กล่องพอดี */
+    if (r.board && r.board.length) {
+      var bw = document.createElement("div");
+      bw.className = "res-board";
+      r.board.forEach(function (bc) { bw.appendChild(window.Cards.make(bc, "sm")); });
+      box.appendChild(bw);
+    }
 
     /* ต้องห่อด้วย .rows เหมือนตารางอันดับ ไม่งั้นแถวไม่ได้กติกาเลื่อน
        แล้วแถวที่ 3 ขึ้นไปจะล้นออกนอกขอบกล่อง */
@@ -3683,24 +3776,43 @@ button { font-family: inherit; }
     });
     box.appendChild(rows);
 
-    /* ---------- ใครซื้อเข้าเท่าไหร่ ตอนนี้ได้เสียเท่าไหร่ ----------
-       ⚠️ ตัวเลขชุดนี้มีอยู่แล้วในแผง "โต๊ะ · เงิน" แต่ต้องกดเปิดแล้วเลื่อนหา
-       จังหวะที่คนอยากรู้จริงคือ "ตอนมือเพิ่งจบ" ไม่ใช่ตอนไปเปิดแผงเอง
-       จึงเอามาแปะท้ายกล่องผลด้วย แตะแล้วเปิดตารางเต็มไปดูต่อได้
-       ยอดในแถวคนแพ้ข้างบนคือเงินที่เสีย "มือนี้" ส่วนแถบนี้คือ "สะสมทั้งโต๊ะ" คนละตัว */
-    var money = document.createElement("div");
-    money.className = "res-money";
-    var mlbl = document.createElement("span");
-    mlbl.className = "lbl";
-    mlbl.textContent = "สะสมทั้งโต๊ะ · ซื้อเข้า → ได้ / เสีย  (แตะเพื่อดูตารางเต็ม)";
-    money.appendChild(mlbl);
+    /* เปิดไพ่หลายคน = ต้องการที่มากกว่าปกติ ไม่งั้นเห็นทีละแถวเดียว */
+    var many = list.length > 2;
+    box.classList.toggle("is-many", many);
+    $("table-area").classList.toggle("is-many", many);
+
+    box.classList.add("is-on");
+  }
+
+  /* ---------- โซนเงิน: ใครซื้อเข้าเท่าไหร่ ตอนนี้ได้เสียเท่าไหร่ ----------
+     ⚠️ เป็นกล่องแยกของตัวเอง ไม่ใช่ส่วนท้ายของกล่องผล
+     เคยรวมอยู่ในกล่องเดียวกัน แล้วมันไปเบียดแถวผู้ชนะจนเหลือ 0px
+     คนเล่นจึงเห็นแต่ตัวเลขเงิน แต่ไม่เห็นว่าชนะด้วยชุดอะไร ซึ่งกลับหัวกลับหางกัน
+     ตัวเลขชุดนี้มีในแผง "โต๊ะ · เงิน" อยู่แล้ว แต่จังหวะที่คนอยากรู้จริงคือตอนมือเพิ่งจบ
+     ยอดในกล่องผลข้างบนคือเงิน "มือนี้" ส่วนโซนนี้คือ "สะสมทั้งโต๊ะ" คนละตัว */
+  function paintMoneyZone() {
+    var box = $("t-money");
+    if (!view || mySeat < 0 || view.phase !== "showdown" ||
+        (view.limit && view.limit.over)) {
+      box.classList.remove("is-on"); box.innerHTML = ""; return;
+    }
+
+    box.innerHTML = "";
+    var h = document.createElement("h3");
+    h.textContent = "เงินสะสมทั้งโต๊ะ";
+    box.appendChild(h);
+
+    var lbl = document.createElement("span");
+    lbl.className = "lbl";
+    lbl.textContent = "ซื้อเข้า → ได้ / เสีย  (แตะเพื่อดูตารางเต็ม)";
+    box.appendChild(lbl);
 
     var chips = document.createElement("div");
     chips.className = "chips";
     /* เรียงจากได้มากไปเสียมาก อ่านลำดับได้โดยไม่ต้องเทียบตัวเลขเอง */
     var moneyRows = [];
     view.seats.forEach(function (sm, im) {
-      if (sm) moneyRows.push({ i: im, name: sm.name, buy: sm.boughtIn, net: sm.net });
+      if (sm) moneyRows.push({ i: im, name: sm.name, buy: sm.boughtIn, net: sm.net, busts: sm.busts || 0 });
     });
     moneyRows.sort(function (a, b) { return b.net - a.net; });
     moneyRows.forEach(function (m) {
@@ -3711,7 +3823,10 @@ button { font-family: inherit; }
       n.textContent = m.name;
       var bq = document.createElement("span");
       bq.className = "b";
-      bq.textContent = m.buy.toLocaleString("th-TH") + " →";
+      /* ล้มแล้วเติมใหม่กี่รอบต้องเห็นด้วย ไม่งั้น "ซื้อเข้า 6,000" ดูเหมือนซื้อหนักตั้งแต่แรก
+         ทั้งที่จริงคือซื้อ 2,000 แล้วล้มไปสองรอบ ซึ่งคนละเรื่องกันเลย */
+      bq.textContent = m.buy.toLocaleString("th-TH") +
+                       (m.busts ? " (ล้ม " + m.busts + ")" : "") + " →";
       var v = document.createElement("span");
       v.className = "v " + (m.net > 0 ? "v--up" : (m.net < 0 ? "v--dn" : "v--flat"));
       v.textContent = (m.net > 0 ? "+" : (m.net < 0 ? "−" : "")) +
@@ -3719,21 +3834,17 @@ button { font-family: inherit; }
       c.appendChild(n); c.appendChild(bq); c.appendChild(v);
       chips.appendChild(c);
     });
-    money.appendChild(chips);
-    money.addEventListener("click", function () {
-      panelTab = "money";
-      tablePanelOn = true;
-      paintTablePanel();
-    });
-    box.appendChild(money);
-
-    /* เปิดไพ่หลายคน = ต้องการที่มากกว่าปกติ ไม่งั้นเห็นทีละแถวเดียว */
-    var many = list.length > 2;
-    box.classList.toggle("is-many", many);
-    $("table-area").classList.toggle("is-many", many);
-
+    box.appendChild(chips);
     box.classList.add("is-on");
   }
+
+  /* แตะโซนเงินแล้วเปิดตารางเต็ม — ผูกครั้งเดียวตอนเริ่ม ไม่ใช่ทุกครั้งที่วาดใหม่
+     ไม่งั้นตัวรับเหตุการณ์จะซ้อนกันเพิ่มขึ้นเรื่อยๆ ทุกมือ */
+  $("t-money").addEventListener("click", function () {
+    panelTab = "money";
+    tablePanelOn = true;
+    paintTablePanel();
+  });
 
 })();
 </script>
