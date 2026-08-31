@@ -203,7 +203,7 @@ button { font-family: inherit; }
 }
 .topbtn:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
 /* แผงสรุปโต๊ะ ใช้เปลือกเดียวกับกล่องผล แต่สูงกว่าเพราะมี 9 แถวเสมอ */
-#t-table.is-on { max-height: 84%; }
+#t-table.is-on { max-height: 88%; }
 #t-table .rows { min-height: 64px; }
 .mhead, .mrow {
   display: grid; grid-template-columns: 1fr auto auto;
@@ -257,6 +257,29 @@ button { font-family: inherit; }
 .prow__top .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prow__top b { font-size: .76rem; flex: 0 0 auto; }
 .prow__bot { font-size: .76rem; color: var(--muted); margin-top: 2px; }
+
+/* ---------- สถิติสะสมรายคน ----------
+   ⚠️ เดิมยัดทุกตัวเลขไว้ในบรรทัดเดียวคั่นด้วย · ตัวหนังสือ .76rem สีจาง
+   อ่านไม่ออกบนมือถือ และแยกไม่ออกว่าเลขไหนเป็นของอะไร
+   จึงแตกเป็นช่องละค่า ตัวเลขใหญ่อยู่บน ป้ายกำกับเล็กอยู่ล่าง กวาดตาทีเดียวจบ */
+.pstats {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 5px; margin-top: 7px;
+}
+.pstat {
+  background: #0d2519; border: 1px solid #1d3a2b; border-radius: 8px;
+  padding: 6px 3px; text-align: center; min-width: 0;
+}
+.pstat .v {
+  display: block; font-family: var(--mono); font-size: 1.02rem;
+  font-weight: 700; color: #e6f2ea; line-height: 1.15;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.pstat .k { display: block; font-size: .66rem; color: var(--muted); margin-top: 2px; }
+.prow__top { font-size: .95rem; }
+.prow__top b { font-size: .95rem; }
+.prow__key { font-size: .7rem; color: #56705f; margin-top: 6px; }
+.pnote { font-size: .74rem; line-height: 1.5; }
 .hand-log { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.08); text-align: left; }
 .hand-log__t { font-family: var(--mono); font-size: .8rem; color: var(--gold); margin-bottom: 3px; }
 .hand-log__p { font-size: .72rem; color: var(--muted); margin: 4px 0 2px; }
@@ -866,6 +889,31 @@ button { font-family: inherit; }
 
 /* กล่องผู้ชนะ อยู่กับที่เสมอ ไม่เลื่อนหนีสายตา */
 .win-box { flex: 0 0 auto; }
+
+/* ---------- แถบเงินสะสมท้ายกล่องผล ----------
+   ⚠️ ต้องอยู่นอกส่วนที่เลื่อนได้ (flex: 0 0 auto) เหมือน .win-box
+   ถ้าอยู่ใน .rows มันจะถูกดันหายตอนมีคนเปิดไพ่หลายคน ซึ่งเป็นจังหวะที่ต้องเห็นที่สุด */
+.res-money {
+  flex: 0 0 auto; margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid #1d3a2b; cursor: pointer;
+}
+.res-money .lbl {
+  display: block; font-size: .68rem; color: var(--muted);
+  margin-bottom: 5px; letter-spacing: .02em;
+}
+.res-money .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.res-money .chip {
+  display: flex; align-items: baseline; gap: 5px;
+  background: #0d2519; border: 1px solid #1d3a2b; border-radius: 7px;
+  padding: 3px 7px; font-size: .74rem;
+}
+.res-money .chip.is-me { border-color: var(--gold); }
+.res-money .chip .n { color: #cfe3d7; max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res-money .chip .b { font-family: var(--mono); font-size: .68rem; color: var(--muted); }
+.res-money .chip .v { font-family: var(--mono); font-weight: 700; }
+.res-money .v--up { color: var(--good); }
+.res-money .v--dn { color: #ff6b5e; }
+.res-money .v--flat { color: var(--muted); }
 .res-more {
   flex: 0 0 auto; font-size: .68rem; color: var(--muted);
   text-align: left; margin: 7px 0 1px; letter-spacing: .04em;
@@ -1900,6 +1948,11 @@ button { font-family: inherit; }
      เบราว์เซอร์ห้ามเล่นเสียงก่อนผู้ใช้แตะจอ จึงต้องปลุก AudioContext ตอนแตะครั้งแรก */
   function ac() {
     if (!soundOn) return null;
+    /* ⚠️ แท็บที่ไม่ได้มองอยู่ต้องเงียบ
+       เปิดโป๊กเกอร์ค้างไว้หลายแท็บ (คนละห้องกัน) ทุกแท็บยังต่อโซเก็ตอยู่
+       และเล่นเสียงตามเหตุการณ์ของห้องตัวเอง = ได้ยินเสียงโต๊ะอื่นแทรกเข้ามา
+       ทั้งที่กำลังนั่งอยู่อีกโต๊ะ เสียงควรมาจากโต๊ะที่มองอยู่เท่านั้น */
+    if (document.hidden) return null;
     if (!audioCtx) {
       var AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
@@ -1908,6 +1961,15 @@ button { font-family: inherit; }
     if (audioCtx.state === "suspended") { try { audioCtx.resume(); } catch (e) {} }
     return audioCtx;
   }
+
+  /* สลับแท็บออกแล้วต้องเงียบทันที ไม่ใช่รอให้เสียงที่ค้างอยู่ดังจนจบ */
+  document.addEventListener("visibilitychange", function () {
+    if (!audioCtx) return;
+    try {
+      if (document.hidden) audioCtx.suspend();
+      else if (soundOn) audioCtx.resume();
+    } catch (e) {}
+  });
 
   /* เสียงรบกวนสั้นๆ ผ่านฟิลเตอร์ = เสียง "เคาะ/ปา/ไถ" ของจริง
      คลื่นไซน์เดี่ยวๆ ฟังเป็นเสียงอิเล็กทรอนิกส์ ไม่เหมือนของบนโต๊ะ */
@@ -2418,20 +2480,43 @@ button { font-family: inherit; }
         net.style.color = p.net > 0 ? "var(--good)" : (p.net < 0 ? "#ff8f84" : "var(--muted)");
         top.appendChild(nm); top.appendChild(net);
 
-        var l1 = document.createElement("div");
-        l1.className = "prow__bot num";
-        l1.textContent = "เล่น " + p.hands + " มือ · ชนะ " + p.won +
-                         " · ลงเงินตั้งแต่พรีฟลอป " + p.vpip + "%" +
-                         " · คิดเฉลี่ย " + p.avgThink + " วิ";
-        var l2 = document.createElement("div");
-        l2.className = "prow__bot num";
-        l2.textContent = "เพิ่ม " + p.acts.raise + " · ตาม " + p.acts.call +
-                         " · เคาะ " + p.acts.check + " · หมอบ " + p.acts.fold;
+        /* ช่องละค่าเดียว ตัวเลขใหญ่บน ป้ายเล็กล่าง แทนบรรทัดยาวคั่นด้วย ·
+           แถวบน = เล่นไปแค่ไหน แถวล่าง = เล่นด้วยท่าอะไร คนละคำถามกัน */
+        function statGrid(items) {
+          var g = document.createElement("div");
+          g.className = "pstats";
+          items.forEach(function (it) {
+            var c = document.createElement("div");
+            c.className = "pstat";
+            var v = document.createElement("span");
+            v.className = "v";
+            v.textContent = it[0];
+            var k = document.createElement("span");
+            k.className = "k";
+            k.textContent = it[1];
+            c.appendChild(v); c.appendChild(k);
+            g.appendChild(c);
+          });
+          return g;
+        }
+
+        var g1 = statGrid([
+          [p.hands, "มือที่เล่น"],
+          [p.won, "มือที่ชนะ"],
+          [p.vpip + "%", "ลงเงิน"],
+          [p.avgThink + " วิ", "คิดเฉลี่ย"]
+        ]);
+        var g2 = statGrid([
+          [p.acts.raise, "Raise"],
+          [p.acts.call, "Call"],
+          [p.acts.check, "Check"],
+          [p.acts.fold, "Fold"]
+        ]);
         var l3 = document.createElement("div");
-        l3.className = "prow__bot";
+        l3.className = "prow__key";
         l3.textContent = "รหัสเครื่อง " + shortKey(p.key);
 
-        d.appendChild(top); d.appendChild(l1); d.appendChild(l2); d.appendChild(l3);
+        d.appendChild(top); d.appendChild(g1); d.appendChild(g2); d.appendChild(l3);
         rows.appendChild(d);
       });
     }
@@ -2440,7 +2525,7 @@ button { font-family: inherit; }
     var foot = document.createElement("div");
     foot.className = "foot";
     var note = document.createElement("p");
-    note.className = "hint-sm";
+    note.className = "hint-sm pnote";
     note.style.margin = "0 0 8px";
     /* ต้องบอกข้อจำกัดไว้ ไม่งั้นคนจะเชื่อตัวเลขเกินจริง */
     note.textContent = "นับคนจากรหัสที่เก็บไว้ในเครื่อง ย้าย WiFi ได้ไม่หาย " +
@@ -2688,11 +2773,14 @@ button { font-family: inherit; }
 
     /* ⚠️ กล่องเพิ่มบอทต้องอยู่บนสุด เห็นทันทีที่เปิดแผง
        เคยวางไว้ล่างสุดใต้ตารางเงิน 9 แถว ต้องเลื่อนลงไปไกลถึงเจอ
-       ซึ่งเท่ากับไม่มีปุ่มสำหรับคนใช้จริง */
-    box.appendChild(buildBotBox());
-
+       ซึ่งเท่ากับไม่มีปุ่มสำหรับคนใช้จริง
+       ⚠️ แต่ใส่เฉพาะแท็บ "เงิน" เท่านั้น มันเป็นเรื่องของ "ใครนั่งอยู่บนโต๊ะ"
+       สองแท็บที่เหลือเป็นตัวเลขล้วน กล่องบอทสูงเกือบ 200px ไปกินที่จนตัวเลข
+       ถูกตัดหัวตัดท้าย เห็นแค่แถวเดียว ทั้งที่คนเปิดมาเพื่อดูตัวเลข */
     if (panelTab === "log") { paintHistoryInto(box); box.classList.add("is-on"); return; }
     if (panelTab === "all") { paintProfilesInto(box); box.classList.add("is-on"); return; }
+
+    box.appendChild(buildBotBox());
 
     /* ย้ายที่นั่งกลางมือไม่ได้ ลำดับการเดินตาผูกกับเลขช่อง */
     var canMove = view.phase === "waiting" || view.phase === "showdown";
@@ -2800,6 +2888,32 @@ button { font-family: inherit; }
         paintTablePanel();
       });
       rows.appendChild(so);
+    }
+
+    /* ---------- เลิกเล่นรอบนี้ ----------
+       ⚠️ ตัวเลือก "ไม่จำกัด" เขียนว่า "เล่นไปเรื่อยๆ จนกดเลิกเอง"
+       แต่ไม่เคยมีปุ่มเลิกอยู่จริง มีแค่ "← ออก" ซึ่งคือลุกจากโต๊ะคนเดียว ไม่ใช่ปิดรอบ
+       คนที่เลือกไม่จำกัดจึงไม่มีทางได้เห็นตารางสรุปรอบเลย
+       ปุ่มนี้ปิดรอบให้ทั้งโต๊ะ แล้วขึ้นตารางสรุป (เริ่มรอบใหม่ได้จากตารางนั้น) */
+    if (!view.limit || !view.limit.over) {
+      var stop = document.createElement("button");
+      stop.type = "button";
+      stop.className = "act";
+      stop.style.width = "100%";
+      stop.style.marginBottom = "8px";
+      var canStop = view.phase === "waiting" || view.phase === "showdown";
+      stop.disabled = !canStop;
+      stop.textContent = "เลิกเล่นรอบนี้";
+      stop.appendChild(makeSub(canStop
+        ? "ปิดรอบทั้งโต๊ะ แล้วขึ้นตารางสรุปว่าใครได้ใครเสีย"
+        : "รอมือนี้จบก่อน"));
+      stop.addEventListener("click", function () {
+        if (!confirm("เลิกรอบนี้ทั้งโต๊ะ แล้วดูตารางสรุปเลยไหม")) return;
+        send({ type: "endrun" });
+        tablePanelOn = false;
+        paintTablePanel();
+      });
+      rows.appendChild(stop);
     }
 
     var close = document.createElement("button");
@@ -3568,6 +3682,50 @@ button { font-family: inherit; }
       rows.appendChild(row);
     });
     box.appendChild(rows);
+
+    /* ---------- ใครซื้อเข้าเท่าไหร่ ตอนนี้ได้เสียเท่าไหร่ ----------
+       ⚠️ ตัวเลขชุดนี้มีอยู่แล้วในแผง "โต๊ะ · เงิน" แต่ต้องกดเปิดแล้วเลื่อนหา
+       จังหวะที่คนอยากรู้จริงคือ "ตอนมือเพิ่งจบ" ไม่ใช่ตอนไปเปิดแผงเอง
+       จึงเอามาแปะท้ายกล่องผลด้วย แตะแล้วเปิดตารางเต็มไปดูต่อได้
+       ยอดในแถวคนแพ้ข้างบนคือเงินที่เสีย "มือนี้" ส่วนแถบนี้คือ "สะสมทั้งโต๊ะ" คนละตัว */
+    var money = document.createElement("div");
+    money.className = "res-money";
+    var mlbl = document.createElement("span");
+    mlbl.className = "lbl";
+    mlbl.textContent = "สะสมทั้งโต๊ะ · ซื้อเข้า → ได้ / เสีย  (แตะเพื่อดูตารางเต็ม)";
+    money.appendChild(mlbl);
+
+    var chips = document.createElement("div");
+    chips.className = "chips";
+    /* เรียงจากได้มากไปเสียมาก อ่านลำดับได้โดยไม่ต้องเทียบตัวเลขเอง */
+    var moneyRows = [];
+    view.seats.forEach(function (sm, im) {
+      if (sm) moneyRows.push({ i: im, name: sm.name, buy: sm.boughtIn, net: sm.net });
+    });
+    moneyRows.sort(function (a, b) { return b.net - a.net; });
+    moneyRows.forEach(function (m) {
+      var c = document.createElement("div");
+      c.className = "chip" + (m.i === mySeat ? " is-me" : "");
+      var n = document.createElement("span");
+      n.className = "n";
+      n.textContent = m.name;
+      var bq = document.createElement("span");
+      bq.className = "b";
+      bq.textContent = m.buy.toLocaleString("th-TH") + " →";
+      var v = document.createElement("span");
+      v.className = "v " + (m.net > 0 ? "v--up" : (m.net < 0 ? "v--dn" : "v--flat"));
+      v.textContent = (m.net > 0 ? "+" : (m.net < 0 ? "−" : "")) +
+                      Math.abs(m.net).toLocaleString("th-TH");
+      c.appendChild(n); c.appendChild(bq); c.appendChild(v);
+      chips.appendChild(c);
+    });
+    money.appendChild(chips);
+    money.addEventListener("click", function () {
+      panelTab = "money";
+      tablePanelOn = true;
+      paintTablePanel();
+    });
+    box.appendChild(money);
 
     /* เปิดไพ่หลายคน = ต้องการที่มากกว่าปกติ ไม่งั้นเห็นทีละแถวเดียว */
     var many = list.length > 2;

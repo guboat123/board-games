@@ -8,7 +8,7 @@
      2 ปานกลาง  เลือกมือพอประมาณ กล้าเดิมพันตอนมือดี บลัฟบ้าง
      3 เก่ง      เล่นตึง ไล่หนักตอนมือดี บลัฟมีจังหวะ ยอมทิ้งมือไม่ดีเร็ว
    =========================================================== */
-import { evaluate7, RANK_CHARS, SUIT_CHARS } from "./poker-engine.mjs";
+import { evaluate7, cardCode, RANK_CHARS, SUIT_CHARS } from "./poker-engine.mjs";
 
 /* ⚠️ ชื่อบอทต้องเป็นอังกฤษล้วน เพื่อให้แยกออกจากคนไทยที่นั่งอยู่ด้วยตาเปล่า
    เดิมใช้ชื่อเล่นไทย (โบ๊ท แมท น้ำ ...) แล้วชนกับชื่อคนจริงบนโต๊ะ
@@ -97,6 +97,73 @@ export function createBotManager(room, broadcast) {
   const pending = {};     /* seatId -> timer ที่ตั้งไว้ */
   let seq = 0;
 
+  /* ---------- ความจำเรื่องคนอื่นที่โต๊ะ ----------
+     ทุกครั้งที่มีใครเปิดไพ่ (เปิดตอน showdown หรือกดโชว์เอง) บอททุกตัวจำไว้
+     ว่าคนนั้นสู้ด้วยไพ่แบบไหน แล้วเอามาใช้ตอนตัดสินใจครั้งต่อไป
+     คนที่โชว์แต่ไพ่แข็ง = เวลาเขาดัน ควรเชื่อ (ต้องใช้ไพ่ดีกว่าปกติถึงสู้)
+     คนที่โชว์ไพ่ขยะบ่อย = เขาบลัฟเป็นนิสัย ตามได้เบามือกว่าปกติ
+
+     ⚠️ เก็บด้วย "ชื่อ" ไม่ใช่เลขที่นั่ง เพราะคนย้ายที่นั่งได้
+     ถ้าอ้างเลขที่นั่ง พอมีคนย้าย ความจำจะไปติดตัวคนอื่นทันที
+     (เหตุผลเดียวกับที่ประวัติมือในเซิร์ฟเวอร์เก็บชื่อ ไม่ใช่ที่นั่ง)
+
+     นี่ไม่ใช่การโกง — เป็นข้อมูลที่คนนั่งอยู่โต๊ะเดียวกันก็เห็นเหมือนกันหมด */
+  const reads = {};         /* ชื่อ -> { n, strong, weak } */
+  let lastSeenHand = -1;
+
+  function readOf(name) {
+    return reads[name] || { n: 0, strong: 0, weak: 0 };
+  }
+
+  function observe(st) {
+    if (st.phase !== "showdown" || st.handNo === lastSeenHand) return;
+    lastSeenHand = st.handNo;
+
+    const seen = [];
+    const r = st.lastResult;
+    if (r && r.reveal) {
+      for (const x of r.reveal) {
+        if (x.cards && x.cards.length === 2) seen.push({ name: x.name, cards: x.cards });
+      }
+    }
+    /* คนที่กดโชว์เอง ไม่ได้อยู่ใน reveal ต้องเก็บด้วย เป็นข้อมูลที่มีค่าที่สุด
+       (เขาเลือกโชว์เอง = ตั้งใจให้เห็น มักเป็นการขิงว่าบลัฟสำเร็จ) */
+    for (let i = 0; i < st.seats.length; i++) {
+      const sx = st.seats[i];
+      if (!sx || !st.shown[i] || !sx.cards || sx.cards.length !== 2) continue;
+      if (seen.some(y => y.name === sx.name)) continue;
+      seen.push({ name: sx.name, cards: sx.cards.map(cardCode) });
+    }
+
+    for (const x of seen) {
+      const v = preflopStrength(x.cards);
+      const rec = reads[x.name] || (reads[x.name] = { n: 0, strong: 0, weak: 0 });
+      rec.n++;
+      if (v >= 0.55) rec.strong++;
+      else if (v < 0.35) rec.weak++;
+      /* จำแค่ช่วงหลัง คนเปลี่ยนสไตล์ได้ ความจำจากเมื่อ 50 มือก่อนไม่ควรค้างตลอดไป */
+      if (rec.n > 12) { rec.n = 8; rec.strong = Math.round(rec.strong * 8 / 12); rec.weak = Math.round(rec.weak * 8 / 12); }
+    }
+  }
+
+  /* บอทขิง: ชนะโดยไม่มีใครตามถึงตอนเปิดไพ่ = ไม่มีใครเห็นว่าถืออะไร
+     คนเล่นจริงชอบโชว์ตอนนั้น ทั้งตอนบลัฟสำเร็จ (กวนประสาท) และตอนไพ่ดีจริง (เสียดายไม่มีใครเห็น)
+     ระดับสูงขิงบ่อยกว่า เพราะเขาเล่นกับภาพจำของคนอื่นเป็น */
+  function maybeShowOff(st) {
+    if (st.phase !== "showdown" || !st.lastResult || st.lastResult.showdown) return;
+    for (const b of botSeats()) {
+      if (st.shown[b.seatId]) continue;
+      if (!b.cards || b.cards.length !== 2) continue;
+      const won = st.lastResult.payouts.some(p => p.seatId === b.seatId);
+      if (!won) continue;
+      const lv = LEVEL[b.botLevel] || LEVEL[2];
+      const v = preflopStrength(b.cards.map(cardCode));
+      /* ไพ่ขยะที่ชนะ = บลัฟสำเร็จ ขิงสนุกกว่า / ไพ่แข็ง = อวดของดี ขิงน้อยกว่า */
+      const chance = (v < 0.35 ? 0.45 : 0.18) * (lv.bluff > 0.1 ? 1.4 : 0.7);
+      if (Math.random() < chance) room.table.action(b.seatId, { type: "showcards" });
+    }
+  }
+
   function botSeats() {
     return room.table._state.seats.filter(s => s && s.isBot);
   }
@@ -130,21 +197,29 @@ export function createBotManager(room, broadcast) {
     /* ไม่มีคนจริงอยู่แล้ว บอทไม่ต้องเล่นต่อ ปล่อยให้ห้องถูกเก็บไป */
     if (!room.table.anyConnected()) return;
 
-    /* ⚠️ ถ้ามีคนจริงที่พร้อมเล่นอยู่ ห้ามบอทกดเริ่มมือให้
-       จังหวะจบมือเป็นของคนเล่น เขาอาจกำลังดูไพ่ที่เปิด ดูว่าใครได้เท่าไหร่ หรือกดโชว์ไพ่
-       บอทกดเริ่มตัดจังหวะนั้นทิ้งหมด — บอทเริ่มให้เฉพาะตอนไม่มีคนจริงที่กดได้ */
-    const humanReady = st.seats.some(x => x && !x.isBot && x.connected && !x.sitOut && x.stack > 0);
-    if ((st.phase === "waiting" || st.phase === "showdown") && botSeats().length && !humanReady) {
-      const starter = botSeats()[0];
-      if (!pending["start"]) {
-        pending["start"] = setTimeout(() => {
-          delete pending["start"];
-          const out = room.table.action(starter.seatId, { type: "start" });
-          if (!out || !out.error) { broadcast(); poke(); }
-        }, 2000);
+    /* จำไพ่ที่เพิ่งเห็น แล้วขิงถ้ามีจังหวะ ทำก่อนอย่างอื่นเสมอ
+       เพราะเป็นข้อมูลของ "มือที่เพิ่งจบ" ซึ่งจะหายไปทันทีที่ขึ้นมือใหม่ */
+    observe(st);
+    maybeShowOff(st);
+
+    /* บอทชิปหมดต้องซื้อกลับเข้ามาเอง ไม่งั้นโต๊ะค่อยๆ ว่างจนเหลือคนเดียว
+       แล้วคนที่เหลือก็เริ่มมือไม่ได้เพราะ "ต้องมีอย่างน้อย 2 คน"
+       เติมได้เฉพาะตอนไม่มีมือกำลังเล่น (เซิร์ฟเวอร์กันไว้อยู่แล้ว)
+       จำนวนครั้งที่ล้มถูกนับใน s.busts แล้วส่งกลับเข้าไปในหัวบอท (ดู decide) */
+    if (st.phase === "waiting" || st.phase === "showdown") {
+      for (const b of botSeats()) {
+        if (b.stack > 0) continue;
+        room.table.action(b.seatId, { type: "rebuy", amount: 2000 });
       }
-      return;
     }
+
+    /* ⚠️ บอทไม่มีสิทธิ์กด "เริ่มเล่น" / "มือต่อไป" เลย (เจ้าของสั่ง 2026-08-31)
+       จังหวะขึ้นมือใหม่เป็นของคนเล่นเท่านั้น เขาอาจกำลังไล่ดูว่าใครถือไพ่อะไร
+       ใครได้ใครเสียเท่าไหร่ หรือกำลังจะกดโชว์ไพ่ บอทกดเริ่มตัดจังหวะนั้นทิ้งหมด
+       เคยลองให้บอทเริ่มได้เฉพาะตอนไม่มีคนจริงพร้อมเล่น ก็ยังรีบเกินไปอยู่ดี
+       อย่าใส่กลับมา ไม่ว่าจะหน่วงเวลานานแค่ไหนก็ตาม
+       ผลข้างเคียงที่ยอมรับแล้ว: โต๊ะที่มีแต่บอทจะไม่เดินเอง ต้องมีคนกด */
+    if (st.phase === "waiting" || st.phase === "showdown") return;
 
     const cur = st.current;
     if (cur < 0) return;
@@ -187,7 +262,33 @@ export function createBotManager(room, broadcast) {
     /* ไพ่ที่มีลุ้น = บลัฟแล้วยังมีทางชนะจริง ไม่ใช่ได้ทางเดียวคือให้เขาหมอบ */
     const draw = pre ? 0 : drawStrength(me.cards, view.board);
 
-    const bluffing = Math.random() < lv.bluff * crowdFactor;
+    /* ⚠️ ล้มโต๊ะมาแล้วกี่รอบ = บทเรียนที่บอทควรจำ ไม่ใช่เริ่มใหม่แบบไม่รู้อะไรเลย
+       ยิ่งล้มบ่อยยิ่งเล่นระวังขึ้น (ต้องการไพ่ดีกว่าเดิมถึงจะสู้) และบลัฟน้อยลง
+       จำกัดเพดานไว้ ไม่งั้นบอทที่ซวยติดกันจะกลายเป็นหมอบทุกมือจนไม่มีใครอยากเล่นด้วย */
+    const busts = Math.min(me.busts || 0, 3);
+
+    /* ---------- อ่านคนที่กำลังดันเราอยู่ ----------
+       ต้องรู้ว่ากำลังสู้กับใคร ไม่ใช่สู้กับ "ราคา" เฉยๆ
+       คนที่ดัน = คนที่วางเงินเท่ากับเงินสูงสุดบนโต๊ะตอนนี้ และท่าล่าสุดคือดัน */
+    let pressureRead = null;
+    if (view.toCall > 0) {
+      view.seats.forEach(function (x, i) {
+        if (!x || i === seatId || x.folded || !x.inHand) return;
+        if (x.bet !== view.currentBet) return;
+        if (x.lastKind !== "raise" && x.lastKind !== "bet") return;
+        pressureRead = readOf(x.name);
+      });
+    }
+    /* เห็นไพ่เขามาแล้วอย่างน้อย 3 ครั้งถึงจะเชื่อสถิติ น้อยกว่านั้นคือเดา
+       โชว์แต่ไพ่แข็ง = ต้องใช้ไพ่ดีกว่าเดิมถึงจะสู้ / โชว์ไพ่ขยะบ่อย = ตามได้เบามือ */
+    let respect = 0;
+    if (pressureRead && pressureRead.n >= 3) {
+      respect = (pressureRead.strong - pressureRead.weak) / pressureRead.n * 0.09;
+    }
+
+    const caution = busts * 0.03 + respect;
+
+    const bluffing = Math.random() < lv.bluff * crowdFactor * (1 - busts * 0.2);
     let eq = base + draw + (bluffing ? 0.26 : 0) + (Math.random() - 0.5) * 0.08;
     eq = Math.max(0, Math.min(1, eq));
 
@@ -205,7 +306,7 @@ export function createBotManager(room, broadcast) {
        ของเดิมดูแค่ "มือแข็งพอไหม" โดยไม่สนราคา จึงพับมือดีทิ้งเพราะเดิมพัน 20 */
     const toCall = view.toCall;
     const price = toCall > 0 ? toCall / (potNow + toCall) : 0;
-    const margin = pre ? lv.preMargin : lv.margin;
+    const margin = (pre ? lv.preMargin : lv.margin) + caution;
     const raiseAt = pre ? lv.preRaise : lv.raise;
     const worthCalling = toCall === 0 || eq >= price + margin;
 

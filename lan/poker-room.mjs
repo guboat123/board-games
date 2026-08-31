@@ -211,6 +211,7 @@ export function createTable(opts = {}) {
       name: finalName,
       stack: chips,
       boughtIn: chips,   /* รวมชิปที่ซื้อเข้ามาทั้งหมด ใช้คิดกำไรขาดทุน */
+      busts: 0,          /* ชิปหมดแล้วเติมใหม่กี่ครั้ง (0 = ยังไม่เคยหมด) */
       bet: 0,            /* ลงไปแล้วเท่าไหร่ในรอบเดิมพันนี้ */
       committed: 0,      /* ลงไปแล้วเท่าไหร่ในมือนี้ทั้งหมด */
       cards: [],
@@ -676,7 +677,7 @@ export function createTable(opts = {}) {
     st.standings = seated()
       .map(s => ({
         seatId: s.seatId, name: s.name,
-        stack: s.stack, boughtIn: s.boughtIn,
+        stack: s.stack, boughtIn: s.boughtIn, busts: s.busts || 0,
         net: s.stack - s.boughtIn
       }))
       .sort((a, b) => b.net - a.net);
@@ -773,6 +774,7 @@ export function createTable(opts = {}) {
         name: s.name,
         stack: s.stack,
         boughtIn: s.boughtIn,
+        busts: s.busts || 0,
         net: s.stack - s.boughtIn,   /* บวก/ลบเทียบกับที่ซื้อเข้ามา */
         bet: s.bet,
         folded: s.folded,
@@ -828,9 +830,13 @@ export function createTable(opts = {}) {
       if (!isFinite(raw) || raw <= 0) return { error: "ใส่จำนวนชิปที่จะเติม" };
       if (raw > cfg.maxBuyIn) return { error: "เติมได้ครั้งละไม่เกิน " + cfg.maxBuyIn };
       const add = raw;   /* เติมเท่าไหร่ก็ได้ ขั้นต่ำมีไว้สำหรับซื้อครั้งแรกเท่านั้น */
+      /* เติมตอนชิปหมดเกลี้ยง = ล้มโต๊ะไปหนึ่งรอบ ต้องนับไว้
+         เติมทั้งที่ยังมีชิปเหลือ (เติมเสริม) ไม่นับ เพราะไม่ได้ล้ม */
+      if (s.stack === 0) s.busts = (s.busts || 0) + 1;
       s.stack += add;
       s.boughtIn += add;
-      note(s.name + " เติมชิป " + add);
+      note(s.name + " เติมชิป " + add +
+           (s.busts ? " (ล้มมาแล้ว " + s.busts + " รอบ)" : ""));
       return {};
     }
 
@@ -879,6 +885,19 @@ export function createTable(opts = {}) {
       note("ตั้งค่าโต๊ะใหม่: บอด " + cfg.smallBlind + "/" + cfg.bigBlind);
       return {};
     }
+    /* เลิกเล่นเอง = ปิดรอบแล้วขึ้นตารางสรุปทันที
+       ⚠️ ตัวเลือก "ไม่จำกัด" เขียนไว้ว่า "เล่นไปเรื่อยๆ จนกดเลิกเอง"
+       แต่เดิมไม่มีคำสั่งให้กดเลิกจริง ปิดรอบได้ทางเดียวคือเล่นให้ครบตาที่ตั้งไว้
+       คนที่เลือกไม่จำกัดจึงไม่มีทางได้เห็นตารางสรุปเลย */
+    if (msg.type === "endrun") {
+      if (st.phase !== "waiting" && st.phase !== "showdown") {
+        return { error: "มือนี้ยังไม่จบ เลิกตอนนี้ไม่ได้" };
+      }
+      if (st.sessionOver) return { error: "รอบเล่นนี้จบไปแล้ว" };
+      closeSession();
+      return {};
+    }
+
     /* เริ่มรอบเล่นใหม่: ล้างเวลาและจำนวนตา แต่ชิปคงไว้ */
     if (msg.type === "newsession") {
       if (st.phase !== "waiting" && st.phase !== "showdown") {
