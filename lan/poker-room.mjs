@@ -29,7 +29,11 @@ export const DEFAULTS = {
   /* ไม่ตอบสนองนานเกินกี่วินาที ให้พักมือให้อัตโนมัติ (0 = ไม่บังคับ)
      นับจาก "ครั้งสุดท้ายที่ลงมือเอง" ไม่ใช่เวลาที่นั่งอยู่เฉยๆ
      คนที่นั่งดูคนอื่นเล่นอยู่ดีๆ จึงไม่โดนพักมือ */
-  idleSitOutSeconds: 200
+  idleSitOutSeconds: 200,
+  /* หมดเวลาติดกันกี่ครั้งถึงพักมือให้ (0 = ไม่ใช้กติกานี้)
+     เร็วกว่าการนับวินาทีมาก และเป็นหลักฐานที่หนักแน่นกว่า:
+     คนที่ปล่อยหมดเวลาสามตาติดคือคนที่ไม่อยู่แล้วจริงๆ ไม่ใช่แค่คิดนาน */
+  idleSitOutTimeouts: 3
 };
 
 export function createTable(opts = {}) {
@@ -219,6 +223,7 @@ export function createTable(opts = {}) {
       lastAction: "",
       lastKind: "",
       lastActAt: Date.now(),   /* ครั้งสุดท้ายที่ "ลงมือเอง" ใช้จับคนหายไปเฉยๆ */
+      timeouts: 0,             /* หมดเวลาติดกันกี่ครั้งแล้ว ล้างเมื่อลงมือเอง */
       isBot: !!(opts && opts.bot),
       botLevel: (opts && opts.level) || 0,
       timeCards: cfg.timeCards,   /* การ์ดต่อเวลาที่เหลือของคนนี้ */
@@ -488,6 +493,7 @@ export function createTable(opts = {}) {
     record(seatId, msg.action, stackBefore - s.stack, thinkMs);
     /* ลงมือเองแล้ว = ยังอยู่ ไม่ต้องโดนบังคับพักมือ */
     s.lastActAt = Date.now();
+    s.timeouts = 0;
 
     checkRoundEnd(seatId);
     return {};
@@ -809,6 +815,7 @@ export function createTable(opts = {}) {
       if (s) {
         s.sitOut = !!msg.value;
         s.lastActAt = Date.now();   /* กดปุ่มเอง = ยังอยู่ นับเวลาใหม่ */
+        s.timeouts = 0;
         note(s.name + (s.sitOut ? " ขอพักมือ" : " กลับมาเล่นต่อ"));
       }
       return {};
@@ -945,15 +952,26 @@ export function createTable(opts = {}) {
        ถ้าอ่านทีหลัง ตัวจับเวลาจะถูกรีเซ็ตด้วยการเดินแทนของระบบเอง
        แล้วจะไม่มีวันถึง 200 วินาที ต่อให้คนนั้นหายไปทั้งคืน */
     const idleSince = s2.lastActAt;
+    /* ⚠️ ต้องนับไว้ก่อนเดินแทน แล้วเขียนทับหลังจากนั้น
+       เพราะ playerAction ล้างตัวนับเสมอ (มันไม่รู้ว่าใครเป็นคนสั่ง)
+       ถ้าไปนับทีหลัง ค่าจะเป็น 1 ตลอดกาล ไม่มีวันครบ 3 ตาติด
+       — กับดักเดียวกับที่ทำให้ตัวจับเวลา 200 วิ ไม่เคยทำงาน */
+    const nextTimeouts = (s2.timeouts || 0) + 1;
     playerAction(who, { action: auto });
+    s2.timeouts = nextTimeouts;
 
     /* หายไปนานจริงๆ ให้พักมือให้ ไม่งั้นทั้งโต๊ะต้องรอครบเวลาทุกมือ
        ⚠️ ต้องเช็คหลังลงมือแทนแล้ว และเฉพาะคนที่ "หมดเวลา" เท่านั้น
        คนที่นั่งดูอยู่เฉยๆ ไม่เคยถึงตา ต้องไม่โดนพักมือ */
     const idleMs = cfg.idleSitOutSeconds * 1000;
-    if (idleMs && !s2.isBot && !s2.sitOut && now - idleSince > idleMs) {
+    const byTime = idleMs && now - idleSince > idleMs;
+    const byCount = cfg.idleSitOutTimeouts && s2.timeouts >= cfg.idleSitOutTimeouts;
+    if (!s2.isBot && !s2.sitOut && (byTime || byCount)) {
       s2.sitOut = true;
-      note(s2.name + " ไม่ตอบสนองเกิน " + cfg.idleSitOutSeconds + " วิ ระบบให้พักมือไว้ก่อน");
+      s2.timeouts = 0;
+      note(s2.name + (byCount && !byTime
+        ? " ปล่อยหมดเวลา " + cfg.idleSitOutTimeouts + " ตาติด ระบบให้พักมือไว้ก่อน"
+        : " ไม่ตอบสนองเกิน " + cfg.idleSitOutSeconds + " วิ ระบบให้พักมือไว้ก่อน"));
     }
     return true;
   }

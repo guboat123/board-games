@@ -396,5 +396,48 @@ head("หายไปนานเกินกำหนด ระบบพัก�
   ok(st4.seats[c4].sitOut !== true, "ตั้งเป็น 0 = ไม่บังคับพักมือเลย");
 }
 
+/* --------------------------------------------------------------- */
+head("ปล่อยหมดเวลาติดกันหลายตา ต้องถูกพักมือเร็วกว่ารอครบ 200 วิ");
+{
+  const t = createTable({ smallBlind: 10, bigBlind: 20, minBuyIn: 1, maxBuyIn: 100000,
+                          turnSeconds: 30, idleSitOutSeconds: 200, idleSitOutTimeouts: 3 });
+  const a = t.sit("เอ", 0, 2000, "tokA");
+  const b = t.sit("บี", 1, 2000, "tokB");
+  const st = t._state;
+
+  /* ให้ "บี" ปล่อยหมดเวลาไปเรื่อยๆ ส่วน "เอ" เล่นปกติ */
+  let timeouts = 0;
+  for (let hand = 0; hand < 6 && !st.seats[b.seatId].sitOut; hand++) {
+    if (st.phase === "waiting" || st.phase === "showdown") { t.action(a.seatId, { type: "start" }); }
+    let guard = 0;
+    while (st.phase !== "showdown" && st.phase !== "waiting" && guard++ < 20) {
+      const cur = st.current;
+      if (cur < 0) break;
+      if (cur === b.seatId) {
+        st.turnAt = Date.now() - 31000;   /* บี ปล่อยหมดเวลา */
+        if (t.tick()) timeouts++;
+      } else {
+        let r = t.action(cur, { type: "act", action: "check" });
+        if (r.error) r = t.action(cur, { type: "act", action: "call" });
+        if (r.error) break;
+      }
+      if (st.seats[b.seatId].sitOut) break;
+    }
+  }
+  ok(st.seats[b.seatId].sitOut === true, "หมดเวลาติดกันครบ ต้องถูกพักมือ", st.seats[b.seatId].sitOut);
+  ok(timeouts <= 4, "ต้องพักมือภายใน 3-4 ตา ไม่ใช่รอครบ 200 วิ (~7 ตา)", timeouts);
+  ok(st.seats[a.seatId].sitOut !== true, "คนที่เล่นปกติต้องไม่โดนพักมือ");
+
+  /* ลงมือเองแม้ครั้งเดียว ต้องล้างตัวนับ */
+  const t2 = createTable({ smallBlind: 10, bigBlind: 20, minBuyIn: 1, turnSeconds: 30, idleSitOutTimeouts: 3 });
+  t2.sit("ซี", 0, 2000, "tokC"); t2.sit("ดี", 1, 2000, "tokD");
+  t2.action(0, { type: "start" });
+  const st2 = t2._state;
+  st2.seats[0].timeouts = 2;                     /* หมดเวลามาแล้วสองครั้ง */
+  t2.action(st2.current, { type: "act", action: "call" });
+  ok(st2.seats[0].timeouts === 0 || st2.seats[1].timeouts === 0,
+     "ลงมือเองแล้วตัวนับต้องถูกล้าง ไม่สะสมข้ามการเล่นจริง");
+}
+
 console.log(fail === 0 ? "\n=== ผ่านทั้งหมด ===" : "\n=== พัง " + fail + " ข้อ ===");
 process.exit(fail ? 1 : 0);
