@@ -568,6 +568,11 @@ button { font-family: inherit; }
   content: ""; width: 9px; height: 9px; border-radius: 50%;
   background: var(--chip); box-shadow: 0 0 0 1.5px #8a6d0d;
 }
+/* ⚠️ ที่นั่งของเราอยู่ล่างสุดของโต๊ะ ติดกับแถบไพ่ในมือพอดี
+   ชิปเดิมพันที่ห้อยอยู่ใต้กล่อง (bottom:-22px) จึงยื่นลงไปทับไพ่ในมือตัวเอง
+   ของคนอื่นไม่เป็น เพราะที่นั่งอยู่กลางโต๊ะ ใต้กล่องเป็นผืนโต๊ะว่าง
+   ที่นั่งเราจึงต้องเอาชิปไว้ "เหนือ" กล่องแทน ซึ่งเป็นผืนโต๊ะว่างเหมือนกัน */
+.seat.is-me .bet { bottom: auto; top: -26px; }
 
 /* ⚠️ media query ต้องอยู่ "หลัง" กฎพื้นฐานที่ selector เหมือนกันเป๊ะ
    เพราะ media query ไม่เพิ่ม specificity กฎที่อยู่ทีหลังจะชนะเสมอ
@@ -592,6 +597,7 @@ button { font-family: inherit; }
   .dealer { width: 15px; height: 15px; font-size: .54rem; line-height: 15px; right: -5px; top: -5px; }
   .bet { bottom: -15px; }
   .bet { font-size: .58rem; }
+  .seat.is-me .bet { bottom: auto; top: -20px; }
   /* ไพ่กลางก็ต้องเล็กลงตาม เพราะช่องว่างระหว่างที่นั่งซ้าย-ขวาแคบลงด้วย */
   .board .pc--md { width: min(40px, 8.6vw); font-size: min(6.5px, 1.4vw); }
 }

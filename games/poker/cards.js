@@ -79,6 +79,9 @@ window.Cards = (function () {
 
     var s = SUIT[info.suit];
     if (s.red) card.className += " pc--red";
+    /* ติดคลาสตามดอก เพื่อให้ CSS แยกสีได้ทีละดอก (แบบสำรับ 4 สี)
+       ดอกดำสองดอกแยกกันยากมากตอนไพ่เล็ก โดยเฉพาะคนสายตาไม่ดี */
+    card.className += " pc--" + info.suit;
     /* "10" กว้างสองตัวอักษร ต้องย่อเลขมุมไม่ให้ไปชนดอก */
     if (info.rank.length > 1) card.className += " pc--wide";
     card.setAttribute("aria-label", info.rank + " " + s.glyph);

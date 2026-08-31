@@ -25,7 +25,15 @@
   .pc--lg { width: 92px; }
 }
 
+/* ---------- สี ----------
+   สำรับ 4 สี: โพดำ=ดำ · โพแดง=แดง · ข้าวหลามตัด=น้ำเงิน · ดอกจิก=เขียว
+   ของเดิมใช้สองสีตามไพ่จริง ซึ่งทำให้ ♠ กับ ♣ แยกกันไม่ออกตอนไพ่เล็ก
+   และ ♥ กับ ♦ ก็เหมือนกัน — เป็นเรื่องที่คนสายตาไม่ดีเจอหนักสุด
+   ถ้าอยากได้แบบไพ่จริงสองสี ลบสามบรรทัดล่างนี้ทิ้งได้เลย */
 .pc--red { color: #d8232a; }
+.pc--d { color: #1668c9; }
+.pc--c { color: #12813f; }
+.pc--s { color: #16181a; }
 
 /* ---- มุมไพ่ ---- */
 .pc__corner {
@@ -37,8 +45,10 @@
 .pc__corner--tl { left: 6%; top: 3.5%; }
 .pc__corner--br { right: 6%; bottom: 3.5%; transform: rotate(180deg); }
 
+/* ดอกต้องใหญ่ใกล้เคียงเลข ไม่ใช่เล็กกว่าครึ่งหนึ่ง
+   บนไพ่ใบเล็กและใบกลาง ดอกคือสิ่งที่อ่านยากที่สุด */
 .pc__cr { font-size: 1.55em; letter-spacing: -.05em; }
-.pc__cs { font-size: 1.2em; margin-top: -.12em; }
+.pc__cs { font-size: 1.45em; margin-top: -.16em; }
 
 /* ไพ่ 10: เลขมุมย่อลงกับขยับชิดขอบ จะได้ไม่กินพื้นที่ดอก */
 .pc--wide .pc__cr { font-size: 1.05em; letter-spacing: -.12em; }
@@ -50,11 +60,11 @@
 
 /* ไพ่ใบเล็กโชว์แค่มุมบนซ้าย พื้นที่ไม่พอ */
 .pc--sm { font-size: 5.5px; }
-.pc--md { font-size: 7.5px; }
-.pc--lg { font-size: 12px; }
+.pc--md { font-size: 8.6px; }
+.pc--lg { font-size: 13px; }
 @media (min-width: 480px) {
-  .pc--md { font-size: 8.5px; }
-  .pc--lg { font-size: 14px; }
+  .pc--md { font-size: 9.6px; }
+  .pc--lg { font-size: 15px; }
 }
 .pc--sm .pc__corner--br { display: none; }
 .pc--sm .pc__face { display: none; }
