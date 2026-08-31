@@ -11,14 +11,21 @@
 import { evaluate7, cardCode, RANK_CHARS, SUIT_CHARS } from "./poker-engine.mjs";
 import * as bank from "./bot-bank.mjs";
 
-/* ⚠️ ชื่อบอทต้องเป็นอังกฤษล้วน เพื่อให้แยกออกจากคนไทยที่นั่งอยู่ด้วยตาเปล่า
-   เดิมใช้ชื่อเล่นไทย (โบ๊ท แมท น้ำ ...) แล้วชนกับชื่อคนจริงบนโต๊ะ
-   มองปราดเดียวไม่รู้ว่ากำลังสู้กับคนหรือกับบอท
+/* ---------- รายชื่อบอทประจำแต่ละระดับ ----------
+   ⚠️ ระดับเป็น "ตัวตน" ของบอท ไม่ใช่ค่าที่เลือกตอนเรียกมาเล่น
+   Rex เป็นมืออาชีพเสมอ ไม่ใช่บางวันเก่งบางวันมั่ว — เพราะเงินติดตัวผูกกับชื่อ
+   ถ้าชื่อเดียวเปลี่ยนระดับไปมา ประวัติได้-เสียของมันก็อ่านไม่ได้ความ
 
-   ⚠️ และห้ามใช้คำที่เป็นศัพท์ไพ่ — เคยมีบอทชื่อ "Ace" แล้วอ่านผลมือแล้วงง
+   ⚠️ ชื่อต้องเป็นอังกฤษล้วน เพื่อให้แยกออกจากคนไทยที่นั่งอยู่ด้วยตาเปล่า
+   และห้ามใช้คำที่เป็นศัพท์ไพ่ — เคยมีบอทชื่อ "Ace" แล้วอ่านผลมือแล้วงง
    ("Ace ชนะด้วย High Card A" — Ace ตัวไหนคือคน ตัวไหนคือไพ่)
-   ห้ามใช้: Ace / King / Queen / Jack / Joker / Flush / Straight / Chip / Pot / Raise */
-const NAMES = ["Bruno", "Duke", "Rex", "Milo", "Vega", "Nico", "Kai", "Otto", "Zed"];
+   ห้ามใช้: Ace / King / Queen / Jack / Joker / Flush / Straight / Chip / Pot / Raise
+   และห้ามซ้ำกันข้ามระดับ เพราะกระเป๋าเงินผูกกับชื่ออย่างเดียว */
+const ROSTER = {
+  1: ["Milo", "Pip", "Toby", "Bruno", "Ozzy", "Rudy", "Gus", "Wally", "Bobby", "Sammy"],
+  2: ["Vince", "Rocco", "Gio", "Marco", "Sonny", "Rico", "Tank", "Buddy", "Lenny", "Frankie"],
+  3: ["Rex", "Duke", "Vega", "Otto", "Zed", "Kai", "Nico", "Sable", "Cole", "Ash"]
+};
 
 /* ---------- กระเป๋าเงินของบอท ----------
    ชิปบนโต๊ะไม่ใช่เงินของบอท มันคือเงินที่ "หยิบมาเล่น" จากกระเป๋า
@@ -336,13 +343,17 @@ export function createBotManager(room, broadcast) {
   function add(count, level) {
     const lv = LEVEL[level] ? level : 2;
     const added = [];
+    let busyAll = false;
     for (let i = 0; i < count; i++) {
       /* ⚠️ ต้องว่างทั้งบนโต๊ะนี้ และว่างทั้งเซิร์ฟเวอร์
          กระเป๋าเงินผูกกับชื่อ ถ้าชื่อเดียวกันนั่งสองโต๊ะ ทั้งสองโต๊ะจะหยิบจากกระเป๋าใบเดียวกัน
          แล้วเขียนทับกันไปมา ยอดของโต๊ะที่บันทึกก่อนจะหายทั้งก้อน */
       const used = room.table._state.seats.filter(Boolean).map(s => s.name);
-      const name = NAMES.filter(n => used.indexOf(n) === -1 && !bank.isBusy(n))[0];
-      if (!name) break;   /* บอทออกโต๊ะอื่นกันหมดแล้ว รอให้ว่างก่อน */
+      const free = (ROSTER[lv] || []).filter(n => used.indexOf(n) === -1 && !bank.isBusy(n));
+      if (!free.length) { busyAll = true; break; }
+      /* สุ่มว่าใครในระดับนั้นจะได้มาเล่น ไม่ใช่เรียกตัวแรกในรายชื่อทุกครั้ง
+         ไม่งั้นจะเจอ Rex ทุกวงจนบอทตัวอื่นไม่มีประวัติของตัวเองเลย */
+      const name = free[Math.floor(Math.random() * free.length)];
       bank.claim(name);
       const r = room.table.sit(name, null, BUY_IN, "bot:" + (++seq), { bot: true, level: lv });
       if (!r.ok) { bank.release(name); break; }
@@ -356,7 +367,11 @@ export function createBotManager(room, broadcast) {
       }
       added.push(r.name);
     }
-    return { added, level: lv, levelName: LEVEL[lv].name };
+    /* บอกกลับไปด้วยว่าเรียกไม่ครบเพราะบอทระดับนี้ไม่ว่าง (ไปนั่งโต๊ะอื่นอยู่)
+       ไม่งั้นคนกดจะเห็นแค่ "ไม่มีอะไรเกิดขึ้น" แล้วกดซ้ำไปเรื่อยๆ */
+    return { added, level: lv, levelName: LEVEL[lv].name,
+             busy: busyAll, roster: (ROSTER[lv] || []).length,
+             inUse: (ROSTER[lv] || []).filter(n => bank.isBusy(n)).length };
   }
 
   function removeAll() {
@@ -370,6 +385,33 @@ export function createBotManager(room, broadcast) {
       bank.release(s.name);
       room.table.leave(s.seatId);
     }
+  }
+
+  /* หมดตัวแล้วจะเติมชิปเล่นต่อ หรือลุกจากโต๊ะ
+     ตัดสินจากนิสัยประจำระดับ + เงินที่เหลือจริงในกระเป๋า */
+  function wantsRebuy(b) {
+    const purse = typeof b.wallet === "number" ? b.wallet : 0;
+    const busts = b.busts || 1;
+
+    /* นิสัยประจำระดับ: อยากเล่นต่อแค่ไหนถ้าเงินยังเหลือเยอะ */
+    let want;
+    if (b.botLevel === 2) want = 0.94;                       /* นักพนัน แทบไม่เลิก */
+    else if (b.botLevel === 1) want = busts >= 2 ? 0.45 : 0.75;  /* มือใหม่ โดนซ้ำแล้วกลัว */
+    else want = busts >= 2 ? 0.60 : 0.88;                    /* มืออาชีพ โต๊ะไม่คุ้มก็ลุก */
+
+    /* ⚠️ เงินในกระเป๋าเหลือน้อย = อยากลุกมากกว่าอยากเล่นต่อ ทุกระดับ
+       ตัววัดที่ตรงที่สุดคือ "ซื้อเข้าได้อีกกี่ครั้ง" ไม่ใช่ยอดดิบ
+       เพราะมืออาชีพเหลือ 5,000 (2 ครั้ง) กับมือใหม่เหลือ 5,000 (2 ครั้ง)
+       อยู่ในสถานการณ์เดียวกันเป๊ะ ต่างกันแค่เคยมีเท่าไหร่ ซึ่งไม่เกี่ยวตอนนี้แล้ว */
+    const runway = purse / BUY_IN;
+    let factor;
+    if (runway < 0) factor = 0.15;        /* ต้องกู้มาเล่น มีบ้างแต่ไม่บ่อย */
+    else if (runway < 1) factor = 0.25;   /* เหลือไม่พอซื้อเข้าอีกครั้งด้วยซ้ำ */
+    else if (runway < 2) factor = 0.45;   /* เหลือครั้งเดียว ลุกดีกว่า */
+    else if (runway < 5) factor = 0.75;   /* เริ่มบาง แต่ยังสู้ไหว */
+    else factor = 1;                      /* เงินหนา ไม่มีอะไรต้องคิด */
+
+    return Math.random() < want * factor;
   }
 
   /* เรียกทุกครั้งที่สถานะโต๊ะเปลี่ยน ถ้าถึงตาบอทให้ตั้งเวลาคิดแล้วค่อยลงมือ
@@ -413,10 +455,30 @@ export function createBotManager(room, broadcast) {
           if (b.sitOut) room.table.action(b.seatId, { type: "sitout", value: false });
         }
         if (b.stack > 0) continue;
+
+        /* ---------- หมดตัวแล้วจะเอายังไงต่อ: เติมชิป หรือ ลุกให้ตัวอื่นมาแทน ----------
+           ⚠️ ต้องเป็นการตัดสินใจของบอทเอง ไม่ใช่เติมให้อัตโนมัติเสมอ
+           คนจริงที่หมดตัวก็เลือกสองทางนี้ และเลือกไม่เหมือนกันตามนิสัยกับเงินที่เหลือ
+           นักพนันแทบไม่เคยเลิก · มือใหม่โดนสองครั้งก็กลัวแล้วลุก
+           มืออาชีพลุกเมื่อโต๊ะนี้ไม่คุ้ม ซึ่งเป็นการตัดสินใจที่ถูกต้อง ไม่ใช่ขี้ขลาด */
+        bank.noteBust(b.name);
+        if (!wantsRebuy(b)) {
+          const gone = b.name, lv = b.botLevel;
+          bank.sync(gone, b.wallet, 0, Date.now());
+          bank.release(gone);
+          delete bench[b.seatId];
+          clearTimeout(pending[b.seatId]);
+          delete pending[b.seatId];
+          room.table.leave(b.seatId);
+          /* เรียกตัวใหม่ระดับเดียวกันมานั่งแทน โต๊ะจะได้ไม่ค่อยๆ ว่างลง
+             ถ้าระดับนั้นไม่ว่างเลย ก็ปล่อยที่นั่งว่างไว้ ดีกว่าลากตัวที่นั่งโต๊ะอื่นอยู่มา */
+          add(1, lv);
+          continue;
+        }
+
         room.table.action(b.seatId, { type: "rebuy", amount: BUY_IN });
         /* ซื้อชิปใหม่ = หยิบเงินออกจากกระเป๋าอีกก้อน ติดลบได้ นั่นคือเป็นหนี้ */
         b.wallet = (typeof b.wallet === "number" ? b.wallet : bank.bankrollOf(b.name)) - BUY_IN;
-        bank.noteBust(b.name);
         const penalty = Math.min(Math.max(b.busts || 1, 1), 5);
         room.table.action(b.seatId, { type: "sitout", value: true });
         bench[b.seatId] = st.handNo + penalty;
@@ -492,11 +554,13 @@ export function createBotManager(room, broadcast) {
     const start = me.walletStart || 20000;
     const ratio = purse / start;
     const debt = Math.max(0, -(typeof me.wallet === "number" ? me.wallet : 0));
-    /* ต่ำกว่าครึ่งของที่เริ่มมา = เริ่มกลัว · ติดลบ = กลัวเต็มพิกัด */
-    const downFear = Math.min(Math.max(0, 1 - ratio / 0.5), 1) * 0.06;
-    const debtFear = (debt > 0 ? 0.04 : 0) + downFear;
-    /* เกินครึ่งเท่าตัวจากที่เริ่มมา = มีเบาะรองรับ กล้าขึ้นนิดหน่อย (เพดานเตี้ยไว้) */
-    const boldness = Math.min(Math.max(0, ratio - 1.5) / 1.5, 1) * 0.035;
+    /* ⚠️ ยอดเงินเองไม่มีเพดาน ติดหนี้เท่าไหร่ก็ได้ กำไรเท่าไหร่ก็ได้
+       บอทแต่ละตัวจึงค่อยๆ มีนิสัยของตัวเองจากประวัติที่ต่างกัน
+       ส่วน "ผลต่อการตัดสินใจ" ยังต้องมีเพดาน ไม่งั้นบอทที่เจ๊งหนักจะหมอบทุกมือ
+       และบอทที่รวยมากจะลุยมั่วทุกมือ — ทั้งคู่เล่นด้วยไม่สนุกพอๆ กัน */
+    const downFear = Math.min(Math.max(0, 1 - ratio / 0.5), 1) * 0.10;
+    const debtFear = (debt > 0 ? 0.05 : 0) + downFear;
+    const boldness = Math.min(Math.max(0, ratio - 1.5) / 2, 1) * 0.06;
 
     /* ---------- อ่านคนที่กำลังดันเราอยู่ ----------
        ต้องรู้ว่ากำลังสู้กับใคร ไม่ใช่สู้กับ "ราคา" เฉยๆ

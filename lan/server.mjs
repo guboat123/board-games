@@ -390,6 +390,15 @@ server.on("upgrade", (req, socket) => {
       } else {
         const r = bots.add(n, lv);
         log("ห้อง", client.room.code, "เพิ่มบอท", r.added.length, "ตัว ระดับ", r.levelName);
+        /* ⚠️ ต้องบอกด้วยเมื่อเรียกไม่ครบ ไม่งั้นคนกดเห็นแค่ "ไม่มีอะไรเกิดขึ้น" แล้วกดซ้ำ
+           บอทหนึ่งตัวนั่งได้ทีละโต๊ะเดียว (กระเป๋าเงินผูกกับชื่อ) ระดับหนึ่งมี 10 ตัว
+           ถ้าไปนั่งโต๊ะอื่นกันหมด ก็ต้องรอ ไม่ใช่เสกตัวใหม่ขึ้นมา */
+        if (r.busy) {
+          send(client, { type: "error", message:
+            "บอทระดับ" + r.levelName + "ไม่ว่างแล้ว (" + r.inUse + "/" + r.roster +
+            " ตัวกำลังนั่งโต๊ะอื่นอยู่)" +
+            (r.added.length ? " เพิ่มให้ได้ " + r.added.length + " ตัว" : "") });
+        }
       }
       broadcastState(client.room);
       pushLobby();
