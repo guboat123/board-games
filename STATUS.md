@@ -161,6 +161,33 @@ Round 4 raised the count on both solo games while every earlier fix still passed
 evidence behind the criterion change. It also showed ~2 of 13 findings were regressions introduced
 by the previous round's own fixes, so each extra fix carries its own risk.
 
+## Poker: what the owner asked for after playing (2026-08-31)
+
+Playing a real game surfaced one hard stop and a list of wants. All done:
+
+- **Could not keep playing after a hand.** Two causes. `render()` closed the amount
+  panel whenever it was not your turn — at showdown it never is, so every incoming
+  state slammed the rebuy panel shut before the busted player could confirm, and the
+  table could never get back to two players with chips. And the disabled "next hand"
+  button was invisible: `.act[disabled]` dimmed the whole button to 32% opacity, and
+  the gold variant uses near-black text, so the label and its reason both fell to
+  1.9:1 contrast. Fixed both — only the bet panel auto-closes now, and disabled
+  buttons have their own colours (7.87:1 label, 6.23:1 reason). The reason text was
+  also wrong: it always claimed "need at least 2 people" even when two were seated
+  and one was simply out of chips.
+- **Animation.** Cards deal in, flip at showdown, the pot bumps when it grows, and the
+  result panel pops. Only genuinely new cards animate, once per hand — the server
+  broadcasts state several times per action, so a naive implementation restarts the
+  animation on every broadcast and you see nothing.
+- **Buy-in and P/L table.** The "โต๊ะ · เงิน" panel, opened from the top bar.
+- **Change seats at the table.** The empty rows of that same table are the move
+  buttons. Server-side `moveSeat` refuses mid-hand (turn order is keyed to seat
+  number) and refuses seats held by a disconnected player (their chips are still
+  there). Host rights follow the person, not the seat.
+- **Action log with decision times**, for studying play patterns. Per-player summary
+  plus a hand-by-hand log, copyable as text. Sent only on request.
+- **Drag-to-size betting**, like Pokerrrr 2. The number pad still works.
+
 ## Automated tests (must pass before any commit)
 
 ```
