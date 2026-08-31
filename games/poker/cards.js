@@ -71,45 +71,56 @@ window.Cards = (function () {
   var DRAGON_SVG = [
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 140">',
     '<defs>',
-      '<linearGradient id="g" x1="0" y1="0" x2="0" y2="1">',
-        '<stop offset="0" stop-color="rgb(212,166,86)"/>',
-        '<stop offset="0.5" stop-color="rgb(240,214,150)"/>',
-        '<stop offset="1" stop-color="rgb(186,138,64)"/>',
+      '<linearGradient id="g" x1="0" y1="0" x2="1" y2="1">',
+        '<stop offset="0" stop-color="rgb(196,150,74)"/>',
+        '<stop offset="0.45" stop-color="rgb(245,222,163)"/>',
+        '<stop offset="1" stop-color="rgb(172,124,56)"/>',
       '</linearGradient>',
-      /* ลายเมฆจีนซ้ำเป็นพื้นหลังจางๆ ให้ไม่โล่งเกินไป */
-      '<pattern id="cl" width="20" height="20" patternUnits="userSpaceOnUse">',
-        '<path d="M3 14a3 3 0 016 0 3 3 0 016 0" fill="none" stroke="rgb(150,60,50)" stroke-width="1" opacity="0.5"/>',
+      /* เมฆจีนซ้ำเป็นพื้นหลังจางๆ ไม่ให้พื้นโล่งเกินไป */
+      '<pattern id="cl" width="22" height="22" patternUnits="userSpaceOnUse">',
+        '<path d="M2 15a4 4 0 018 0 4 4 0 018 0" fill="none" stroke="rgb(126,44,38)" stroke-width="1.1" opacity="0.55"/>',
       '</pattern>',
     '</defs>',
+
     /* พื้นแดงเข้มเกือบดำ แบบไพ่สำรับจีน */
-    '<rect width="100" height="140" fill="rgb(24,10,12)"/>',
+    '<rect width="100" height="140" fill="rgb(26,10,11)"/>',
     '<rect width="100" height="140" fill="url(#cl)"/>',
-    /* กรอบทองสองชั้น + ลายประแจจีนที่มุม */
-    '<rect x="5" y="5" width="90" height="130" rx="5" fill="none" stroke="url(#g)" stroke-width="1.6"/>',
-    '<rect x="9" y="9" width="82" height="122" rx="3" fill="none" stroke="url(#g)" stroke-width="0.5" opacity="0.75"/>',
-    '<path d="M13 13h8v3h-5v5h-3zM87 13h-8v3h5v5h3zM13 127h8v-3h-5v-5h-3zM87 127h-8v-3h5v-5h3z" fill="url(#g)" opacity="0.9"/>',
-    /* วงกลมกลางใบ */
-    '<circle cx="50" cy="70" r="31" fill="none" stroke="url(#g)" stroke-width="1.1" opacity="0.85"/>',
-    '<circle cx="50" cy="70" r="34" fill="none" stroke="url(#g)" stroke-width="0.5" opacity="0.5"/>',
-    /* ตัวมังกรขดเป็นวง หัวอยู่บน หางม้วนอยู่ล่าง */
+
+    /* กรอบทองสองชั้น + ลายประแจจีนที่มุมทั้งสี่ */
+    '<rect x="5" y="5" width="90" height="130" rx="5" fill="none" stroke="url(#g)" stroke-width="1.7"/>',
+    '<rect x="9.5" y="9.5" width="81" height="121" rx="3" fill="none" stroke="url(#g)" stroke-width="0.55" opacity="0.7"/>',
+    '<path d="M13 13h9v3.2h-5.8v5.8H13zM87 13h-9v3.2h5.8v5.8H87zM13 127h9v-3.2h-5.8v-5.8H13zM87 127h-9v-3.2h5.8v-5.8H87z" fill="url(#g)" opacity="0.92"/>',
+
+    /* วงกลมล้อมตัวมังกร */
+    '<circle cx="50" cy="70" r="33" fill="none" stroke="url(#g)" stroke-width="0.9" opacity="0.55"/>',
+
+    /* ---- ตัวมังกร ----
+       ลำตัวเป็นเส้นโค้งขดรอบเดียว หัวอยู่บนซ้าย หางม้วนเข้าด้านใน
+       วาดสองชั้น: ชั้นล่างหนาเป็นตัว ชั้นบนบางเป็นเกล็ด */
     '<g fill="none" stroke="url(#g)" stroke-linecap="round" stroke-linejoin="round">',
-      '<path d="M50 47c-13 0-21 10-21 21 0 13 10 22 21 22 10 0 18-7 18-16 0-8-6-14-14-14-7 0-12 5-12 11 0 5 4 9 9 9" stroke-width="3.4"/>',
-      /* เกล็ดบนหลัง */
-      '<path d="M50 47c-13 0-21 10-21 21 0 13 10 22 21 22" stroke-width="1" opacity="0.55" stroke-dasharray="1 3"/>',
-      /* หัว: ปาก เขา หนวด */
-      '<path d="M50 47l-9-6" stroke-width="3"/>',
-      '<path d="M41 41l-7-1 5 4z" stroke-width="1.2" fill="url(#g)"/>',
-      '<path d="M44 40c-2-4-6-6-10-5" stroke-width="1.4"/>',
-      '<path d="M47 43c-3-5-9-7-15-5" stroke-width="1.1" opacity="0.8"/>',
-      /* ขาและเล็บ */
-      '<path d="M32 62l-8-3m8 3l-7 3m7-3l-6-7" stroke-width="1.4"/>',
-      '<path d="M63 84l8 3m-8-3l6 6m-6-6l8-2" stroke-width="1.4"/>',
-      /* ลูกแก้วในกรงเล็บ */
-      '<circle cx="50" cy="70" r="4" stroke-width="1.2"/>',
+      '<path d="M43 53C29 59 25 75 35 85c10 10 28 8 34-4 5-10 0-20-10-20-7 0-11 6-9 12" stroke-width="4.2"/>',
+      '<path d="M43 53C29 59 25 75 35 85c10 10 28 8 34-4" stroke-width="1.1" opacity="0.6" stroke-dasharray="0.8 3.2"/>',
+
+      /* ขาหน้า-ขาหลัง พร้อมเล็บสามนิ้ว */
+      '<path d="M31 70l-8-3m8 3l-8 2m8-2l-6-6" stroke-width="1.5"/>',
+      '<path d="M62 88l7 5m-7-5l8 1m-8-1l5 7" stroke-width="1.5"/>',
+
+      /* ครีบหลัง */
+      '<path d="M37 57l-3-5m1 11l-5-3m2 12l-6-1" stroke-width="1.2" opacity="0.85"/>',
+
+      /* หัว: ปากแหลม เขาโค้งไปหลัง หนวดยาวสองเส้น */
+      '<path d="M41 47c4-3 9-2 11 2" stroke-width="1.6"/>',
+      '<path d="M35 44c-6 2-9 7-8 12" stroke-width="1.3" opacity="0.9"/>',
+      '<path d="M33 52c-7-1-11 3-12 8" stroke-width="1.1" opacity="0.75"/>',
     '</g>',
-    '<circle cx="50" cy="70" r="1.8" fill="url(#g)"/>',
+    /* ปากอ้า (รูปทึบ) */
+    '<path d="M43 53l-11-6 4-4 9 5z" fill="url(#g)"/>',
     /* ตา */
-    '<circle cx="45.5" cy="44" r="1.1" fill="rgb(200,60,50)"/>',
+    '<circle cx="40.5" cy="50" r="1.25" fill="rgb(210,64,52)"/>',
+
+    /* ลูกแก้วที่มังกรไล่คว้า */
+    '<circle cx="59" cy="71" r="4.2" fill="none" stroke="url(#g)" stroke-width="1.2"/>',
+    '<circle cx="59" cy="71" r="1.6" fill="url(#g)"/>',
     '</svg>'
   ].join("");
 

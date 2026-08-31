@@ -142,8 +142,10 @@ export function all() {
   return Object.keys(db.bots).map(n => ({
     name: n,
     bankroll: db.bots[n].bankroll,
+    start: db.bots[n].start || START,
     sessions: db.bots[n].sessions,
-    busts: db.bots[n].busts
+    busts: db.bots[n].busts,
+    busy: busy.has(n)
   })).sort((a, b) => b.bankroll - a.bankroll);
 }
 

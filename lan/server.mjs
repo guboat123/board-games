@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import { createTable } from "./poker-room.mjs";
 import * as store from "./history-store.mjs";
 import { createBotManager } from "./bots.mjs";
+import * as botBank from "./bot-bank.mjs";
 store.load();
 /* เขียนลงดิสก์เป็นช่วงๆ ไม่ใช่ทุกมือ ดิสก์จะได้ไม่ถูกกวนตลอดเวลา
    ตัว save เองข้ามเองถ้าไม่มีอะไรเปลี่ยน */
@@ -324,6 +325,13 @@ server.on("upgrade", (req, socket) => {
     /* หน้าเลือกโต๊ะขอรายการโต๊ะที่เปิดอยู่ */
     if (msg.type === "lobby") {
       send(client, { type: "rooms", rooms: roomList() });
+      return;
+    }
+
+    /* เงินติดตัวบอททุกตัว ขอได้จากหน้าก่อนเข้าเกม ไม่ต้องนั่งโต๊ะก่อน
+       ⚠️ ตอบได้โดยไม่ต้องมีที่นั่ง เพราะเป็นข้อมูลของทั้งเซิร์ฟเวอร์ ไม่ใช่ของโต๊ะไหน */
+    if (msg.type === "botbank") {
+      send(client, { type: "botbank", bots: botBank.all() });
       return;
     }
 

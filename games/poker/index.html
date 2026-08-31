@@ -1022,6 +1022,30 @@ button { font-family: inherit; }
 #t-money .v--up { color: var(--good); }
 #t-money .v--dn { color: #ff6b5e; }
 #t-money .v--flat { color: var(--muted); }
+/* ---------- ตารางเงินบอท (หน้าก่อนเข้าเกม) ---------- */
+.bank-box { margin: 10px 0 4px; text-align: left; }
+.bank-box > summary {
+  cursor: pointer; font-size: .84rem; color: var(--gold);
+  padding: 6px 0; list-style: none;
+}
+.bank-box > summary::-webkit-details-marker { display: none; }
+.bank-box > summary:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+.bank-head, .bank-row {
+  display: grid; grid-template-columns: 1fr auto auto auto;
+  gap: 8px; align-items: baseline; padding: 4px 0;
+}
+.bank-head {
+  font-size: .62rem; color: var(--muted); letter-spacing: .04em;
+  border-bottom: 1px solid rgba(255,255,255,.12);
+}
+.bank-row { font-size: .78rem; border-bottom: 1px solid rgba(255,255,255,.06); }
+.bank-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bank-row .lv { font-family: var(--mono); font-size: .6rem; color: var(--muted); }
+.bank-row .num { font-family: var(--mono); }
+.bank-row .up { color: var(--good); }
+.bank-row .dn { color: #ff6b5e; }
+.bank-row .busy { color: var(--gold); font-size: .6rem; }
+#bank-list { max-height: 46vh; overflow-y: auto; }
 .res-more {
   flex: 0 0 auto; font-size: .68rem; color: var(--muted);
   text-align: left; margin: 7px 0 1px; letter-spacing: .04em;
@@ -1128,6 +1152,11 @@ button { font-family: inherit; }
 
     <button class="btn-main" id="btn-join">นั่งโต๊ะ</button>
     <p class="err" id="join-err"></p>
+    <!-- เงินติดตัวบอท ดูได้ก่อนเข้าเกม ไม่ต้องนั่งโต๊ะก่อน -->
+    <details class="bank-box" id="bank-box">
+      <summary>💰 เงินติดตัวบอท</summary>
+      <div id="bank-list"><p class="hint-sm">กำลังโหลด...</p></div>
+    </details>
     <a class="back" href="../../index.html">← กลับไปหน้ารวมเกม</a>
   </div>
 </div>
@@ -1561,16 +1590,84 @@ button { font-family: inherit; }
   $("f-room").addEventListener("input", function () { paintSeatPicker(); paintTables(window.__rooms || []); });
   $("f-name").addEventListener("input", refreshBuyIn);
 
+  /* ---------- ตารางเงินติดตัวบอท ----------
+     ⚠️ อยู่ที่หน้าก่อนเข้าเกม เพราะมันเป็นข้อมูลของทั้งเซิร์ฟเวอร์ ไม่ใช่ของโต๊ะไหนโต๊ะหนึ่ง
+     บอทตัวเดียวกันเดินไปเล่นโต๊ะไหนก็ได้ กระเป๋าเงินติดตัวมันไป
+     ดูตรงนี้จะได้รู้ว่าจะเจอตัวไหน ตัวไหนกำลังนั่งโต๊ะอื่นอยู่ และใครกำลังเจ๊ง */
+  var BOT_LEVEL_OF = {};
+  [["มือใหม่", ["Milo","Pip","Toby","Bruno","Ozzy","Rudy","Gus","Wally","Bobby","Sammy"]],
+   ["นักพนัน", ["Vince","Rocco","Gio","Marco","Sonny","Rico","Tank","Buddy","Lenny","Frankie"]],
+   ["มืออาชีพ", ["Rex","Duke","Vega","Otto","Zed","Kai","Nico","Sable","Cole","Ash"]]
+  ].forEach(function (g) { g[1].forEach(function (n) { BOT_LEVEL_OF[n] = g[0]; }); });
+
+  function paintBank(list) {
+    var host = $("bank-list");
+    host.innerHTML = "";
+    if (!list.length) {
+      var none = document.createElement("p");
+      none.className = "hint-sm";
+      none.textContent = "ยังไม่มีบอทตัวไหนเคยลงโต๊ะ ลองเรียกมาเล่นสักตั้งก่อน";
+      host.appendChild(none);
+      return;
+    }
+    var head = document.createElement("div");
+    head.className = "bank-head";
+    head.innerHTML = "<span>บอท</span><span>เงินตอนนี้</span><span>ได้ / เสีย</span><span>ล้ม</span>";
+    host.appendChild(head);
+
+    list.forEach(function (b) {
+      var row = document.createElement("div");
+      row.className = "bank-row";
+
+      var nm = document.createElement("span");
+      nm.className = "nm";
+      nm.textContent = b.name;
+      var lv = document.createElement("span");
+      lv.className = "lv";
+      lv.textContent = " " + (BOT_LEVEL_OF[b.name] || "");
+      nm.appendChild(lv);
+      if (b.busy) {
+        var bz = document.createElement("span");
+        bz.className = "busy";
+        bz.textContent = " · กำลังเล่น";
+        nm.appendChild(bz);
+      }
+
+      var now = document.createElement("span");
+      now.className = "num";
+      now.textContent = b.bankroll.toLocaleString("th-TH");
+      /* ติดลบ = เป็นหนี้ ต้องเห็นทันทีว่าเป็นคนละเรื่องกับ "มีเงินน้อย" */
+      if (b.bankroll < 0) now.className += " dn";
+
+      var pl = b.bankroll - b.start;
+      var d = document.createElement("span");
+      d.className = "num " + (pl > 0 ? "up" : (pl < 0 ? "dn" : ""));
+      d.textContent = (pl > 0 ? "+" : (pl < 0 ? "−" : "")) + Math.abs(pl).toLocaleString("th-TH");
+
+      var bu = document.createElement("span");
+      bu.className = "num";
+      bu.textContent = b.busts || 0;
+
+      row.appendChild(nm); row.appendChild(now); row.appendChild(d); row.appendChild(bu);
+      host.appendChild(row);
+    });
+  }
+
   function openLobby() {
     lobbyWanted = true;
     var proto = location.protocol === "https:" ? "wss://" : "ws://";
     try { lobbyWs = new WebSocket(proto + location.host); } catch (e) { return; }
 
-    lobbyWs.onopen = function () { lobbyRetry = 0; lobbyWs.send(JSON.stringify({ type: "lobby" })); };
+    lobbyWs.onopen = function () {
+      lobbyRetry = 0;
+      lobbyWs.send(JSON.stringify({ type: "lobby" }));
+      lobbyWs.send(JSON.stringify({ type: "botbank" }));
+    };
     lobbyWs.onmessage = function (ev) {
       var msg;
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
       if (msg.type === "rooms") { window.__rooms = msg.rooms; paintTables(msg.rooms); paintSeatPicker(); }
+      if (msg.type === "botbank") paintBank(msg.bots || []);
     };
     lobbyWs.onerror = function () { $("tables-list").innerHTML = ""; $("join-err").innerHTML = hostedHint(); };
     lobbyWs.onclose = function () {
