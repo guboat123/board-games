@@ -1339,12 +1339,21 @@ export function createBotManager(room, broadcast) {
        สองอันนี้เก็บไพ่คนละแบบ: ในสถานะดิบไพ่เป็นตัวเลข ในมุมมองเป็นข้อความ เช่น "As"
        ส่งตัวเลขเข้าไปให้ฟังก์ชันที่คาดว่าเป็นข้อความ → cards[0].slice is not a function
        ซึ่ง "ทำให้เซิร์ฟเวอร์ทั้งเครื่องล่ม" ไม่ใช่แค่บอทตัวนั้นพัง เพราะมันโยนออกมานอก poke() */
+    /* ⚠️ ต้องเป็นเลขเดียวกับที่คนอื่นเอาไปอ่านทาง ไม่ใช่ทอยใหม่
+       ถ้าทอยสองครั้ง บอทจะ "หน่วงจริง 3 วินาที" แต่คนอื่นอ่านว่า "ลงทันที" ซึ่งขัดกันเอง
+       จดไว้ให้ decide() ใช้ตัวเดียวกัน (decide จะทอยเองเฉพาะตอนไม่มีใครจดไว้ให้) */
     const wait = thinkMs(lv, view, view.seats[cur]);
+    plannedThink[cur] = wait;
 
     pending[cur] = setTimeout(() => {
       delete pending[cur];
       /* สถานะอาจเปลี่ยนไปแล้วระหว่างที่ "คิด" ต้องเช็คซ้ำก่อนลงมือเสมอ */
-      if (room.table._state.current !== cur) { poke(); return; }
+      if (room.table._state.current !== cur) {
+        /* ไม่ได้ลงมือ = เวลาที่จดไว้ใช้ไม่ได้แล้ว ทิ้งไปไม่งั้นค้างไปโดนใช้ผิดตาทีหลัง */
+        delete plannedThink[cur];
+        poke();
+        return;
+      }
       decide(cur, lv);
       broadcast();
       poke();
@@ -1365,8 +1374,9 @@ export function createBotManager(room, broadcast) {
     const base = pre ? preflopStrength(me.cards) : madeStrength(me.cards, view.board);
 
     /* จดว่า "ถ้าเล่นจริงเขาจะใช้เวลาคิดเท่าไหร่" ให้คนอื่นอ่านทางได้เหมือนเกมจริง
-       (เกมจริงหน่วงเวลาเท่านี้อยู่แล้ว ตัวเลขจึงตรงกัน ไม่ใช่ของปลอมสำหรับเครื่องมือวัด) */
-    plannedThink[seatId] = thinkMs(lv, view, me, base);
+       ในเซิร์ฟเวอร์จริง poke() จดไว้ให้แล้วตอนตั้งเวลาหน่วง ใช้ตัวนั้นเพื่อให้ตรงกัน
+       ในเครื่องมือวัดผลไม่มีการหน่วงเวลา จึงต้องคิดเองตรงนี้ */
+    if (plannedThink[seatId] === undefined) plannedThink[seatId] = thinkMs(lv, view, me, base);
 
     /* คนที่ยังสู้อยู่กี่คน — บลัฟได้ผลกับคนน้อย ยิ่งหลายคนยิ่งมีคนตามแน่ */
     let live = 0;
