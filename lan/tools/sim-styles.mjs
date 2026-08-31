@@ -2,8 +2,11 @@
 import { createTable } from "../poker-room.mjs";
 import { createBotManager } from "../bots.mjs";
 import * as bank from "../bot-bank.mjs";
+import * as mind from "../bot-mind.mjs";
 import fs from "node:fs"; import os from "node:os"; import path from "node:path";
-bank._setDir(fs.mkdtempSync(path.join(os.tmpdir(), "sim-")));
+const _d = fs.mkdtempSync(path.join(os.tmpdir(), "sim-"));
+bank._setDir(_d);
+mind._setDir(_d);
 
 const stats = {};
 for (const lv of [1, 2, 3]) {

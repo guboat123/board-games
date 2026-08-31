@@ -4,8 +4,11 @@
 import { createTable } from "../poker-room.mjs";
 import { createBotManager } from "../bots.mjs";
 import * as bank from "../bot-bank.mjs";
+import * as mind from "../bot-mind.mjs";
 import fs from "node:fs"; import os from "node:os"; import path from "node:path";
-bank._setDir(fs.mkdtempSync(path.join(os.tmpdir(), "skill-")));
+const _d = fs.mkdtempSync(path.join(os.tmpdir(), "skill-"));
+bank._setDir(_d);
+mind._setDir(_d);
 
 const HANDS = Number(process.argv[2] || 600);
 const t = createTable("SKILL");
