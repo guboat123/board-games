@@ -136,7 +136,14 @@ function preflopStrength(cards) {
   if (a < 0 || b < 0) return 0.4;
   const suited = cards[0].slice(-1) === cards[1].slice(-1);
   const hi = Math.max(a, b), lo = Math.min(a, b);
-  if (a === b) return Math.min(1, 0.56 + hi / 26);
+  /* ⚠️ คู่สูงต้องไม่แตะ 0.90
+     ของเดิม AA ได้ 1.000 · KK 0.983 · QQ 0.945 · JJ 0.906 — ทุกตัวเกิน 0.90
+     ซึ่งเป็นเกณฑ์ที่ปลดล็อกให้ลงได้ "ทั้งตัก" (ดู commitCap)
+     ได้คู่สูงเมื่อไหร่จึงเป็นลุยหมดหน้าตักแทบทุกครั้ง อ่านออกตั้งแต่มือที่สาม
+     และมันไม่จริงด้วย: AA ชนะคู่แข่งคนเดียวราว 85% เจอแปดคนเหลือราว 35%
+     ไม่มีไพ่สองใบไหน "ชนะแน่" ตั้งแต่ยังไม่เปิดอะไรเลย
+     สเกลใหม่: AA 0.86 · KK 0.83 · QQ 0.80 · JJ 0.77 · TT 0.74 · 22 0.50 */
+  if (a === b) return 0.50 + (hi / 12) * 0.36;
   let v = (hi * 0.62 + lo * 0.38) / 12 * 0.6;
   if (suited) v += 0.08;
   if (hi - lo === 1) v += 0.05;
@@ -146,9 +153,32 @@ function preflopStrength(cards) {
 
 /* หลังเปิดไพ่กลาง ใช้เครื่องประเมินตัวจริงของเกม แล้วแปลงหมวดเป็นความมั่นใจ */
 function madeStrength(hole, board) {
+  const bs = board.map(toNum).filter(x => x >= 0);
   const cs = hole.concat(board).map(toNum).filter(x => x >= 0);
   if (cs.length < 5) return 0.4;
-  return CAT_EQUITY[evaluate7(cs)[0]] || 0.5;
+  const mine = evaluate7(cs);
+  let v = CAT_EQUITY[mine[0]] || 0.5;
+
+  /* ⚠️ ชุดที่ "บอร์ดมีอยู่แล้ว" ไม่ใช่ของเรา ทุกคนบนโต๊ะก็มีเหมือนกัน
+     เคสจริงที่เจ้าของจับได้: บอร์ด 4♥ Q♠ 10♣ J♣ 4♠ · บอทถือ K♥3♦
+     เครื่องประเมินตอบว่า "One Pair 4s" ได้คะแนน 0.45 เท่ากับตอนเข้าคู่ด้วยไพ่ตัวเอง
+     บอทเลยตามไป 3,374 ในราคา 31% ด้วยไพ่ที่ไม่มีอะไรเลย
+     เทียบกับชุดของบอร์ดล้วน ถ้าได้ชุดเดียวกันและแต้มเดียวกัน แปลว่าเราไม่ได้เพิ่มอะไร
+     เหลือค่าเท่าไพ่สูง บวกนิดหน่อยถ้าไพ่ข้างดีกว่าที่บอร์ดมี */
+  if (bs.length >= 5) {
+    const onBoard = evaluate7(bs);
+    if (onBoard[0] === mine[0] && onBoard[1] === mine[1]) {
+      let better = false;
+      for (let i = 2; i < mine.length; i++) {
+        const a = mine[i], b = onBoard[i];
+        if (a === b) continue;
+        better = (a != null && b != null) ? a > b : (a != null);
+        break;
+      }
+      v = 0.16 + (better ? 0.09 : 0.01);
+    }
+  }
+  return v;
 }
 
 /* ---------- นับ "ไพ่ที่ยังลุ้นอยู่" (outs) ----------
@@ -307,7 +337,7 @@ function stackFear(toCall, stack, nerve, walletPressure) {
 
    หลักคือ "ยิ่งมั่นใจยิ่งกล้าลงเยอะ" ไม่ใช่ลงเยอะตลอดเวลา
    และคนที่กระเป๋าบางต้องลงน้อยลงอีก เพราะเขามีน้อยจะเสีย */
-function commitCap(eq, walletPressure, nerve) {
+function commitCap(eq, walletPressure, nerve, pre) {
   var base;
   if (eq >= 0.90) base = 1.00;       /* มือแทบชนะแน่ ลงได้หมด */
   else if (eq >= 0.80) base = 0.55;
@@ -317,7 +347,11 @@ function commitCap(eq, walletPressure, nerve) {
   /* ใจถึงหรือระวังตัว มีผลตรงนี้มากที่สุด — คนใจถึงกล้าใส่เงินมากกว่าด้วยไพ่เท่ากัน
      ช่วง 0.65 ถึง 1.35 เท่า พอให้รู้สึกต่าง แต่ไม่ถึงกับคนละเกม */
   var byNerve = 0.65 + (nerve === undefined ? 0.5 : nerve) * 0.7;
-  return base * byNerve * (1 - walletPressure * 0.45);
+  /* ⚠️ ก่อนฟลอปลงได้น้อยกว่าหลังฟลอปเสมอ
+     ตอนนั้นยังไม่เห็นอะไรเลย เหลือไพ่ให้เปิดอีกห้าใบ มือที่ดูดีที่สุดก็พลิกได้
+     คนเล่นเงินสดจริงไม่เอาทั้งตักลงก่อนฟลอป นอกจากเจอตักสั้นหรือโดนบีบจริงๆ */
+  var byStreet = pre ? 0.55 : 1;
+  return base * byNerve * byStreet * (1 - walletPressure * 0.45);
 }
 
 /* คิดยอดเรซจริง โดยไม่ให้เกินทั้งเพดานเทียบกอง และเพดานเทียบตัก */
@@ -328,7 +362,8 @@ function raiseTo(f, eq, potMult) {
   /* เพดานเทียบกอง: เดิมพันเกินกองมากๆ ไม่มีเหตุผลรองรับ นอกจากมือแทบชนะแน่ */
   var potCeil = f.view.currentBet + Math.round(f.potNow * (eq >= 0.9 ? 2.5 : 1.3));
   /* เพดานเทียบตัก: ห้ามใส่เงินเข้าไปในมือนี้เกินสัดส่วนที่มั่นใจ */
-  var stackCeil = f.me.bet + Math.round(f.me.stack * commitCap(eq, f.walletPressure || 0, f.trait.nerve));
+  var stackCeil = f.me.bet +
+    Math.round(f.me.stack * commitCap(eq, f.walletPressure || 0, f.trait.nerve, f.pre));
 
   var target = Math.min(want, Math.max(potCeil, minTarget), Math.max(stackCeil, minTarget));
   /* ต่ำกว่าขั้นต่ำไม่ได้ และเกินที่มีก็ไม่ได้ */

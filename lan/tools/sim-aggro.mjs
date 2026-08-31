@@ -35,6 +35,14 @@ for (const lv of [1, 2, 3]) {
     }
     return orig.call(t, seat, msg);
   };
+  const RANKS = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
+  const bigPair = (cards) => {
+    if (!cards || cards.length !== 2) return false;
+    const r = cards.map(c => RANKS.indexOf(String(c).slice(0, -1)));
+    return r[0] === r[1] && r[0] >= 8;   // TT ขึ้นไป
+  };
+  s.bigPairHands = 0; s.bigPairAllIn = 0;
+
   for (let h = 0; h < 300; h++) {
     const r = t.action(0, { type: "start" });
     if (r && r.error) break;
@@ -43,6 +51,14 @@ for (const lv of [1, 2, 3]) {
       const cur = t._state.current;
       if (cur < 0) break;
       if (!mgr._decideNow(cur)) t.action(cur, { type: "act", action: t.viewFor(cur).toCall > 0 ? "call" : "check" });
+    }
+    /* บอทที่ถือคู่สูง จบมือแล้วลงหมดตักไปกี่ตัว */
+    for (const b of t._state.seats) {
+      if (!b || !b.isBot || !b.cards || b.cards.length !== 2) continue;
+      const codes = b.cards.map(c => RANKS[c >> 2] + "shcd"[c & 3]);
+      if (!bigPair(codes)) continue;
+      s.bigPairHands++;
+      if (b.allIn) s.bigPairAllIn++;
     }
     s.allInSeen += t._state.seats.filter(x => x && x.isBot && x.allIn).length;
     s.hands++;
@@ -57,7 +73,10 @@ for (const lv of [1, 2, 3]) {
     avgBetVsStack: (avg(s.stackFrac) * 100).toFixed(1) + "%",
     shovePer100Acts: (s.shoves / Math.max(1, s.acts) * 100).toFixed(1),
     allInCallsPer100: ((s.allInCalls || 0) / Math.max(1, s.acts) * 100).toFixed(1),
-    allInPerHand: (s.allInSeen / Math.max(1, s.hands)).toFixed(2)
+    allInPerHand: (s.allInSeen / Math.max(1, s.hands)).toFixed(2),
+    bigPairAllInPct: s.bigPairHands
+      ? (s.bigPairAllIn / s.bigPairHands * 100).toFixed(0) + "% (จาก " + s.bigPairHands + " มือที่ถือคู่ TT+)"
+      : "ไม่มีข้อมูล"
   };
 }
 console.log(JSON.stringify(out, null, 2));
