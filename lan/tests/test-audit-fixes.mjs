@@ -235,3 +235,44 @@ console.log("test-audit-fixes: ผ่านหมด");
 }
 
 console.log("test-audit-fixes (รอบสอง): ผ่านหมด");
+
+/* ---------- สิทธิ์กด "มือต่อไป" ----------
+   มีคนจริงพร้อมเล่น = สิทธิ์เป็นของคน บอทห้ามแตะ
+   เหลือแต่บอท = บอทกดเองได้ ไม่งั้นโต๊ะค้างเปล่า */
+{
+  const { createBotManager } = await import("../bots.mjs");
+  const bank2 = await import("../bot-bank.mjs");
+  const fs2 = await import("node:fs");
+  const os2 = await import("node:os");
+  const path2 = await import("node:path");
+  bank2._setDir(fs2.mkdtempSync(path2.join(os2.tmpdir(), "startright-")));
+
+  const t = createTable("STARTRIGHT");
+  const mgr = createBotManager({ table: t }, () => {});
+  const human = t.sit("Human", null, 2000, "human");
+  t._state.seats[human.seatId].connected = true;
+  mgr.add(2, 2);
+
+  /* มีคนจริงพร้อมเล่น → บอทต้องไม่ตั้งเวลาเริ่มมือ */
+  mgr.poke();
+  assert.equal(t._state.phase, "waiting", "ยังไม่เริ่ม");
+  assert.equal(mgr._pendingStart(), false,
+    "มีคนจริงพร้อมเล่นอยู่ บอทต้องไม่จองคิวกดเริ่มมือ");
+
+  /* คนจริงพักมือ → ไม่มีใครกดได้แล้ว บอทกดเองได้ */
+  t.action(human.seatId, { type: "sitout", value: true });
+  mgr.poke();
+  assert.equal(mgr._pendingStart(), true,
+    "เหลือแต่บอท ต้องจองคิวกดเริ่มมือให้");
+
+  /* คนจริงกลับมา → สิทธิ์ต้องกลับไปเป็นของคนทันที */
+  t.action(human.seatId, { type: "sitout", value: false });
+  mgr.poke();
+  assert.equal(mgr._pendingStart(), false,
+    "คนจริงกลับมาพร้อมเล่น สิทธิ์ต้องกลับไปเป็นของคน");
+
+  mgr.removeAll();
+  mgr.stop();
+}
+
+console.log("test-audit-fixes (สิทธิ์เริ่มมือ): ผ่านหมด");
