@@ -276,3 +276,35 @@ console.log("test-audit-fixes (รอบสอง): ผ่านหมด");
 }
 
 console.log("test-audit-fixes (สิทธิ์เริ่มมือ): ผ่านหมด");
+
+/* ---------- หมดเวลาแล้ว แต่ยังไม่มีใครกดเริ่มมือใหม่ ----------
+   เซิร์ฟเวอร์ปิดรอบตอน "พยายามเริ่มมือแล้วพบว่าหมดเวลา" เท่านั้น
+   ถ้านาฬิกาหมดตอนที่ยังไม่มีใครกด จะมีช่วงที่ over ยังเป็นเท็จ แต่เวลาหมดแล้ว
+   หน้าจอต้องรู้เรื่องนี้จาก msLeft ไม่ใช่รอ over อย่างเดียว
+   ไม่งั้นปุ่ม "มือต่อไป" จะเป็นสีทองกดได้ แล้วกดปุ๊บได้ข้อความแดงวาบเดียวแล้วเด้งไปหน้าจบรอบ */
+{
+  const t = createTable({ smallBlind: 10, bigBlind: 20, minBuyIn: 1,
+                          limitType: "minutes", limitValue: 1 });
+  t.sit("A", 0, 1000, "ta");
+  t.sit("B", 1, 1000, "tb");
+  t.action(0, { type: "start" });
+  let g = 0;
+  while (t._state.phase !== "showdown" && t._state.current >= 0 && g++ < 30) {
+    const c = t._state.current;
+    t.action(c, { type: "act", action: t.viewFor(c).toCall > 0 ? "call" : "check" });
+  }
+  /* เวลาหมดระหว่างที่ยังไม่มีใครกดเริ่มมือใหม่ */
+  t._state.startedAt = Date.now() - 90000;
+  const v = t.viewFor(0);
+  assert.equal(v.limit.over, false, "เซิร์ฟเวอร์ยังไม่ปิดรอบ เพราะยังไม่มีใครกดเริ่ม");
+  assert.equal(v.limit.msLeft, 0, "แต่เวลาหมดแล้วจริง");
+  assert.ok(v.canStart, "และเซิร์ฟเวอร์ยังบอกว่ากดเริ่มได้ — นี่คือกับดัก");
+
+  /* กดจริงต้องถูกปฏิเสธ และรอบต้องถูกปิดให้ */
+  const out = t.action(0, { type: "start" });
+  assert.ok(out.error, "กดเริ่มตอนหมดเวลา ต้องถูกปฏิเสธ");
+  assert.equal(t.viewFor(0).limit.over, true, "และรอบต้องถูกปิดพร้อมตารางสรุป");
+  assert.ok(t.viewFor(0).standings, "ต้องมีตารางอันดับให้ดู");
+}
+
+console.log("test-audit-fixes (หมดเวลาก่อนกดเริ่ม): ผ่านหมด");

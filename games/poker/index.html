@@ -3599,7 +3599,17 @@ button { font-family: inherit; }
       var alive = view.seats.filter(function (s) { return s && s.connected && !s.sitOut; });
       var broke = alive.filter(function (s) { return s.stack <= 0; });
       var why = null;
-      if (view.limit && view.limit.over) why = "รอบเล่นนี้จบแล้ว";
+      /* ⚠️ "หมดเวลาแล้ว" กับ "ปิดรอบแล้ว" เป็นคนละสถานะ และมีช่วงคาบเกี่ยว
+         เซิร์ฟเวอร์ปิดรอบตอน "พยายามเริ่มมือใหม่แล้วพบว่าหมดเวลา" เท่านั้น
+         ถ้านาฬิกาหมดตอนที่ยังไม่มีใครกดเริ่ม over จะยังเป็นเท็จอยู่
+         ปุ่มจึงเป็นสีทองกดได้ ทั้งที่กดแล้วได้ข้อความแดงวาบเดียวแล้วเด้งไปหน้าจบรอบ
+         = ปุ่มที่หลอกให้กด ต้องบอกความจริงตั้งแต่ก่อนกด */
+      var lim = view.limit || {};
+      var timeUp = lim.type === "minutes" && typeof lim.msLeft === "number" && lim.msLeft <= 0;
+      var handsUp = lim.type === "hands" && typeof lim.handsLeft === "number" && lim.handsLeft <= 0;
+      if (lim.over) why = "รอบเล่นนี้จบแล้ว";
+      else if (timeUp) why = "หมดเวลาแล้ว · รอบนี้จบแล้ว";
+      else if (handsUp) why = "ครบ " + lim.value + " ตาแล้ว · รอบนี้จบแล้ว";
       else if (view.readyCount < 2) {
         if (alive.length < 2) why = "ต้องมีอย่างน้อย 2 คน";
         else if (me.stack <= 0) why = "ชิปคุณหมด กดเติมชิปก่อน";
@@ -3610,6 +3620,16 @@ button { font-family: inherit; }
         function () { send({ type: "start" }); });
       start.disabled = !!why;
       row.appendChild(start);
+
+      /* ครบกติกาแล้วแต่ยังไม่มีใครปิดรอบ ต้องมีปุ่มพาไปดูสรุป
+         ไม่งั้นคนจะเห็นแค่ปุ่มเทาที่กดไม่ได้ แล้วไม่รู้ว่าต้องทำอะไรต่อ */
+      if ((timeUp || handsUp) && !lim.over) {
+        var fin = mkBtn("act act--raise", "ดูสรุปรอบนี้",
+          "ปิดรอบแล้วขึ้นตารางว่าใครได้ใครเสีย",
+          function () { send({ type: "endrun" }); });
+        fin.style.flexBasis = "100%";
+        row.appendChild(fin);
+      }
 
       /* โชว์ไพ่เอง — ของสนุกที่โต๊ะจริงมี เช่นชนะเพราะทุกคนหมอบ แล้วโชว์ว่าบลัฟ
          โผล่เฉพาะตอนจบมือ และเฉพาะคนที่ไพ่ยังไม่ถูกเปิด */
