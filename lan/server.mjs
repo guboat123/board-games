@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 
 import { createTable } from "./poker-room.mjs";
 import * as store from "./history-store.mjs";
+import { createBotManager } from "./bots.mjs";
 store.load();
 /* เขียนลงดิสก์เป็นช่วงๆ ไม่ใช่ทุกมือ ดิสก์จะได้ไม่ถูกกวนตลอดเวลา
    ตัว save เองข้ามเองถ้าไม่มีอะไรเปลี่ยน */
@@ -241,7 +242,16 @@ function send(client, obj) {
 }
 
 /* ส่งสถานะให้ทุกคนในห้อง โดยแต่ละคนเห็นไพ่ของตัวเองเท่านั้น */
+/* บอทของห้องนั้น สร้างครั้งเดียวตอนใช้ครั้งแรก */
+function botsOf(room) {
+  if (!room.bots) room.bots = createBotManager(room, () => broadcastState(room));
+  return room.bots;
+}
+
 function broadcastState(room) {
+  /* ทุกครั้งที่สถานะเปลี่ยน ให้บอทได้ดูว่าถึงตาตัวเองหรือยัง
+     ต้องเรียกก่อนส่งออก ไม่งั้นบอทจะช้าไปหนึ่งจังหวะเสมอ */
+  if (room.bots) room.bots.poke();
   for (const c of room.clients) {
     send(c, { type: "state", state: room.table.viewFor(c.seatId) });
   }
@@ -288,6 +298,9 @@ server.on("upgrade", (req, socket) => {
     if (client.room) {
       client.room.clients.delete(client);
       client.room.table.disconnect(client.seatId);
+      if (client.room.clients.size === 0 && client.room.bots) {
+        client.room.bots.stop(); client.room.bots.removeAll();
+      }
       if (client.room.clients.size === 0) scheduleReap(client.room);
       else broadcastState(client.room);
       client.room = null;
@@ -354,6 +367,23 @@ server.on("upgrade", (req, socket) => {
 
     if (!client.room) return;
 
+    /* เพิ่ม/เอาบอทออก ใช้ซ้อมตอนยังไม่มีคนมาเล่นด้วย */
+    if (msg.type === "addbot") {
+      const n = Math.max(0, Math.min(8, Math.floor(Number(msg.count)) || 0));
+      const lv = Math.max(1, Math.min(3, Math.floor(Number(msg.level)) || 2));
+      const bots = botsOf(client.room);
+      if (n === 0) {
+        bots.removeAll();
+        log("ห้อง", client.room.code, "เอาบอทออกหมด");
+      } else {
+        const r = bots.add(n, lv);
+        log("ห้อง", client.room.code, "เพิ่มบอท", r.added.length, "ตัว ระดับ", r.levelName);
+      }
+      broadcastState(client.room);
+      pushLobby();
+      return;
+    }
+
     /* ประวัติมือ ส่งเฉพาะตอนมีคนขอ ไม่แนบไปกับ state ทุกครั้ง */
     if (msg.type === "history") {
       send(client, { type: "history", hands: client.room.table.history() });
@@ -392,7 +422,9 @@ server.on("upgrade", (req, socket) => {
       lobby.add(client);
       /* คนสุดท้ายลุกออกไปแล้ว ต้องตั้งคิวปิดห้องด้วย
          ไม่งั้นห้องร้างจะค้างในรายการตลอดกาล (เดิมตั้งคิวไว้เฉพาะตอนโซเก็ตหลุด) */
-      if (room.clients.size === 0) scheduleReap(room);
+      /* คนจริงออกหมดแล้ว บอทต้องหยุดด้วย ไม่งั้นมันเล่นกันเองในห้องร้างไปเรื่อยๆ */
+    if (room.clients.size === 0 && room.bots) { room.bots.stop(); room.bots.removeAll(); }
+    if (room.clients.size === 0) scheduleReap(room);
       else broadcastState(room);
       pushLobby();
       send(client, { type: "left" });

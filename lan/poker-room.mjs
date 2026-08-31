@@ -113,7 +113,8 @@ export function createTable(opts = {}) {
     return Math.max(cfg.minBuyIn, Math.min(cfg.maxBuyIn, n));
   }
 
-  function sit(name, preferred, buyIn, token) {
+  /* opts.bot = true คือบอทฝึกซ้อมที่เซิร์ฟเวอร์คุมเอง ไม่ใช่คนจริงที่ต่อเข้ามา */
+  function sit(name, preferred, buyIn, token, opts) {
     name = String(name || "").trim() || "ผู้เล่น";
     token = String(token || "").slice(0, 64);
 
@@ -188,6 +189,8 @@ export function createTable(opts = {}) {
       sitOut: false,
       lastAction: "",
       lastKind: "",
+      isBot: !!(opts && opts.bot),
+      botLevel: (opts && opts.level) || 0,
       timeCards: cfg.timeCards,   /* การ์ดต่อเวลาที่เหลือของคนนี้ */
       token: token      /* รหัสประจำเครื่อง ใช้พิสูจน์ตัวตนตอนกลับเข้ามา */
     };
@@ -648,6 +651,10 @@ export function createTable(opts = {}) {
      เดิมคำนวณตอนจบมือเท่านั้น คนเล่นจึงไม่เห็นว่ากองแยกเป็นชั้นแล้ว
      buildPots อ่านอย่างเดียวไม่แก้ข้อมูล จึงเรียกสดได้ปลอดภัย */
   function livePots() {
+    /* ⚠️ แสดงเฉพาะตอนมีคนหมดตักจริงเท่านั้น
+       ระหว่างพรีฟลอปปกติ บอดเล็กยังลงไม่เท่าบอดใหญ่ buildPots ก็แตกกองให้แล้ว
+       ซึ่งถูกทางเทคนิคแต่ไม่ใช่กองรองจริง แสดงไปก็มีแต่ทำให้สับสน */
+    if (!seated().some(s => s.inHand && !s.folded && s.allIn)) return [];
     const players = seated()
       .filter(s => s.committed > 0)
       .map(s => ({ id: s.seatId, contributed: s.committed, folded: s.folded || !s.inHand }));
@@ -732,6 +739,8 @@ export function createTable(opts = {}) {
         inHand: s.inHand,
         connected: s.connected,
         sitOut: s.sitOut,
+        isBot: s.isBot,
+        botLevel: s.botLevel,
         timeCards: s.timeCards,
         lastAction: s.lastAction,
         /* รหัสท่าแบบเครื่องอ่าน แยกจากข้อความที่คนอ่าน
@@ -878,8 +887,9 @@ export function createTable(opts = {}) {
     return true;
   }
 
-  /* มีใครยังต่ออยู่ไหม ใช้ตัดสินว่าจะเก็บห้องทิ้งได้หรือยัง */
-  function anyConnected() { return seated().some(s => s.connected); }
+  /* มีใครยังต่ออยู่ไหม ใช้ตัดสินว่าจะเก็บห้องทิ้งได้หรือยัง
+     ⚠️ ห้ามนับบอท ไม่งั้นห้องที่เหลือแต่บอทจะไม่มีวันถูกเก็บ และเล่นกันเองไปตลอดกาล */
+  function anyConnected() { return seated().some(s => s.connected && !s.isBot); }
 
   /* ข้อมูลย่อสำหรับหน้าเลือกโต๊ะ */
   function summary() {
@@ -891,7 +901,7 @@ export function createTable(opts = {}) {
       names: all.filter(s => s.connected).map(s => s.name),
       /* ที่นั่งทั้ง 9 ช่อง: null = ว่าง · มีชื่อ = มีคนจองอยู่ */
       /* ไม่ส่งชิปของแต่ละคนออกไปนอกโต๊ะ คนที่ยังไม่ได้นั่งไม่ควรเห็น */
-      seats: st.seats.map(s => s ? { name: s.name, connected: s.connected } : null),
+      seats: st.seats.map(s => s ? { name: s.name, connected: s.connected, isBot: s.isBot } : null),
       blinds: cfg.smallBlind + "/" + cfg.bigBlind,
       phase: st.phase,
       handNo: st.handNo,
