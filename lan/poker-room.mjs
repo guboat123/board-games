@@ -661,6 +661,14 @@ export function createTable(opts = {}) {
       showdown: showdown && live.length > 1,
       board: st.board.map(cardCode),
       reveal, payouts,
+      /* ⚠️ ต้องส่ง "ใครลงไปเท่าไหร่" ของทุกคนไปด้วย ไม่ใช่เฉพาะคนที่เปิดไพ่
+         ไม่งั้นหน้าจอคิดยอดสุทธิของมือนี้ไม่ได้ แล้วจะขึ้นแค่ "ได้กองเท่าไหร่"
+         ซึ่งอ่านผิดได้ทันทีเวลามีกองรอง: คนที่ชนะกองบนสุดอาจสุทธิติดลบ
+         (เคสจริง: ลงไป 3,963 ด้วยตอง K ได้กองบน 3,926 แต่กองใหญ่ตกเป็นของสเตรท = สุทธิ −37) */
+      puts: players.map(pl => {
+        const sx = st.seats[pl.id];
+        return { seatId: pl.id, name: sx ? sx.name : "", amount: pl.contributed };
+      }),
       pot: pots.reduce((a, p) => a + p.amount, 0)
     };
 
