@@ -128,6 +128,25 @@ export function recordHand(hand, seatKey, at) {
   try { fs.appendFileSync(HANDS, JSON.stringify({ at: at, hand: hand }) + "\n", "utf8"); } catch (e) {}
 }
 
+/* ---------- ล้างสถิติสะสม ----------
+   ⚠️ ไม่ลบไฟล์ทิ้ง เปลี่ยนชื่อเก็บไว้แทน
+   ข้อมูลเงินและประวัติการเล่นเรียกคืนไม่ได้ถ้าลบผิด และคนกดอาจกดพลาด
+   ไฟล์ที่เก็บไว้ชื่อ players.<เวลา>.json — เอากลับมาได้ด้วยการเปลี่ยนชื่อกลับ
+   ประวัติมือ (hands.jsonl) ไม่แตะ มันเป็นบันทึกดิบที่ใช้ตรวจย้อนหลังได้ */
+export function clearProfiles(at) {
+  ensureDir();
+  try {
+    if (fs.existsSync(FILE)) {
+      const stamp = String(at || 0).replace(/[^0-9]/g, "") || "old";
+      fs.renameSync(FILE, path.join(DIR, "players." + stamp + ".json"));
+    }
+  } catch (e) { /* ย้ายไม่ได้ก็ยังล้างในหน่วยความจำต่อได้ */ }
+  db = { version: 1, players: {} };
+  dirty = true;
+  save();
+  return true;
+}
+
 export function profiles() {
   return Object.keys(db.players).map(k => {
     const p = db.players[k];

@@ -936,7 +936,26 @@ button { font-family: inherit; }
    ไม่งั้นเพดาน 33% (126px) เล็กกว่าหัว+ปุ่มที่ยืดไม่ได้ (140px) แถวอันดับจะถูกบีบเหลือ 0px
    = จบรอบเล่นแล้วไม่มีใครรู้ว่าใครชนะ ซึ่งเป็นเหตุผลเดียวของการตั้ง limit */
 .table-area.is-over .center { display: none; }
-#t-standings.is-on { max-height: 78%; }
+/* ---------- หน้าจบรอบเล่น: เต็มจอ ----------
+   ⚠️ กล่องนี้ไม่ใช่ "ป๊อปอัปบนโต๊ะ" เหมือนกล่องอื่น มันคือหน้าสุดท้ายของวง
+   รอบจบไปแล้ว ไม่มีอะไรข้างหลังที่ต้องมองอีก การบีบให้เหลือ 78% ของโต๊ะ
+   ทำให้เห็นอันดับได้แค่ 2-3 คนจาก 9 ต้องเลื่อนหาตัวเอง ทั้งที่นี่คือผลรวมทั้งวง
+   ใช้ fixed inset:0 ให้เต็มหน้าจอไปเลย */
+#t-standings.is-on {
+  position: fixed; inset: 0; left: 0; bottom: 0;
+  width: auto; max-width: none; max-height: none; transform: none;
+  border: 0; border-radius: 0; box-shadow: none;
+  padding: 26px 16px calc(20px + env(safe-area-inset-bottom));
+  z-index: 70;
+  background: radial-gradient(120% 80% at 50% 0%, #12402a 0%, #061a12 72%);
+}
+#t-standings h3 { font-size: 1.5rem; margin-bottom: 6px; }
+#t-standings .rows { max-height: none; }
+#t-standings .row { font-size: 1rem; padding: 10px 2px; }
+#t-standings .row--win { padding: 14px 12px; }
+#t-standings .row--win span { font-size: 1.15rem; font-weight: 800; }
+#t-standings .row b { font-size: 1.05rem; }
+#t-standings .foot { padding-top: 14px; }
 /* ⚠️ ตอนเปิดไพ่หลายคน กล่องผลมีได้ถึง 9 แถว เพดาน 33% เหลือที่ให้แถวแค่ ~58px
    = เห็นทีละแถวเดียว ทั้งที่จุดประสงค์คือดูว่าใครมีอะไรบ้าง
    (บั๊กทรงเดียวกับตารางอันดับรอบ 7) ตอนนั้นกองจ่ายออกไปแล้ว ซ่อนบรรทัดกองได้
@@ -2804,6 +2823,22 @@ button { font-family: inherit; }
 
     var foot = document.createElement("div");
     foot.className = "foot";
+
+    /* ⚠️ ต้องมีทางล้างสถิติได้ ไม่งั้นตัวเลขจากตอนทดสอบจะค้างอยู่ตลอดไป
+       และวิธีนับ "ได้เสียสะสม" เคยผิด (บวกแต่ที่ชนะ ไม่หักที่ลงไป) ข้อมูลเก่าจึงเชื่อไม่ได้
+       ล้างแล้วไฟล์เดิมยังถูกเก็บไว้ในเครื่อง ไม่ได้ลบทิ้ง */
+    var clr = document.createElement("button");
+    clr.type = "button";
+    clr.className = "act";
+    clr.style.cssText = "width:100%; margin-bottom:8px";
+    clr.textContent = "ล้างสถิติสะสม";
+    clr.appendChild(makeSub("เริ่มนับใหม่ทั้งหมด · ไฟล์เดิมยังเก็บไว้ในเครื่อง"));
+    clr.addEventListener("click", function () {
+      if (!confirm("ล้างสถิติสะสมของทุกคนบนเครื่องนี้ แล้วเริ่มนับใหม่ไหม")) return;
+      send({ type: "clearstats" });
+    });
+    foot.appendChild(clr);
+
     var note = document.createElement("p");
     note.className = "hint-sm pnote";
     note.style.margin = "0 0 8px";

@@ -429,6 +429,21 @@ server.on("upgrade", (req, socket) => {
       return;
     }
 
+    /* ล้างสถิติสะสม — เฉพาะคนที่เปิดโต๊ะ เพราะมันกระทบข้อมูลของทุกคนบนเครื่องนี้
+       ไฟล์เดิมถูกเก็บไว้ ไม่ได้ลบทิ้ง (ดู clearProfiles) */
+    if (msg.type === "clearstats") {
+      const st = client.room && client.room.table._state;
+      if (st && st.hostSeat !== null && st.hostSeat !== client.seatId) {
+        send(client, { type: "error", message: "เฉพาะคนที่เปิดโต๊ะเท่านั้นที่ล้างสถิติได้" });
+        return;
+      }
+      store.clearProfiles(Date.now());
+      log("ล้างสถิติสะสมแล้ว (ไฟล์เดิมเก็บไว้)");
+      send(client, { type: "profiles", players: store.profiles(), me: client.playerKey });
+      send(client, { type: "error", message: "ล้างสถิติสะสมแล้ว (ไฟล์เดิมเก็บไว้ในเครื่อง)" });
+      return;
+    }
+
     /* ประวัติมือ ส่งเฉพาะตอนมีคนขอ ไม่แนบไปกับ state ทุกครั้ง */
     if (msg.type === "history") {
       send(client, { type: "history", hands: client.room.table.history() });
