@@ -20,6 +20,12 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { createTable } from "./poker-room.mjs";
+import * as store from "./history-store.mjs";
+store.load();
+/* เขียนลงดิสก์เป็นช่วงๆ ไม่ใช่ทุกมือ ดิสก์จะได้ไม่ถูกกวนตลอดเวลา
+   ตัว save เองข้ามเองถ้าไม่มีอะไรเปลี่ยน */
+setInterval(() => store.save(), 20000);
+process.on("SIGINT", () => { store.save(); process.exit(0); });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -164,10 +170,40 @@ const lobby = new Set();   /* เครื่องที่ยังไม่�
    จะได้เทสต์ได้โดยไม่ต้องรอเวลาจริง */
 setInterval(() => {
   for (const room of rooms.values()) {
-    try { if (room.table.tick()) broadcastState(room); }
+    try { if (room.table.tick()) { persistNewHands(room); broadcastState(room); } }
     catch (e) { log("tick error", room.code, e && e.message); }
   }
 }, 1000);
+
+/* เก็บมือที่เพิ่งจบลงประวัติรายคน
+   ต้องทำที่ชั้นนี้เพราะโมดูลโต๊ะไม่รู้จัก IP (มันเป็นตรรกะล้วน ไม่ยุ่งกับเน็ตเวิร์ก) */
+function persistNewHands(room) {
+  const all = room.table.history();
+  if (all.length <= (room.savedHands || 0)) {
+    /* ประวัติมีเพดาน 200 มือ ถ้าโดนตัดหัวทิ้ง ตัวนับต้องหดตาม ไม่งั้นจะเก็บซ้ำ */
+    room.savedHands = Math.min(room.savedHands || 0, all.length);
+    return;
+  }
+  /* แผนที่ ที่นั่ง -> IP จากคนที่ยังต่ออยู่ตอนนี้ · ชื่อ -> IP ไว้ใช้ตอนหาผู้ชนะ */
+  const bySeat = {}, byName = {};
+  for (const c of room.clients) {
+    if (c.seatId == null || !c.ip) continue;
+    bySeat[c.seatId] = c.ip;
+    const seat = room.table._state.seats[c.seatId];
+    if (seat) byName[seat.name] = c.ip;
+  }
+  const keyOf = (seatIdx, name) => {
+    if (seatIdx >= 0 && bySeat[seatIdx]) return bySeat[seatIdx];
+    if (name && byName[name]) return byName[name];
+    /* คนที่หลุดไปแล้วไม่รู้ IP จึงยึดชื่อไว้ก่อน ดีกว่าทิ้งข้อมูลไปเฉยๆ */
+    return name ? "ชื่อ:" + name : "";
+  };
+  for (let i = room.savedHands || 0; i < all.length; i++) {
+    try { store.recordHand(all[i], keyOf, all[i].at || Date.now()); }
+    catch (e) { log("บันทึกประวัติไม่สำเร็จ", e && e.message); }
+  }
+  room.savedHands = all.length;
+}
 
 function roomList() {
   const out = [];
@@ -225,7 +261,11 @@ server.on("upgrade", (req, socket) => {
   );
   socket.setNoDelay(true);
 
-  const client = { id: nextId++, socket, room: null, seatId: null, alive: true };
+  /* "IP เดิม = คนเดิม" ตามที่เจ้าของกำหนด ใช้เป็นคีย์ประวัติรายคน
+     ตัด ::ffff: ที่ Node เติมหน้า IPv4 ออก ไม่งั้นเครื่องเดียวจะกลายเป็นสองคน */
+  let ip = "";
+  try { ip = String(socket.remoteAddress || "").replace(/^::ffff:/, ""); } catch (e) {}
+  const client = { id: nextId++, socket, room: null, seatId: null, alive: true, ip: ip };
   lobby.add(client);
 
   /* โซเก็ตที่ตายแบบไม่ส่ง FIN (ปิด WiFi / แท็บถูกพักใน bfcache) จะค้างอยู่ตลอดกาล
@@ -311,6 +351,13 @@ server.on("upgrade", (req, socket) => {
       return;
     }
 
+    /* ประวัติสะสมรายคน ข้ามรอบเล่นและข้ามการปิดเปิดเซิร์ฟเวอร์ */
+    if (msg.type === "profiles") {
+      persistNewHands(client.room);
+      send(client, { type: "profiles", players: store.profiles(), me: client.ip });
+      return;
+    }
+
     /* ย้ายที่นั่งบนโต๊ะเดิม ต้องทำที่ชั้นนี้ ไม่ใช่ใน table.action
        เพราะเลขที่นั่งของ client เก็บอยู่ตรงนี้ ถ้าโต๊ะย้ายแต่ client ยังถือเลขเดิม
        คนคนนั้นจะสั่งการแทนช่องเก่า และเห็นไพ่ในมือของคนที่มานั่งช่องนั้นทีหลัง */
@@ -345,6 +392,7 @@ server.on("upgrade", (req, socket) => {
 
     const out = client.room.table.action(client.seatId, msg);
     if (out && out.error) send(client, { type: "error", message: out.error });
+    persistNewHands(client.room);
     broadcastState(client.room);
     schedulePushLobby();
   }

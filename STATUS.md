@@ -187,6 +187,22 @@ Playing a real game surfaced one hard stop and a list of wants. All done:
 - **Action log with decision times**, for studying play patterns. Per-player summary
   plus a hand-by-hand log, copyable as text. Sent only on request.
 - **Drag-to-size betting**, like Pokerrrr 2. The number pad still works.
+- **Turn clock** (30s default) with tournament **time-bank cards** (3 per player, +30s).
+  The room stays pure logic — `server.mjs` calls `table.tick()` once a second and the room
+  auto-checks, or folds when there is money to call, so a table never stalls on someone who
+  walked away. It refuses to fold the last player standing.
+- **Pre-actions** (fold / check-fold / call-any) while waiting. Fold and check-fold last the
+  whole hand; call-any expires each street so a later raise cannot be called by a stale
+  instruction.
+- **Sound**, synthesised live with Web Audio — no audio files, so the no-assets constraint
+  holds. Knock, chips, deal, muck, turn alert, hurry-up, win. Mute button in the top bar,
+  remembered in localStorage.
+- **Per-player history that survives restarts**, in `lan/data/` (gitignored — it is data, not
+  code). Keyed by **IP**, on the owner's rule that the same device is the same person; the
+  names that device has used are stored alongside so a rename does not split the record.
+  Written temp-then-rename so a crash cannot leave a half-written file. Caveats worth
+  repeating to players: DHCP can hand out a new IP, and two people sharing one device count
+  as one person.
 
 ## Automated tests (must pass before any commit)
 
@@ -195,6 +211,7 @@ node lan/tests/test-payout.mjs     # side pots, seat-0 wins, dead-pot refund
 node lan/tests/test-uncalled.mjs   # uncalled bet returns to its owner (+400-case money fuzz)
 node lan/tests/test-room.mjs       # pot excludes uncalled money · seat takeover · host rights
 node tests/test-clue.mjs           # clue rules, extracted live from color-clues/index.html
+node lan/tests/test-history.mjs    # per-player history: no double counting, money totals, reload
 ```
 
 `test-clue.mjs` pulls the real code out of the HTML rather than copying the rules, so it fails if a
