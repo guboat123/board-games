@@ -2821,7 +2821,12 @@ button { font-family: inherit; }
     lbl.className = "botbox__t";
     lbl.textContent = "บอทซ้อม";
     lvRow.appendChild(lbl);
-    [[1, "อ่อน"], [2, "กลาง"], [3, "เก่ง"]].forEach(function (o) {
+    /* ⚠️ ชื่อระดับต้องบอก "วิธีคิด" ไม่ใช่ "เก่งแค่ไหน"
+       สามระดับนี้ใช้อัลกอริทึมคนละตัวจริงๆ (ดู lan/bots.mjs)
+       มือใหม่ตัดสินจาก "มีอะไรในมือไหม" · นักพนันไล่ลุ้นทุกทางและไม่ยอมทิ้ง
+       · มืออาชีพคิดจากราคาเทียบกองและตำแหน่ง
+       เขียนว่า อ่อน/กลาง/เก่ง จะสื่อผิดว่าเป็นตัวเดียวกันแค่ปรับความยาก */
+    [[1, "มือใหม่"], [2, "นักพนัน"], [3, "มืออาชีพ"]].forEach(function (o) {
       var b = document.createElement("button");
       b.type = "button";
       b.className = "botlv" + (botLevel === o[0] ? " is-on" : "");

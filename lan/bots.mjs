@@ -9,6 +9,7 @@
      3 เก่ง      เล่นตึง ไล่หนักตอนมือดี บลัฟมีจังหวะ ยอมทิ้งมือไม่ดีเร็ว
    =========================================================== */
 import { evaluate7, cardCode, RANK_CHARS, SUIT_CHARS } from "./poker-engine.mjs";
+import * as bank from "./bot-bank.mjs";
 
 /* ⚠️ ชื่อบอทต้องเป็นอังกฤษล้วน เพื่อให้แยกออกจากคนไทยที่นั่งอยู่ด้วยตาเปล่า
    เดิมใช้ชื่อเล่นไทย (โบ๊ท แมท น้ำ ...) แล้วชนกับชื่อคนจริงบนโต๊ะ
@@ -25,8 +26,19 @@ const NAMES = ["Bruno", "Duke", "Rex", "Milo", "Vega", "Nico", "Kai", "Otto", "Z
    กระเป๋าติดลบได้ = เป็นหนี้ ซึ่งบอทรู้ตัวและเล่นระวังขึ้นจริง (ดู decide)
    ทำแบบนี้เพราะถ้าซื้อชิปใหม่ได้ฟรีไม่จำกัด การหมดตัวก็ไม่มีความหมายอะไรเลย
    บอทจะไล่ all-in ทุกมือแล้วก็ยังอยู่ครบ ซึ่งไม่เหมือนคนเล่นจริงสักนิด */
-const WALLET_START = 10000;   /* เท่ากับซื้อเข้าได้ 5 ครั้งก่อนเริ่มเป็นหนี้ */
+/* ⚠️ เงินไม่ได้เริ่มใหม่ทุกวง มันผูกกับ "ชื่อบอท" และอยู่ข้ามการรีสตาร์ต (ดู bot-bank.mjs)
+   Rex ที่เจอเมื่อวานกับ Rex วันนี้คือตัวเดียวกัน ถ้าเมื่อวานมันเจ๊ง วันนี้มันก็ยังเป็นหนี้อยู่
+   สมการที่ต้องเป็นจริงเสมอ: bankroll = wallet (นอกโต๊ะ) + stack (บนโต๊ะ) */
 const BUY_IN = 2000;
+
+/* ---------- เงินตั้งต้นของบอทแต่ละระดับ ----------
+   ⚠️ ตัวเลขนี้ไม่ใช่แค่ "ให้เงินเยอะน้อย" มันคือ "มีอะไรให้กลัวแค่ไหน"
+   เจ้าของโต๊ะเล่นกันจริงที่ซื้อเข้า 1,000-2,000 ต่อครั้ง คิดเป็นจำนวนครั้งที่ซื้อเข้าได้:
+     มือใหม่   5,000   ≈ 2-3 ครั้ง  หมดเร็ว รู้สึกทุกครั้งที่เสีย เล่นกลัวเร็ว — ตรงกับคนเพิ่งหัด
+     นักพนัน  20,000   ≈ 10 ครั้ง   รับความเหวี่ยงได้ จึงมั่วต่อได้เรื่อยๆ ซึ่งคือนิสัยของเขา
+     มืออาชีพ 100,000  ≈ 50 ครั้ง   ไม่มีวันเล่นแบบกลัวเงินหมด นั่นแหละที่ทำให้เขาน่ากลัว
+   ที่บอทชอบลุยหมดหน้าตักเพราะเมื่อก่อนเงินไม่มีวันหมดจริง ตอนนี้หมดได้แล้ว */
+const WALLET_START = { 1: 5000, 2: 20000, 3: 100000 };
 
 /* margin = ต้องได้เปรียบกว่าราคาที่จ่ายเท่าไหร่ถึงจะตาม (ติดลบ = ตามแม้ราคาไม่คุ้ม)
    bet    = มือแข็งแค่ไหนถึงจะเปิดเดิมพันเองตอนไม่มีใครเดิมพัน
@@ -40,8 +52,8 @@ const BUY_IN = 2000;
      lv1 เล่น 77% เรซ 3%  · lv2 เล่น 40% เรซ 8%  · lv3 เล่น 28% เรซ 18% */
 const LEVEL = {
   1: { name: "มือใหม่",  margin: -0.16, preMargin: -0.18, bet: 0.70, raise: 0.86, preRaise: 0.78, bluff: 0.02, think: [700, 1800],  sizing: 0.35 },
-  2: { name: "ปานกลาง", margin:  0.02, preMargin: -0.04, bet: 0.55, raise: 0.72, preRaise: 0.60, bluff: 0.08, think: [900, 2600],  sizing: 0.55 },
-  3: { name: "เก่ง",     margin:  0.08, preMargin:  0.02, bet: 0.48, raise: 0.64, preRaise: 0.50, bluff: 0.16, think: [1100, 3400], sizing: 0.75 }
+  2: { name: "นักพนัน", margin:  0.02, preMargin: -0.04, bet: 0.55, raise: 0.72, preRaise: 0.60, bluff: 0.08, think: [900, 2600],  sizing: 0.55 },
+  3: { name: "มืออาชีพ",     margin:  0.08, preMargin:  0.02, bet: 0.48, raise: 0.64, preRaise: 0.50, bluff: 0.16, think: [1100, 3400], sizing: 0.75 }
 };
 
 /* ความแข็งของชุดไพ่ที่ทำได้แล้ว แปลงเป็น "โอกาสชนะคร่าวๆ"
@@ -115,6 +127,120 @@ function drawStrength(hole, board) {
   return 0;
 }
 
+
+/* ===========================================================
+   สามระดับ = สามวิธีคิด ไม่ใช่ตัวเลขชุดเดียวกันปรับค่า
+
+   ⚠️ ของเดิมทุกระดับใช้ตรรกะเดียวกันหมด ต่างแค่เกณฑ์
+   ผลคือทุกตัวเล่นเหมือนกัน แค่ตัวหนึ่งใจกล้ากว่าอีกตัว ซึ่งอ่านออกได้ในสิบมือ
+   คนเล่นสามแบบนี้ในชีวิตจริง "คิดคนละเรื่อง" กันเลย ไม่ใช่แค่กล้าไม่เท่ากัน
+
+     1 มือใหม่   ถามตัวเองแค่ "มีอะไรในมือไหม" ไม่คิดเรื่องราคา
+                 มีคู่ = ตาม · ไม่มีอะไร = พับ · เจอเดิมพันก้อนโตแล้วกลัว
+                 ไม่ไล่ลุ้น (นับ out ไม่เป็น) ไม่บลัฟเลย
+     2 นักพนัน   อยากอยู่ในมือ ไล่ลุ้นทุกทาง ไม่ค่อยยอมพับเมื่อลงเงินไปแล้ว
+                 ตามกว้างเกินราคาที่ควร และบางทีก็ลุยหมดหน้าตักด้วยลางสังหรณ์
+     3 มืออาชีพ  คิดจากราคาเทียบกอง (pot odds) + ตำแหน่ง + อ่านคนที่กำลังดัน
+                 บลัฟมีจังหวะ ยิงต่อเนื่องเมื่อเป็นคนไล่ก่อนฟลอป ยอมทิ้งเร็วเมื่อราคาไม่คุ้ม
+   =========================================================== */
+
+/* ---------- 1 มือใหม่ ---------- */
+function decideBeginner(f) {
+  const bet = () => {
+    /* ขนาดเดิมพันมั่วๆ ครึ่งกองบ้าง เท่ากองบ้าง ไม่มีเหตุผลรองรับ */
+    const want = f.view.currentBet + f.view.minRaise + Math.round(f.potNow * (0.4 + Math.random() * 0.6));
+    return { type: "act", action: "raise",
+             amount: Math.max(f.view.currentBet + f.view.minRaise,
+                              Math.min(f.me.bet + f.me.stack, want)) };
+  };
+
+  /* "มีอะไรไหม" = คู่ขึ้นไป (หลังฟลอป) หรือไพ่สูงสองใบ (ก่อนฟลอป)
+     ไม่สนใจไพ่ลุ้น เพราะมือใหม่นับ out ไม่เป็น เห็นว่ายังไม่เข้าชุดก็คิดว่าไม่มีอะไร */
+  const got = f.pre ? f.base >= 0.50 : f.base >= 0.45;
+  const strong = f.base >= 0.78;
+
+  if (f.toCall === 0) {
+    if (strong) return bet();
+    return { type: "act", action: "check" };
+  }
+  /* เดิมพันก้อนโตทำให้กลัว ต่อให้มือดี — ตัดสินจาก "ก้อนใหญ่แค่ไหนเทียบตักเรา"
+     ไม่ใช่เทียบกอง ซึ่งเป็นวิธีที่ผิดและเป็นจุดที่ถูกไล่ออกจากมือได้ง่ายที่สุด */
+  const scary = f.toCall > f.me.stack * 0.25;
+  if (f.base >= 0.90) return bet();
+  if (got && !scary) return { type: "act", action: "call" };
+  if (got && scary && f.base >= 0.72) return { type: "act", action: "call" };
+  return { type: "act", action: "fold" };
+}
+
+/* ---------- 2 นักพนัน ---------- */
+function decideGambler(f) {
+  const shove = () => ({ type: "act", action: "raise", amount: f.me.bet + f.me.stack });
+  const bet = (mult) => {
+    const want = f.view.currentBet + f.view.minRaise + Math.round(f.potNow * mult);
+    return { type: "act", action: "raise",
+             amount: Math.max(f.view.currentBet + f.view.minRaise,
+                              Math.min(f.me.bet + f.me.stack, want)) };
+  };
+
+  /* ลงเงินไปแล้วยิ่งไม่อยากทิ้ง (sunk cost) ซึ่งเป็นนิสัยของนักพนันจริงๆ
+     ไม่ใช่ข้อผิดพลาดในโค้ด — เป็นจุดอ่อนที่ตั้งใจให้มี คนเล่นจะได้จับทางได้ */
+  const committed = f.me.bet > 0 ? 0.10 : 0;
+  /* ไล่ลุ้นทุกทาง ให้น้ำหนักไพ่ลุ้นมากกว่าที่ควรเกือบเท่าตัว */
+  const chase = f.draw * 1.8;
+  const eq = Math.min(1, f.base + chase);
+
+  /* ลางสังหรณ์: บางมือก็ลุยหมดหน้าตักไปเลย ไม่ต้องมีเหตุผล */
+  if (Math.random() < 0.035 && f.me.stack > 0 && f.live <= 2) return shove();
+
+  if (f.toCall === 0) {
+    if (eq >= 0.42 || Math.random() < 0.28) return bet(0.5 + Math.random() * 0.8);
+    return { type: "act", action: "check" };
+  }
+  if (eq >= 0.80) return bet(0.9 + Math.random());
+  /* ตามกว้างกว่าราคาที่ควรมาก ยอมจ่ายแพงเพื่อจะได้อยู่ในมือต่อ */
+  if (eq >= f.price - 0.18 - committed) return { type: "act", action: "call" };
+  return { type: "act", action: "fold" };
+}
+
+/* ---------- 3 มืออาชีพ ---------- */
+function decidePro(f) {
+  const lv = f.lv;
+  const eq = Math.max(0, Math.min(1, f.base + f.draw + (f.bluffing ? 0.26 : 0) +
+                                     (Math.random() - 0.5) * 0.08));
+
+  /* ตำแหน่งมีผลจริง: ได้เดินท้ายแปลว่าเห็นคนอื่นตัดสินใจก่อน เล่นกว้างขึ้นได้
+     คนที่ต้องเดินก่อนเป็นฝ่ายเสียเปรียบ ต้องมือแน่นกว่า
+     นี่คือสิ่งที่แยกคนเล่นเป็นออกจากคนเล่นตามความรู้สึกชัดที่สุด */
+  const latePos = f.actsLast ? -0.03 : 0.02;
+
+  const margin = (f.pre ? lv.preMargin : lv.margin) + f.caution + latePos;
+  const raiseAt = f.pre ? lv.preRaise : lv.raise;
+  const worthCalling = f.toCall === 0 || eq >= f.price + margin;
+
+  /* ไม่เรซทับเดิมพันก้อนใหญ่ด้วยมือกลางๆ ไม่งั้นบอทจะสาดกันไปมาไม่จบ */
+  const facingBig = f.toCall > f.me.stack * 0.3;
+  const canRaise = f.me.stack > f.toCall && eq >= raiseAt && (!facingBig || eq >= 0.82);
+
+  const sized = (mult) => {
+    const want = f.view.currentBet + f.view.minRaise + Math.round(f.potNow * mult);
+    return { type: "act", action: "raise",
+             amount: Math.max(f.view.currentBet + f.view.minRaise,
+                              Math.min(f.me.bet + f.me.stack, want)) };
+  };
+
+  if (canRaise) return sized(lv.sizing * (0.6 + Math.random() * 0.7));
+  if (f.toCall === 0) {
+    if ((eq >= lv.bet || f.cbet) && f.me.stack > f.view.blinds.bb) {
+      return sized(lv.sizing * (0.5 + Math.random() * 0.6));
+    }
+    return { type: "act", action: "check" };
+  }
+  if (worthCalling) return { type: "act", action: "call" };
+  return { type: "act", action: "fold" };
+}
+
+const STYLE = { 1: decideBeginner, 2: decideGambler, 3: decidePro };
+
 export function createBotManager(room, broadcast) {
   const pending = {};     /* seatId -> timer ที่ตั้งไว้ */
   let seq = 0;
@@ -135,6 +261,7 @@ export function createBotManager(room, broadcast) {
   let showOffHand = -1;     /* ตัดสินใจขิงไปแล้วในมือไหน (กันทอยลูกเต๋าซ้ำ) */
   let seenThisHand = {};    /* เก็บไพ่ของใครไปแล้วบ้างในมือนี้ (กันนับซ้ำ) */
   const bench = {};         /* seatId -> กลับมาเล่นได้ตอนจบมือที่เท่าไหร่ */
+  let bankedHand = -1;      /* บันทึกเงินบอทของมือไหนไปแล้ว */
 
   function readOf(name) {
     return reads[name] || { n: 0, strong: 0, weak: 0 };
@@ -210,13 +337,23 @@ export function createBotManager(room, broadcast) {
     const lv = LEVEL[level] ? level : 2;
     const added = [];
     for (let i = 0; i < count; i++) {
+      /* ⚠️ ต้องว่างทั้งบนโต๊ะนี้ และว่างทั้งเซิร์ฟเวอร์
+         กระเป๋าเงินผูกกับชื่อ ถ้าชื่อเดียวกันนั่งสองโต๊ะ ทั้งสองโต๊ะจะหยิบจากกระเป๋าใบเดียวกัน
+         แล้วเขียนทับกันไปมา ยอดของโต๊ะที่บันทึกก่อนจะหายทั้งก้อน */
       const used = room.table._state.seats.filter(Boolean).map(s => s.name);
-      const name = NAMES.filter(n => used.indexOf(n) === -1)[0] || ("Bot" + (++seq));
+      const name = NAMES.filter(n => used.indexOf(n) === -1 && !bank.isBusy(n))[0];
+      if (!name) break;   /* บอทออกโต๊ะอื่นกันหมดแล้ว รอให้ว่างก่อน */
+      bank.claim(name);
       const r = room.table.sit(name, null, BUY_IN, "bot:" + (++seq), { bot: true, level: lv });
-      if (!r.ok) break;
-      /* เปิดกระเป๋าให้ พร้อมหักค่าซื้อเข้าครั้งแรกทันที เงินบนโต๊ะมาจากกระเป๋าเสมอ */
+      if (!r.ok) { bank.release(name); break; }
+      /* หยิบเงินเก่าของบอทชื่อนี้ขึ้นมา แล้วหักค่าซื้อเข้าโต๊ะครั้งแรก
+         เงินบนโต๊ะมาจากกระเป๋าเสมอ ไม่ได้เสกขึ้นมาใหม่ */
       const bs = room.table._state.seats[r.seatId];
-      if (bs) bs.wallet = WALLET_START - BUY_IN;
+      if (bs) {
+        bs.wallet = bank.startSession(r.name, WALLET_START[lv] || 20000, Date.now()) - BUY_IN;
+        /* จำเงินตั้งต้นไว้ด้วย ใช้เทียบว่า "ตอนนี้ขึ้นหรือลงจากที่เริ่มมา" (ดู decide) */
+        bs.walletStart = WALLET_START[lv] || 20000;
+      }
       added.push(r.name);
     }
     return { added, level: lv, levelName: LEVEL[lv].name };
@@ -227,6 +364,10 @@ export function createBotManager(room, broadcast) {
       clearTimeout(pending[s.seatId]);
       delete pending[s.seatId];
       delete bench[s.seatId];
+      /* เก็บเงินกลับกระเป๋าก่อนลุก ไม่งั้นชิปที่ชนะมาทั้งวงหายไปเฉยๆ
+         แล้วปล่อยชื่อคืน ให้โต๊ะอื่นเรียกบอทตัวนี้ไปเล่นต่อได้ */
+      if (typeof s.wallet === "number") bank.sync(s.name, s.wallet, s.stack, Date.now());
+      bank.release(s.name);
       room.table.leave(s.seatId);
     }
   }
@@ -243,6 +384,15 @@ export function createBotManager(room, broadcast) {
        เพราะเป็นข้อมูลของ "มือที่เพิ่งจบ" ซึ่งจะหายไปทันทีที่ขึ้นมือใหม่ */
     observe(st);
     maybeShowOff(st);
+    /* ⚠️ บันทึกเงินบอททุกครั้งที่จบมือ ไม่ใช่แค่ตอนลุกจากโต๊ะ
+       ถ้าบันทึกแค่ตอนลุก พอเซิร์ฟเวอร์ถูกปิดกลางวง (ซึ่งเกิดบ่อยตอนแก้โค้ด)
+       ชิปที่อยู่บนโต๊ะจะหายทั้งก้อน บันทึกทุกมือ ของที่เสียได้มากที่สุดคือมือเดียว */
+    if (st.phase === "showdown" && st.handNo !== bankedHand) {
+      bankedHand = st.handNo;
+      for (const b of botSeats()) {
+        if (typeof b.wallet === "number") bank.sync(b.name, b.wallet, b.stack, Date.now());
+      }
+    }
 
     /* ---------- บอทหมดตัว: ซื้อกลับเข้ามา แต่ต้องนั่งพักก่อน ----------
        ต้องซื้อกลับเอง ไม่งั้นโต๊ะค่อยๆ ว่างจนเหลือคนเดียว แล้วคนที่เหลือก็เริ่มมือไม่ได้
@@ -265,7 +415,8 @@ export function createBotManager(room, broadcast) {
         if (b.stack > 0) continue;
         room.table.action(b.seatId, { type: "rebuy", amount: BUY_IN });
         /* ซื้อชิปใหม่ = หยิบเงินออกจากกระเป๋าอีกก้อน ติดลบได้ นั่นคือเป็นหนี้ */
-        b.wallet = (typeof b.wallet === "number" ? b.wallet : WALLET_START) - BUY_IN;
+        b.wallet = (typeof b.wallet === "number" ? b.wallet : bank.bankrollOf(b.name)) - BUY_IN;
+        bank.noteBust(b.name);
         const penalty = Math.min(Math.max(b.busts || 1, 1), 5);
         room.table.action(b.seatId, { type: "sitout", value: true });
         bench[b.seatId] = st.handNo + penalty;
@@ -330,8 +481,22 @@ export function createBotManager(room, broadcast) {
        คนที่เล่นด้วยเงินที่ยืมมา จะไม่กล้าลุยแบบคนที่ยังมีเงินเหลือในกระเป๋า
        ยิ่งเป็นหนี้มาก ยิ่งต้องการไพ่ดีกว่าเดิมถึงจะสู้ และแทบไม่บลัฟ
        เพดานที่ 0.07 เพื่อไม่ให้บอทที่จนกลายเป็นหมอบทุกมือจนเล่นด้วยไม่สนุก */
+    /* ⚠️ ต้องวัดจาก "ขึ้นหรือลงจากเงินที่ตัวเองเริ่มมา" ไม่ใช่จากตัวเลขดิบ
+       ถ้าเทียบกับเลขคงที่ มืออาชีพที่เริ่มด้วยแสนหนึ่งจะถูกนับว่า "รวย" ตลอดกาล
+       แล้วเล่นมั่วขึ้นเรื่อยๆ ซึ่งกลับหัวกลับหางกับความเป็นมืออาชีพ
+       สิ่งที่กดดันคนเล่นจริงคือ "ตอนนี้ฉันขาดทุนอยู่หรือเปล่า" ไม่ใช่ยอดในบัญชี
+
+       ผลที่ตามมาโดยธรรมชาติ: มือใหม่ที่มี 5,000 (ซื้อเข้าได้ 2-3 ครั้ง) เสียสองครั้งก็เริ่มกลัวแล้ว
+       ส่วนมืออาชีพที่มีแสนหนึ่ง แทบไม่ขยับจากจุดเริ่ม จึงเล่นนิ่งเสมอ — ซึ่งถูกต้อง */
+    const purse = (typeof me.wallet === "number" ? me.wallet : 0) + me.stack;
+    const start = me.walletStart || 20000;
+    const ratio = purse / start;
     const debt = Math.max(0, -(typeof me.wallet === "number" ? me.wallet : 0));
-    const debtFear = Math.min(debt / 8000, 1) * 0.07;
+    /* ต่ำกว่าครึ่งของที่เริ่มมา = เริ่มกลัว · ติดลบ = กลัวเต็มพิกัด */
+    const downFear = Math.min(Math.max(0, 1 - ratio / 0.5), 1) * 0.06;
+    const debtFear = (debt > 0 ? 0.04 : 0) + downFear;
+    /* เกินครึ่งเท่าตัวจากที่เริ่มมา = มีเบาะรองรับ กล้าขึ้นนิดหน่อย (เพดานเตี้ยไว้) */
+    const boldness = Math.min(Math.max(0, ratio - 1.5) / 1.5, 1) * 0.035;
 
     /* ---------- อ่านคนที่กำลังดันเราอยู่ ----------
        ต้องรู้ว่ากำลังสู้กับใคร ไม่ใช่สู้กับ "ราคา" เฉยๆ
@@ -352,61 +517,41 @@ export function createBotManager(room, broadcast) {
       respect = (pressureRead.strong - pressureRead.weak) / pressureRead.n * 0.09;
     }
 
-    const caution = busts * 0.03 + respect + debtFear;
+    const caution = busts * 0.03 + respect + debtFear - boldness;
 
     const bluffing = Math.random() <
       lv.bluff * crowdFactor * (1 - busts * 0.2) * (debt > 0 ? 0.4 : 1);
-    let eq = base + draw + (bluffing ? 0.26 : 0) + (Math.random() - 0.5) * 0.08;
-    eq = Math.max(0, Math.min(1, eq));
 
     /* เดิมพันต่อเนื่อง: คนที่เป็นคนไล่ก่อนฟลอป มักยิงต่อในฟลอปไม่ว่าไพ่จะออกยังไง
        เพราะเขาแสดงความแข็งไปแล้ว คนอื่นที่ไม่ได้อะไรก็มักทิ้ง
-       ใช้ได้เฉพาะตอนคนเหลือน้อย ยิงใส่สามคนคือเผาเงินเปล่า
-       รู้ว่าเราเป็นคนไล่จาก lastKind ซึ่งยังค้างจากรอบก่อนจนกว่าจะลงมือใหม่ */
-    const cbet = !pre && view.phase === "flop" && toCallNow(view) === 0 &&
+       ใช้ได้เฉพาะตอนคนเหลือน้อย ยิงใส่สามคนคือเผาเงินเปล่า */
+    const cbet = !pre && view.phase === "flop" && view.toCall === 0 &&
                  me.lastKind === "raise" && live <= 2 && Math.random() < 0.62;
 
     const potNow = typeof view.potForBet === "number" ? view.potForBet : view.pot;
 
-    /* ราคาที่ต้องจ่ายเทียบกับกอง — นี่คือสิ่งที่คนเล่นจริงคิด และของเดิมไม่มีเลย
-       ตาม 20 ในกอง 500 กับตาม 500 ในกอง 500 คนละเรื่องกันคนละโลก
-       ของเดิมดูแค่ "มือแข็งพอไหม" โดยไม่สนราคา จึงพับมือดีทิ้งเพราะเดิมพัน 20 */
+    /* ราคาที่ต้องจ่ายเทียบกอง — ตาม 20 ในกอง 500 กับตาม 500 ในกอง 500
+       คนละเรื่องกันคนละโลก ระดับที่คิดเรื่องนี้เป็นมีแค่มืออาชีพ */
     const toCall = view.toCall;
     const price = toCall > 0 ? toCall / (potNow + toCall) : 0;
-    const margin = (pre ? lv.preMargin : lv.margin) + caution;
-    const raiseAt = pre ? lv.preRaise : lv.raise;
-    const worthCalling = toCall === 0 || eq >= price + margin;
 
-    /* ไม่เรซทับเดิมพันก้อนใหญ่ด้วยมือกลางๆ ไม่งั้นบอทจะสาดกันไปมาไม่จบ */
-    const facingBig = toCall > me.stack * 0.3;
-    const canRaise = me.stack > toCall &&
-                     eq >= raiseAt &&
-                     (!facingBig || eq >= 0.82);
-
-    let msg;
-    if (canRaise) {
-      /* ขนาดเดิมพัน: อิงกองจริง ไม่ต่ำกว่าขั้นต่ำ และไม่เกินที่มี */
-      const want = view.currentBet + view.minRaise +
-                   Math.round(potNow * lv.sizing * (0.6 + Math.random() * 0.7));
-      const target = Math.max(view.currentBet + view.minRaise,
-                              Math.min(me.bet + me.stack, want));
-      msg = { type: "act", action: "raise", amount: target };
-    } else if (toCall === 0) {
-      /* ไม่มีใครเดิมพัน: มือดีพอก็เปิดเดิมพันเอง ไม่ใช่เคาะผ่านตลอด */
-      if ((eq >= lv.bet || cbet) && me.stack > view.blinds.bb) {
-        const want = view.currentBet + view.minRaise +
-                     Math.round(potNow * lv.sizing * (0.5 + Math.random() * 0.6));
-        msg = { type: "act", action: "raise",
-                amount: Math.max(view.currentBet + view.minRaise,
-                                 Math.min(me.bet + me.stack, want)) };
-      } else {
-        msg = { type: "act", action: "check" };
-      }
-    } else if (worthCalling) {
-      msg = { type: "act", action: "call" };
-    } else {
-      msg = { type: "act", action: "fold" };
+    /* ได้เดินท้ายไหม — หลังฟลอปคนที่อยู่ใกล้ปุ่มดีลเลอร์ที่สุดเป็นคนเดินท้าย
+       เรียงคนที่ยังสู้อยู่จากช่องถัดจากปุ่มไปเรื่อยๆ คนสุดท้ายในลิสต์คือคนเดินท้าย */
+    let order = [];
+    for (let k = 1; k <= view.seats.length; k++) {
+      const idx = (view.button + k) % view.seats.length;
+      const x = view.seats[idx];
+      if (x && x.inHand && !x.folded) order.push(idx);
     }
+    const actsLast = order.length > 0 && order[order.length - 1] === seatId;
+
+    const facts = { pre, base, draw, live, me, view, seatId, lv,
+                    potNow, toCall, price, caution, crowdFactor, bluffing, cbet, actsLast };
+
+    /* ⚠️ แต่ละระดับใช้ "วิธีคิด" คนละแบบ ไม่ใช่เกณฑ์ชุดเดียวกันปรับตัวเลข
+       (ดูคำอธิบายเหนือ decideBeginner / decideGambler / decidePro) */
+    const style = STYLE[me.botLevel] || decidePro;
+    const msg = style(facts);
 
     const out = room.table.action(seatId, msg);
     /* กันเหนียว: ถ้าคำสั่งไม่ผ่านด้วยเหตุใดก็ตาม อย่าปล่อยให้โต๊ะค้างรอบอท */
@@ -420,5 +565,14 @@ export function createBotManager(room, broadcast) {
     for (const k in pending) clearTimeout(pending[k]);
   }
 
-  return { add, removeAll, poke, stop, count: () => botSeats().length, LEVEL };
+  /* ให้เครื่องมือทดสอบสั่งบอทลงมือทันทีได้ ไม่ต้องรอเวลาคิดจริง
+     (poke ตั้ง setTimeout 0.7-3.4 วิ ต่อหนึ่งท่า จำลองพันมือจะใช้เวลาเป็นชั่วโมง) */
+  function _decideNow(seatId) {
+    const b = room.table._state.seats[seatId];
+    if (!b || !b.isBot) return false;
+    decide(seatId, LEVEL[b.botLevel] || LEVEL[2]);
+    return true;
+  }
+
+  return { add, removeAll, poke, stop, _decideNow, count: () => botSeats().length, LEVEL };
 }
