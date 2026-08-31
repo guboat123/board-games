@@ -785,6 +785,12 @@ button { font-family: inherit; }
 }
 /* wrap ไว้เพื่อให้แถวตัดสินใจล่วงหน้าตกลงไปบรรทัดใหม่ ไม่เบียดกับแถบ "รอ ..." */
 .act-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.act--clock { flex-basis: 100%; background: #2b2a12; border-color: var(--gold); color: var(--gold); }
+.clockbar {
+  flex-basis: 100%; text-align: center; padding: 6px;
+  font-size: .78rem; color: var(--gold);
+  border: 1px solid var(--gold); border-radius: 10px; background: rgba(216,164,65,.12);
+}
 .pre { flex: 1 0 100%; }
 .act {
   flex: 1 1 0; padding: 13px 8px;
@@ -3324,17 +3330,23 @@ button { font-family: inherit; }
       el.style.top = spot[1] + "%";
 
       /* ไพ่คว่ำเล็กๆ ข้างชื่อ */
+      /* ⚠️ "โชว์เอง" ต้องหงายที่ที่นั่งด้วย ไม่ใช่ขึ้นแค่ในกล่องผล
+         คนกดโชว์เพื่อให้คนอื่นเห็นไพ่ของตัวเอง (โดยเฉพาะตอนบลัฟสำเร็จ)
+         ถ้าที่นั่งยังคว่ำอยู่ คนที่มองโต๊ะจะไม่เห็นอะไรเลย ซึ่งพังจุดประสงค์ทั้งหมด
+         หงายได้สองทาง: เปิดไพ่ตามกติกา (showdown แล้วไม่ได้หมอบ) หรือเจ้าตัวกดโชว์เอง */
+      var openHere = (view.lastResult && view.lastResult.showdown && !s.folded) || s.selfShown;
       var cards = document.createElement("div");
-      cards.className = "seat__cards" +
-        ((view.lastResult && view.lastResult.showdown && !s.folded && s.cards.length) ? " is-open" : "");
+      cards.className = "seat__cards" + ((openHere && s.cards.length) ? " is-open" : "");
       /* ⚠️ ตอนหมอบ s.folded เป็นจริงแล้ว ถ้าไม่วาดไพ่เลยก็ไม่มีอะไรให้ปาทิ้ง
          จังหวะที่เพิ่งหมอบจึงต้องวาดไพ่ไว้ก่อน แล้วปล่อยให้แอนิเมชันพามันหายไปเอง */
       var justMuck = freshAct[seatId] === "fold" && !reducedMotion();
-      if (s.cards.length && (!s.folded || justMuck)) {
+      /* คนที่หมอบแล้วกดโชว์ไพ่เอง ต้องวาดไพ่ให้เห็นด้วย ไม่งั้นกดโชว์แล้วไม่มีอะไรเกิดขึ้น
+         (จังหวะที่สนุกที่สุดคือหมอบแล้วโชว์ว่าเมื่อกี้ทิ้งอะไรไป) */
+      if (s.cards.length && (!s.folded || justMuck || s.selfShown)) {
         s.cards.forEach(function (c, ci) {
           /* ไพ่ตัวเองบนโต๊ะคว่ำตลอด ดูได้จากแถบล่างที่บังมือเท่านั้น
              ถ้าผูกกับ peeking ไพ่จะค้างหงายกลางจอหลังปล่อยปุ่ม */
-          var faceUp = (view.lastResult && view.lastResult.showdown && !s.folded);
+          var faceUp = openHere;
           var cel = window.Cards.make(
             (seatId === mySeat && !faceUp) ? "??" : (faceUp ? c : "??"), "sm");
           /* ไพ่รอบโต๊ะพลิกไล่กันไป ทีละที่นั่ง ทีละใบ ให้เห็นว่าใครถืออะไร */
@@ -3521,6 +3533,26 @@ button { font-family: inherit; }
       var who = view.seats[view.current];
       var wait = document.createElement("div");
       wait.className = "waitbar";
+      /* ⚠️ โต๊ะที่ตั้ง "ไม่จำกัดเวลา" ไม่มีนาฬิกากดดัน ซึ่งดีตอนเล่นกันสบายๆ
+         แต่ถ้าคนที่ถึงตาหายไปเฉยๆ ทั้งโต๊ะจะค้างโดยไม่มีทางออก
+         ปุ่มนี้คือทางออกแบบโต๊ะจริง: รอเกินสองนาทีแล้วใครก็ขอนาฬิกาได้
+         คนที่ถึงตาจะเหลือเวลาอีก 30 วินาที แล้วระบบเดินแทนให้
+         โผล่เฉพาะตอนขอได้จริง จะได้ไม่มีปุ่มลอยอยู่ให้กดแล้วโดนปฏิเสธ */
+      if (view.canCallClock) {
+        var ck = document.createElement("button");
+        ck.type = "button";
+        ck.className = "act act--clock";
+        ck.textContent = "ขอนาฬิกา";
+        ck.appendChild(makeSub("รอนานแล้ว · ให้เขาอีก 30 วินาที"));
+        ck.addEventListener("click", function () { send({ type: "clock" }); });
+        row.appendChild(ck);
+      }
+      if (view.clockLeftMs > 0) {
+        var cl = document.createElement("div");
+        cl.className = "clockbar";
+        cl.textContent = "มีคนขอนาฬิกา · เหลือ " + Math.ceil(view.clockLeftMs / 1000) + " วินาที";
+        row.appendChild(cl);
+      }
       wait.innerHTML = "<div class='msg'>" +
         (me.folded ? "คุณหมอบแล้ว" : (me.allIn ? "คุณ All in แล้ว" : "รอ " + (who ? who.name : "—"))) +
         "</div>";

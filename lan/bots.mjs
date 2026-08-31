@@ -473,7 +473,7 @@ export function createBotManager(room, broadcast) {
 
      คนจริงตัดสินใจ "แนวทางของรอบนี้" ครั้งเดียวตอนเห็นไพ่ใหม่ แล้วเดินตามนั้น
      จะบลัฟ ก็บลัฟทั้งรอบ · จะแกล้งอ่อน ก็แกล้งทั้งรอบ · เปลี่ยนใจเมื่อมีข้อมูลใหม่จริงๆ เท่านั้น */
-  const plans = {};   /* seatId -> { key, bluff, trap, giveUp } */
+  const plans = {};   /* seatId -> { key, bluff, trap } */
 
   function planFor(seatId, view, base, trait, lv, wet) {
     const key = view.handNo + "|" + view.phase;
@@ -495,13 +495,37 @@ export function createBotManager(room, broadcast) {
     const trap = base >= 0.86 && crowd <= 2 && wet < 0.4 &&
                  Math.random() < (0.34 * (1.2 - trait.nerve));
 
-    /* ยิงบลัฟแล้วต้องรู้ด้วยว่าจะเลิกเมื่อไหร่
-       คนที่ยิงต่อไปเรื่อยๆ ทุกสตรีทจนหมดตัวไม่ใช่คนบลัฟเป็น เป็นคนไม่ยอมแพ้
-       ใจถึงมาก = ยิงได้หลายกระบอกกว่า */
-    const giveUp = Math.random() < (0.55 - trait.nerve * 0.3);
-
-    plans[seatId] = { key: key, bluff: bluff, trap: trap, giveUp: giveUp };
+    plans[seatId] = { key: key, bluff: bluff && barrelsLeft(seatId, view, trait) > 0,
+                      trap: trap };
     return plans[seatId];
+  }
+
+  /* ---------- ยิงบลัฟได้อีกกี่กระบอก ----------
+     ⚠️ คนที่บลัฟแล้วยิงต่อไปเรื่อยๆ ทุกสตรีทจนหมดตัว ไม่ใช่คนบลัฟเป็น เป็นคนไม่ยอมแพ้
+     คนเล่นจริงตั้งใจไว้ตั้งแต่ต้นว่าจะยิงกี่ครั้ง แล้วถ้าไม่ผ่านก็เลิก
+     "เลิก" คือส่วนที่ทำให้การบลัฟเป็นการลงทุนที่คิดแล้ว ไม่ใช่การดื้อ
+     ใจถึงมาก = ตั้งใจยิงหลายกระบอกกว่า แต่ก็ยังมีเพดาน
+
+     ⚠️ นับต่อ "มือ" ไม่ใช่ต่อสตรีท เพราะการเลิกเป็นการตัดสินใจข้ามสตรีท
+     (แผนบลัฟตัดสินใหม่ทุกสตรีท แต่โควตากระบอกใช้ร่วมกันทั้งมือ) */
+  const barrels = {};   /* seatId -> { hand, max, fired } */
+
+  function barrelsLeft(seatId, view, trait) {
+    const rec = barrels[seatId];
+    if (!rec || rec.hand !== view.handNo) {
+      /* ใจถึง 0 → ยิงกระบอกเดียว · ใจถึง 1 → ยิงได้ถึงสาม */
+      const max = 1 + (Math.random() < trait.nerve ? 1 : 0) +
+                      (Math.random() < trait.nerve * 0.5 ? 1 : 0);
+      barrels[seatId] = { hand: view.handNo, max: max, fired: 0 };
+      return max;
+    }
+    return rec.max - rec.fired;
+  }
+
+  /* เรียกตอนบอทลงเงินด้วยมือที่ไม่มีอะไรจริง = ยิงไปหนึ่งกระบอก */
+  function noteBarrel(seatId) {
+    const rec = barrels[seatId];
+    if (rec) rec.fired++;
   }
   let seenThisHand = {};    /* เก็บไพ่ของใครไปแล้วบ้างในมือนี้ (กันนับซ้ำ) */
 
@@ -874,7 +898,11 @@ export function createBotManager(room, broadcast) {
 
     const lv = LEVEL[me.botLevel] || LEVEL[2];
     const view = room.table.viewFor(cur);
-    const wait = thinkMs(lv, view, me);
+    /* ⚠️ ต้องส่ง "ที่นั่งจากมุมมอง" (view.seats) ไม่ใช่ที่นั่งจากสถานะดิบ (st.seats)
+       สองอันนี้เก็บไพ่คนละแบบ: ในสถานะดิบไพ่เป็นตัวเลข ในมุมมองเป็นข้อความ เช่น "As"
+       ส่งตัวเลขเข้าไปให้ฟังก์ชันที่คาดว่าเป็นข้อความ → cards[0].slice is not a function
+       ซึ่ง "ทำให้เซิร์ฟเวอร์ทั้งเครื่องล่ม" ไม่ใช่แค่บอทตัวนั้นพัง เพราะมันโยนออกมานอก poke() */
+    const wait = thinkMs(lv, view, view.seats[cur]);
 
     pending[cur] = setTimeout(() => {
       delete pending[cur];
@@ -1029,6 +1057,10 @@ export function createBotManager(room, broadcast) {
        (ดูคำอธิบายเหนือ decideBeginner / decideGambler / decidePro) */
     const style = STYLE[me.botLevel] || decidePro;
     const msg = style(facts);
+
+    /* ยิงบลัฟไปแล้วหนึ่งกระบอก ต้องนับไว้ ไม่งั้นโควตาที่ตั้งใจไว้ไม่มีความหมาย
+       นับเฉพาะตอน "ลงเงินด้วยมือที่ไม่มีอะไรจริง" ไม่ใช่ทุกครั้งที่เรซ */
+    if (bluffing && msg.action === "raise" && base < 0.5) noteBarrel(seatId);
 
     const out = room.table.action(seatId, msg);
     /* กันเหนียว: ถ้าคำสั่งไม่ผ่านด้วยเหตุใดก็ตาม อย่าปล่อยให้โต๊ะค้างรอบอท */
