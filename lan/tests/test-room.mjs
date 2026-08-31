@@ -226,5 +226,48 @@ head("ย้ายที่นั่งบนโต๊ะเดิม");
   ok(total === 1500, "ย้ายที่นั่งแล้วชิปรวมบนโต๊ะเท่าเดิม", total);
 }
 
+/* --------------------------------------------------------------- */
+head("ประวัติมือ + เวลาที่ใช้ตัดสินใจ");
+{
+  const t = createTable({ smallBlind: 10, bigBlind: 20, minBuyIn: 1, maxBuyIn: 100000 });
+  const a = t.sit("เอ", 0, 1000, "tokA");
+  const b = t.sit("บี", 1, 1000, "tokB");
+  const st = t._state;
+
+  ok(t.history().length === 0, "ยังไม่เล่น ประวัติต้องว่าง", t.history().length);
+
+  t.action(a.seatId, { type: "start" });
+  /* เล่นให้จบหนึ่งมือ ตามอย่างเดียวพอ */
+  let guard = 0;
+  while (st.phase !== "showdown" && guard++ < 40) {
+    const cur = st.current;
+    if (cur < 0) break;
+    let r = t.action(cur, { type: "act", action: "call" });
+    if (r.error) r = t.action(cur, { type: "act", action: "check" });
+    if (r.error) break;
+  }
+
+  const hs = t.history();
+  ok(hs.length === 1, "จบมือแล้วต้องมีประวัติ 1 มือ", hs.length);
+  const h = hs[0];
+  ok(h.no === 1 && h.sb === 10 && h.bb === 20, "หัวมือถูกต้อง", { no: h.no, sb: h.sb, bb: h.bb });
+  ok(h.players.length === 2, "จดคนที่ร่วมมือครบ", h.players.map(x => x.name));
+  ok(h.acts.length > 0, "ต้องมีรายการลงมือ", h.acts.length);
+  ok(h.acts.every(x => typeof x.think === "number" && x.think >= 0),
+     "ทุกรายการต้องมีเวลาที่ใช้คิด (วินาที)", h.acts.slice(0, 3));
+  ok(h.acts.every(x => x.name && x.phase && x.act),
+     "ทุกรายการต้องรู้ว่าใคร รอบไหน ทำอะไร", h.acts[0]);
+  /* ต้องจดชื่อไว้ตรงๆ ไม่ใช่เลขที่นั่ง เพราะคนย้ายที่นั่งได้ */
+  ok(h.acts.every(x => x.name === "เอ" || x.name === "บี"), "ชื่อในประวัติต้องเป็นชื่อจริง");
+  ok(h.result && Array.isArray(h.result.payouts) && h.result.payouts.length > 0,
+     "ต้องจดว่าใครได้เงินเท่าไหร่", h.result && h.result.payouts);
+  ok(h.board.length === 5 || h.result.showdown === false,
+     "ไพ่กลางถูกจดไว้", h.board.length);
+
+  /* เล่นอีกมือ ประวัติต้องเพิ่มไม่ใช่ทับ */
+  t.action(a.seatId, { type: "start" });
+  ok(t.history().length === 1, "ระหว่างเล่น ยังไม่ปิดสมุดมือที่สอง", t.history().length);
+}
+
 console.log(fail === 0 ? "\n=== ผ่านทั้งหมด ===" : "\n=== พัง " + fail + " ข้อ ===");
 process.exit(fail ? 1 : 0);

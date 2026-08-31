@@ -41,8 +41,12 @@ export function createTable(opts = {}) {
     sessionOver: false,  /* ครบตามที่ตั้งไว้แล้ว */
     standings: null,     /* ผลรวมตอนจบรอบเล่น */
     lastResult: null,        /* สรุปมือที่เพิ่งจบ */
-    log: []                  /* ข้อความสั้นๆ ให้โชว์ข้างโต๊ะ */
+    log: [],                 /* ข้อความสั้นๆ ให้โชว์ข้างโต๊ะ */
+    turnAt: 0,               /* เวลาที่ตาเพิ่งเปลี่ยนมาถึงคนปัจจุบัน ใช้วัดว่าคิดนานแค่ไหน */
+    hand: null,              /* สมุดบันทึกของมือที่กำลังเล่น */
+    hands: []                /* ประวัติมือที่จบแล้ว ใช้ย้อนดูรูปแบบการเล่น */
   };
+  const MAX_HISTORY = 200;   /* เก็บในหน่วยความจำ ไม่มีฐานข้อมูล จึงต้องมีเพดาน */
 
   /* ---------- ตัวช่วย ---------- */
 
@@ -58,6 +62,27 @@ export function createTable(opts = {}) {
       if (s && test(s)) return idx;
     }
     return -1;
+  }
+
+  /* ทุกที่ที่เปลี่ยน "ตาใคร" ต้องผ่านตรงนี้ จะได้จับเวลาคิดได้ครบทุกครั้ง
+     ถ้าใครไปแก้ st.current ตรงๆ เวลาที่บันทึกจะเพี้ยนเงียบๆ */
+  function setCurrent(n) {
+    st.current = n;
+    st.turnAt = n >= 0 ? Date.now() : 0;
+  }
+
+  /* บันทึกลงประวัติมือปัจจุบัน ใช้ย้อนดูรูปแบบการเล่นทีหลัง */
+  function record(seat, act, amount, thinkMs) {
+    if (!st.hand) return;
+    st.hand.acts.push({
+      phase: st.phase,
+      seat: seat,
+      name: st.seats[seat] ? st.seats[seat].name : "—",
+      act: act,
+      amount: amount || 0,
+      /* วินาทีที่ใช้ตัดสินใจ ทศนิยม 1 ตำแหน่งพอ */
+      think: Math.round((thinkMs || 0) / 100) / 10
+    });
   }
 
   function note(msg) {
@@ -297,7 +322,19 @@ export function createTable(opts = {}) {
     /* บอดใหญ่ยังมีสิทธิ์เคาะหรือเรซตอนจบรอบ จึงยังไม่ถือว่าพูดแล้ว */
     for (const s of canAct()) s.acted = false;
 
-    st.current = nextOccupied(bbSeat, s => s.inHand && !s.folded && !s.allIn);
+    /* เปิดสมุดบันทึกของมือนี้ ก่อนใครลงมือ */
+    st.hand = {
+      no: st.handNo,
+      at: Date.now(),
+      sb: cfg.smallBlind, bb: cfg.bigBlind,
+      button: st.button,
+      players: seated().filter(x => x.inHand)
+        .map(x => ({ name: x.name, stack: x.stack + x.committed })),
+      acts: [],
+      board: [],
+      result: null
+    };
+    setCurrent(nextOccupied(bbSeat, s => s.inHand && !s.folded && !s.allIn));
     note("— มือที่ " + st.handNo + " เริ่มแล้ว —");
     return {};
   }
@@ -322,6 +359,9 @@ export function createTable(opts = {}) {
     if (st.current !== seatId) return { error: "ยังไม่ถึงตาคุณ" };
     if (s.folded || s.allIn) return { error: "รอบนี้คุณลงมือไม่ได้แล้ว" };
 
+    /* ต้องจับเวลาก่อนทำอะไร ไม่งั้น setCurrent ข้างล่างจะรีเซ็ตไปแล้ว */
+    const thinkMs = st.turnAt ? Date.now() - st.turnAt : 0;
+    const stackBefore = s.stack;
     const toCall = st.currentBet - s.bet;
 
     if (msg.action === "fold") {
@@ -388,6 +428,9 @@ export function createTable(opts = {}) {
       return { error: "คำสั่งไม่รู้จัก" };
     }
 
+    /* จดไว้หลังจากรู้ผลแล้ว จะได้รู้ว่าจ่ายไปเท่าไหร่จริง */
+    record(seatId, msg.action, stackBefore - s.stack, thinkMs);
+
     checkRoundEnd(seatId);
     return {};
   }
@@ -411,7 +454,7 @@ export function createTable(opts = {}) {
 
   function advance() {
     const nxt = nextOccupied(st.current, s => s.inHand && !s.folded && !s.allIn);
-    st.current = nxt;
+    setCurrent(nxt);
     if (nxt === -1) nextPhase();
   }
 
@@ -442,7 +485,7 @@ export function createTable(opts = {}) {
       if (stillNeeded === 0) return nextPhase();
     }
 
-    st.current = nextOccupied(st.button, s => s.inHand && !s.folded && !s.allIn);
+    setCurrent(nextOccupied(st.button, s => s.inHand && !s.folded && !s.allIn));
     if (st.current === -1) return nextPhase();
   }
 
@@ -511,7 +554,24 @@ export function createTable(opts = {}) {
     };
 
     st.phase = "showdown";
-    st.current = -1;
+    setCurrent(-1);
+
+    /* ปิดสมุดบันทึกของมือนี้ แล้วเก็บเข้าประวัติ
+       เก็บชื่อไว้ตรงๆ ไม่อ้างเลขที่นั่ง เพราะคนย้ายที่นั่งได้ ประวัติเก่าจะอ่านผิด */
+    if (st.hand) {
+      st.hand.board = st.board.map(cardCode);
+      st.hand.pot = st.lastResult ? st.lastResult.pot : 0;
+      st.hand.result = {
+        showdown: !!(st.lastResult && st.lastResult.showdown),
+        payouts: (st.lastResult && st.lastResult.payouts || [])
+          .map(x => ({ name: x.name, amount: x.amount })),
+        reveal: (st.lastResult && st.lastResult.reveal || [])
+          .map(x => ({ name: x.name, hand: x.hand, cards: x.cards }))
+      };
+      st.hands.push(st.hand);
+      if (st.hands.length > MAX_HISTORY) st.hands.shift();
+      st.hand = null;
+    }
     /* ล้าง committed ด้วย ไม่งั้นหน้าจอยังโชว์กองกลางทั้งที่จ่ายไปแล้ว
        (ชิปจะดูเหมือนมีสองเท่า) */
     for (const s of seated()) { s.inHand = false; s.bet = 0; s.committed = 0; }
@@ -738,5 +798,9 @@ export function createTable(opts = {}) {
     };
   }
 
-  return { sit, moveSeat, leave, disconnect, action, viewFor, openSeats, anyConnected, summary, _state: st, _cfg: cfg };
+  /* ประวัติมือทั้งหมดที่จบแล้ว ส่งเฉพาะตอนมีคนขอ ไม่ยัดไปกับ state ทุกครั้ง
+     ไม่งั้นทุกการกดของทุกคนจะลากประวัติทั้งกองวิ่งข้ามเน็ตไปด้วย */
+  function history() { return st.hands; }
+
+  return { sit, moveSeat, leave, disconnect, action, viewFor, openSeats, anyConnected, summary, history, _state: st, _cfg: cfg };
 }

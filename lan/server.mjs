@@ -296,6 +296,12 @@ server.on("upgrade", (req, socket) => {
 
     if (!client.room) return;
 
+    /* ประวัติมือ ส่งเฉพาะตอนมีคนขอ ไม่แนบไปกับ state ทุกครั้ง */
+    if (msg.type === "history") {
+      send(client, { type: "history", hands: client.room.table.history() });
+      return;
+    }
+
     /* ย้ายที่นั่งบนโต๊ะเดิม ต้องทำที่ชั้นนี้ ไม่ใช่ใน table.action
        เพราะเลขที่นั่งของ client เก็บอยู่ตรงนี้ ถ้าโต๊ะย้ายแต่ client ยังถือเลขเดิม
        คนคนนั้นจะสั่งการแทนช่องเก่า และเห็นไพ่ในมือของคนที่มานั่งช่องนั้นทีหลัง */

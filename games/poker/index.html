@@ -176,6 +176,36 @@ button { font-family: inherit; }
 }
 .mseat[disabled] { background: #24402f; color: #a9c8b6; cursor: not-allowed; }
 .mseat:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+/* แท็บในแผงเดียวกัน */
+.ptabs { display: flex; gap: 6px; margin: 2px 0 8px; }
+.ptab {
+  flex: 1 1 0; padding: 7px 6px; font-family: inherit;
+  font-size: .82rem; font-weight: 700;
+  color: var(--muted); background: #102b1e;
+  border: 1px solid #2b4b37; border-radius: 9px; cursor: pointer;
+}
+.ptab.is-on { color: #06170f; background: var(--gold); border-color: var(--gold); }
+.ptab:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+/* ประวัติทีละมือ */
+/* สรุปพฤติกรรมรายคน สองบรรทัด กันตัวหนังสือล้นขอบขวาบนจอแคบ */
+.prow { padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.08); text-align: left; }
+.prow__top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; font-size: .88rem; }
+.prow__top .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prow__top b { font-size: .76rem; flex: 0 0 auto; }
+.prow__bot { font-size: .76rem; color: var(--muted); margin-top: 2px; }
+.hand-log { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.08); text-align: left; }
+.hand-log__t { font-family: var(--mono); font-size: .8rem; color: var(--gold); margin-bottom: 3px; }
+.hand-log__p { font-size: .72rem; color: var(--muted); margin: 4px 0 2px; }
+.hand-log__a { font-family: var(--mono); font-size: .78rem; padding-left: 8px; }
+.hand-log__w { font-family: var(--mono); font-size: .78rem; color: var(--good); padding-left: 8px; margin-top: 3px; }
+/* ทางสำรองตอนคลิปบอร์ดใช้ไม่ได้ ต้องยังเอาข้อความออกไปได้ */
+.log-raw {
+  display: none; position: fixed; inset: 8% 5%; z-index: 90;
+  width: 90%; height: 84%; padding: 12px;
+  font-family: var(--mono); font-size: .78rem;
+  color: var(--text); background: #06170f;
+  border: 1px solid var(--gold); border-radius: 12px;
+}
 
 /* ---------- โต๊ะ ---------- */
 .table-area { flex: 1 1 auto; position: relative; min-height: 0; padding: 10px; }
@@ -446,6 +476,27 @@ button { font-family: inherit; }
 }
 .dial__btn:active { transform: translateY(1px); }
 .dial__btn:focus-visible { outline: 2px solid var(--live); outline-offset: 3px; }
+/* ---------- รางเลื่อนกำหนดจำนวน ----------
+   ต้องสูงพอให้นิ้วโดนง่าย (48px) และหัวเลื่อนต้องใหญ่กว่านิ้วเล็กน้อย
+   touch-action: none เพื่อไม่ให้เบราว์เซอร์แย่งไปเลื่อนหน้าจอแทน */
+.slider {
+  position: relative; height: 48px; margin: 2px 4px 10px;
+  touch-action: none; cursor: pointer;
+}
+.slider__track {
+  position: absolute; top: 50%; left: 0; right: 0; height: 10px;
+  margin-top: -5px; border-radius: 6px;
+  background: #06170f; border: 1px solid #2f5540; overflow: hidden;
+}
+.slider__fill { height: 100%; width: 0; background: linear-gradient(90deg, #8a6a20, var(--gold)); }
+.slider__thumb {
+  position: absolute; top: 50%; left: 0;
+  width: 34px; height: 34px; margin: -17px 0 0 -17px;
+  border-radius: 50%; background: linear-gradient(#f0cd72, var(--gold));
+  border: 2px solid #06170f; box-shadow: 0 3px 8px rgba(0,0,0,.5);
+}
+.slider.is-drag .slider__thumb { transform: scale(1.14); }
+.slider:focus-visible { outline: 2px solid var(--live); outline-offset: 3px; border-radius: 10px; }
 .dial__val {
   flex: 1 1 auto; max-width: 190px;
   background: #06170f; border: 2px solid var(--gold);
@@ -645,6 +696,14 @@ button { font-family: inherit; }
         <div class="dial__hint" id="bet-hint"></div>
       </div>
       <button class="dial__btn" id="bet-plus" aria-label="เพิ่มจำนวน">+</button>
+    </div>
+
+    <!-- ลากนิ้วกำหนดจำนวน แบบเดียวกับแอปโป๊กเกอร์ทั่วไป
+         แป้นตัวเลขยังอยู่ ใครอยากพิมพ์เป๊ะๆ ก็ยังพิมพ์ได้ -->
+    <div class="slider" id="bet-slider" role="slider" tabindex="0"
+         aria-label="เลื่อนเพื่อกำหนดจำนวน">
+      <div class="slider__track"><div class="slider__fill" id="bet-fill"></div></div>
+      <div class="slider__thumb" id="bet-thumb"></div>
     </div>
 
     <div class="chips-row" id="bet-quick" style="justify-content:center"></div>
@@ -1046,6 +1105,9 @@ button { font-family: inherit; }
         $("game").classList.add("is-on");
         $("t-hand").textContent = "ห้อง " + msg.room;
         location.hash = msg.room;
+      } else if (msg.type === "history") {
+        historyData = msg.hands || [];
+        paintTablePanel();
       } else if (msg.type === "state") {
         view = msg.state;
         render();
@@ -1246,10 +1308,202 @@ button { font-family: inherit; }
     justRevealed = false;
   }
 
+  /* ---------- ประวัติมือ: เอาไว้ย้อนดูรูปแบบการเล่น ----------
+     สองส่วน: สรุปพฤติกรรมรายคน (ตอบว่า "คนนี้เล่นแบบไหน")
+     กับรายการทีละมือ (ตอบว่า "มือนั้นเกิดอะไรขึ้น")
+     เวลาที่ใช้ตัดสินใจติดมาทุกรายการ เพราะการคิดนานสั้นก็เป็นข้อมูลของ pattern */
+  function summarisePlay(hands) {
+    var by = {};
+    hands.forEach(function (h) {
+      h.acts.forEach(function (a) {
+        var r = by[a.name] || (by[a.name] = { n: 0, fold: 0, check: 0, call: 0, raise: 0, think: 0 });
+        r.n++;
+        if (r[a.act] !== undefined) r[a.act]++;
+        r.think += a.think || 0;
+      });
+    });
+    return Object.keys(by).map(function (n) {
+      var r = by[n];
+      return { name: n, n: r.n, fold: r.fold, check: r.check, call: r.call, raise: r.raise,
+               avg: r.n ? Math.round(r.think / r.n * 10) / 10 : 0 };
+    }).sort(function (x, y) { return y.n - x.n; });
+  }
+
+  function historyText(hands) {
+    var out = [];
+    summarisePlay(hands).forEach(function (r) {
+      out.push(r.name + " — ลงมือ " + r.n + " ครั้ง · เพิ่ม " + r.raise + " · ตาม " + r.call +
+               " · เคาะ " + r.check + " · หมอบ " + r.fold + " · คิดเฉลี่ย " + r.avg + " วิ");
+    });
+    out.push("");
+    hands.forEach(function (h) {
+      out.push("— มือที่ " + h.no + " · บอด " + h.sb + "/" + h.bb +
+               (h.pot ? " · กอง " + h.pot : ""));
+      var lastPhase = "";
+      h.acts.forEach(function (a) {
+        if (a.phase !== lastPhase) { out.push("  [" + (PHASE_TH[a.phase] || a.phase) + "]"); lastPhase = a.phase; }
+        out.push("    " + a.name + " " + (ACT_TH[a.act] || a.act) +
+                 (a.amount ? " " + a.amount : "") + "  (" + a.think + " วิ)");
+      });
+      if (h.board && h.board.length) out.push("  ไพ่กลาง " + h.board.map(cardText).join(" "));
+      if (h.result) {
+        (h.result.reveal || []).forEach(function (r) {
+          out.push("  " + r.name + " [" + (r.cards || []).map(cardText).join(" ") + "] " + r.hand);
+        });
+        (h.result.payouts || []).forEach(function (r) { out.push("  " + r.name + " รับ +" + r.amount); });
+      }
+      out.push("");
+    });
+    return out.join("\n");
+  }
+
+  function paintHistoryInto(box) {
+    var rows = document.createElement("div");
+    rows.className = "rows";
+
+    if (!historyData) {
+      var wait = document.createElement("p");
+      wait.className = "hint-sm";
+      wait.textContent = "กำลังดึงประวัติ...";
+      rows.appendChild(wait);
+    } else if (!historyData.length) {
+      var none = document.createElement("p");
+      none.className = "hint-sm";
+      none.textContent = "ยังไม่มีมือที่เล่นจบในโต๊ะนี้";
+      rows.appendChild(none);
+    } else {
+      /* สองบรรทัดต่อคน ไม่ใช่สามคอลัมน์
+         สถิติสี่ตัว + เวลา ยาวเกินจอ 360-390 ถ้าอัดไว้แถวเดียว ตัวขวาสุดจะโดนตัด */
+      summarisePlay(historyData).forEach(function (r) {
+        var d = document.createElement("div");
+        d.className = "prow";
+        var top = document.createElement("div");
+        top.className = "prow__top";
+        var nm = document.createElement("span");
+        nm.className = "nm";
+        nm.textContent = r.name;
+        var rt = document.createElement("b");
+        rt.className = "num";
+        rt.style.color = "var(--muted)";
+        rt.textContent = "คิดเฉลี่ย " + r.avg + " วิ";
+        top.appendChild(nm); top.appendChild(rt);
+        var bot = document.createElement("div");
+        bot.className = "prow__bot num";
+        bot.textContent = "เพิ่ม " + r.raise + " · ตาม " + r.call +
+                          " · เคาะ " + r.check + " · หมอบ " + r.fold + " · รวม " + r.n;
+        d.appendChild(top); d.appendChild(bot);
+        rows.appendChild(d);
+      });
+
+      /* มือล่าสุดอยู่บนสุด คนอยากดูมือที่เพิ่งเล่นมากกว่ามือแรกของคืน */
+      historyData.slice().reverse().forEach(function (h) {
+        var wrap = document.createElement("div");
+        wrap.className = "hand-log";
+        var t = document.createElement("div");
+        t.className = "hand-log__t";
+        t.textContent = "มือที่ " + h.no + " · บอด " + h.sb + "/" + h.bb +
+                        (h.pot ? " · กอง " + h.pot.toLocaleString("th-TH") : "");
+        wrap.appendChild(t);
+        var lastPhase = "";
+        h.acts.forEach(function (a) {
+          if (a.phase !== lastPhase) {
+            var ph = document.createElement("div");
+            ph.className = "hand-log__p";
+            ph.textContent = PHASE_TH[a.phase] || a.phase;
+            wrap.appendChild(ph);
+            lastPhase = a.phase;
+          }
+          var li = document.createElement("div");
+          li.className = "hand-log__a";
+          li.textContent = a.name + " " + (ACT_TH[a.act] || a.act) +
+                           (a.amount ? " " + a.amount.toLocaleString("th-TH") : "") +
+                           "  (" + a.think + " วิ)";
+          wrap.appendChild(li);
+        });
+        if (h.board && h.board.length) {
+          var bd = document.createElement("div");
+          bd.className = "hand-log__p";
+          bd.textContent = "ไพ่กลาง " + h.board.map(cardText).join(" ");
+          wrap.appendChild(bd);
+        }
+        if (h.result) {
+          (h.result.payouts || []).forEach(function (r) {
+            var w = document.createElement("div");
+            w.className = "hand-log__w";
+            var rv = (h.result.reveal || []).filter(function (x) { return x.name === r.name; })[0];
+            w.textContent = r.name +
+              (rv && rv.cards ? " [" + rv.cards.map(cardText).join(" ") + "]" : "") +
+              (rv ? " " + rv.hand : "") + " +" + r.amount.toLocaleString("th-TH");
+            wrap.appendChild(w);
+          });
+        }
+        rows.appendChild(wrap);
+      });
+    }
+    box.appendChild(rows);
+
+    var foot = document.createElement("div");
+    foot.className = "foot";
+    if (historyData && historyData.length) {
+      var copy = document.createElement("button");
+      copy.type = "button";
+      copy.className = "act";
+      copy.style.width = "100%";
+      copy.style.marginBottom = "8px";
+      copy.textContent = "คัดลอกเป็นข้อความ";
+      copy.addEventListener("click", function () {
+        var txt = historyText(historyData);
+        /* คลิปบอร์ดใช้ไม่ได้ทุกที่ (ต้อง https หรือ localhost) จึงมีทางสำรองเสมอ */
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(txt).then(
+            function () { toast("คัดลอกประวัติแล้ว"); },
+            function () { showRawLog(txt); });
+        } else showRawLog(txt);
+      });
+      foot.appendChild(copy);
+    }
+    var close = document.createElement("button");
+    close.type = "button";
+    close.className = "btn-main";
+    close.textContent = "ปิด";
+    close.addEventListener("click", function () { tablePanelOn = false; paintTablePanel(); });
+    foot.appendChild(close);
+    box.appendChild(foot);
+  }
+
+  /* ก็อปไม่ได้ก็ต้องยังเอาข้อความออกไปได้ ไม่ใช่บอกว่าล้มเหลวแล้วจบ */
+  function showRawLog(txt) {
+    var ta = document.getElementById("log-raw");
+    if (!ta) {
+      ta = document.createElement("textarea");
+      ta.id = "log-raw";
+      ta.className = "log-raw";
+      ta.readOnly = true;
+      document.body.appendChild(ta);
+    }
+    ta.value = txt;
+    ta.style.display = "block";
+    ta.focus();
+    ta.select();
+    toast("กดค้างแล้วเลือกคัดลอกเอง");
+  }
+
   /* ---------- แผงสรุปโต๊ะ: ใครนั่งตรงไหน ซื้อเข้าเท่าไหร่ ตอนนี้ได้เสียเท่าไหร่ ----------
      รวมสองเรื่องไว้แผงเดียว เพราะมันคือคำถามเดียวกันของคนเล่นตอนมองไปรอบโต๊ะ
      และช่องว่างในตารางนี้ก็เป็นปุ่มย้ายไปนั่งได้เลย ไม่ต้องมีหน้าจอแยกอีกอัน */
   var tablePanelOn = false;
+  var panelTab = "money";      /* money = เงิน · log = ประวัติ */
+  var historyData = null;      /* ประวัติมือ ขอมาเฉพาะตอนเปิดแท็บ */
+
+  var ACT_TH = { fold: "หมอบ", check: "เคาะ", call: "ตาม", raise: "เพิ่มเป็น" };
+  /* รหัสไพ่ที่เซิร์ฟเวอร์ส่งมาเป็น "7c" อ่านยาก ในประวัติต้องเป็นดอกจริง */
+  var SUIT_CH = { c: "♣", d: "♦", h: "♥", s: "♠" };
+  function cardText(code) {
+    if (!code || code.length < 2) return code || "";
+    var su = code.charAt(code.length - 1).toLowerCase();
+    return code.slice(0, -1) + (SUIT_CH[su] || su);
+  }
+  var PHASE_TH = { preflop: "พรีฟลอป", flop: "ฟลอป", turn: "เทิร์น", river: "ริเวอร์" };
 
   function paintTablePanel() {
     var box = $("t-table");
@@ -1259,6 +1513,27 @@ button { font-family: inherit; }
     var h = document.createElement("h3");
     h.textContent = "โต๊ะ · เงิน";
     box.appendChild(h);
+
+    /* สองแท็บในแผงเดียว เพราะเป็นคำถามชุดเดียวกันของคนเล่น
+       "ตอนนี้ใครได้ใครเสีย" กับ "เมื่อกี้ใครเล่นยังไง" */
+    var tabs = document.createElement("div");
+    tabs.className = "ptabs";
+    [["money", "เงิน"], ["log", "ประวัติ"]].forEach(function (t) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "ptab" + (panelTab === t[0] ? " is-on" : "");
+      b.textContent = t[1];
+      b.addEventListener("click", function () {
+        panelTab = t[0];
+        /* ขอประวัติตอนกดเท่านั้น ไม่ได้ติดมากับ state ทุกครั้ง */
+        if (t[0] === "log") send({ type: "history" });
+        paintTablePanel();
+      });
+      tabs.appendChild(b);
+    });
+    box.appendChild(tabs);
+
+    if (panelTab === "log") { paintHistoryInto(box); box.classList.add("is-on"); return; }
 
     var head = document.createElement("div");
     head.className = "mhead";
@@ -1548,9 +1823,67 @@ button { font-family: inherit; }
       : "ต้องอย่างน้อย " + betMin.toLocaleString("th-TH");
     var ok = document.querySelector(".pad--ok");
     if (ok) ok.disabled = !okNow;
+    paintSlider();
   }
 
   function setBet(v) { betVal = clampBet(v); paintBet(); }
+
+  /* ---------- รางเลื่อนกำหนดจำนวนด้วยนิ้ว ----------
+     แป้นตัวเลขยังอยู่ครบ อันนี้เป็นทางลัดสำหรับกะคร่าวๆ เร็วๆ */
+  function paintSlider() {
+    var sl = $("bet-slider");
+    if (!sl) return;
+    var span = betMax - betMin;
+    var r = span > 0 ? (betVal - betMin) / span : 1;
+    r = Math.max(0, Math.min(1, r));
+    $("bet-fill").style.width = (r * 100) + "%";
+    /* ⚠️ แผงถูกซ่อนด้วย display:none ตอนปิด ความกว้างจะเป็น 0
+       จึงต้องเรียกซ้ำหลังเปิดแผงแล้วเท่านั้น ไม่งั้นหัวเลื่อนไปกองที่ซ้ายสุด */
+    $("bet-thumb").style.left = (r * sl.clientWidth) + "px";
+    sl.setAttribute("aria-valuemin", betMin);
+    sl.setAttribute("aria-valuemax", betMax);
+    sl.setAttribute("aria-valuenow", betVal);
+    sl.setAttribute("aria-valuetext", betVal.toLocaleString("th-TH"));
+  }
+
+  (function bindSlider() {
+    var sl = $("bet-slider");
+    if (!sl) return;
+    var dragging = false;
+
+    function fromX(clientX) {
+      var b = sl.getBoundingClientRect();
+      if (!b.width) return;
+      var r = Math.max(0, Math.min(1, (clientX - b.left) / b.width));
+      betTyping = false;
+      setBet(Math.round(betMin + r * (betMax - betMin)));
+    }
+    sl.addEventListener("pointerdown", function (e) {
+      dragging = true;
+      sl.classList.add("is-drag");
+      try { sl.setPointerCapture(e.pointerId); } catch (err) {}
+      fromX(e.clientX);
+      e.preventDefault();
+    });
+    sl.addEventListener("pointermove", function (e) { if (dragging) fromX(e.clientX); });
+    function endDrag(e) {
+      if (!dragging) return;
+      dragging = false;
+      sl.classList.remove("is-drag");
+      try { sl.releasePointerCapture(e.pointerId); } catch (err) {}
+    }
+    sl.addEventListener("pointerup", endDrag);
+    sl.addEventListener("pointercancel", endDrag);
+
+    /* ต้องเลื่อนด้วยคีย์บอร์ดได้ด้วย ไม่งั้นคนที่ใช้เมาส์อย่างเดียวเสียเปรียบ */
+    sl.addEventListener("keydown", function (e) {
+      var step = Math.max(1, Math.round((betMax - betMin) / 50));
+      if (e.key === "ArrowRight" || e.key === "ArrowUp") { setBet(betVal + step); e.preventDefault(); }
+      else if (e.key === "ArrowLeft" || e.key === "ArrowDown") { setBet(betVal - step); e.preventDefault(); }
+      else if (e.key === "Home") { setBet(betMin); e.preventDefault(); }
+      else if (e.key === "End") { setBet(betMax); e.preventDefault(); }
+    });
+  })();
 
   var betOnConfirm = null;   /* null = ส่งเป็นการเพิ่มเดิมพัน */
 
@@ -1562,6 +1895,7 @@ button { font-family: inherit; }
     $("bet-quick").innerHTML = "";
     paintBetRaw();
     $("bet-sheet").classList.add("is-on");
+    paintSlider();   /* ต้องเรียกหลังแผงโผล่แล้ว ตอนซ่อนอยู่ความกว้างเป็น 0 */
   }
 
   function openRaise(minTarget, maxTarget) {
@@ -1599,6 +1933,7 @@ button { font-family: inherit; }
     });
 
     $("bet-sheet").classList.add("is-on");
+    paintSlider();   /* ต้องเรียกหลังแผงโผล่แล้ว ตอนซ่อนอยู่ความกว้างเป็น 0 */
   }
 
   function closeRaise() {
