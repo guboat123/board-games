@@ -102,8 +102,9 @@ Three genuinely different algorithms, not one routine with different constants
 
 ### Tests
 
-9 suites, all green: `test-payout` `test-room` `test-uncalled` `test-history` `test-split`
-`test-busts` `test-audit-fixes` `test-bot-bank` (lan) and `test-clue` (root).
+12 suites, all green: `test-payout` `test-room` `test-uncalled` `test-history` `test-split`
+`test-busts` `test-audit-fixes` `test-bot-bank` `test-outs` `test-hand-value` `test-bot-memory` (lan)
+and `test-clue` (root).
 Run: `for t in lan/tests/test-*.mjs tests/test-*.mjs; do node "$t"; done`
 
 ### Next / open
@@ -312,40 +313,107 @@ Note for whoever repeats this: the first version of that auditor reported 164 fa
 errors because it compared against a buy-in total that was still being filled in while bots
 were joining. Gate the audit on all seats being occupied before believing it.
 
-## Bot calibration (measured, not guessed)
+## Bot calibration (measured over 10,000,000 hands)
 
-Practice bots are tuned against how often real players act, not against how the numbers
-felt. Preflop and postflop use separate thresholds, because a hand scoring 0.64 before the
-flop is rare while after it is ordinary — sharing one threshold made every level raise about
-5% preflop, when a tight player raises 18-22% and raises rather than calls.
+### The tools, and why every number here before 2026-09-01 was wrong
 
-Frequencies over 30,000 dealt hands:
+| Tool | Question it answers |
+|---|---|
+| `lan/tools/watch-bots.mjs <hands> <perRound> [startAt] [json]` | which level beats which, at scale |
+| `lan/tools/merge-watch.mjs <json...>` | merges parallel watch-bots runs into one table |
+| `lan/tools/play-as-human.mjs <hands> <perTable> [level]` | can a competent human beat them, and how |
+| `lan/tools/leak-scan.mjs <hands>` | which street a level loses on, calling or raising |
+| `lan/tools/smoke-live.mjs <hands>` | does the live `poke()` path still run at all |
 
-| Level | plays | raises | real-player reference |
-|---|---|---|---|
-| 1 มือใหม่ | 77% | 3% | loose recreational, 50-70% |
-| 2 ปานกลาง | 40% | 8% | casual, 35-50% |
-| 3 เก่ง | 28% | 18% | tight-aggressive, 22-30% / raise 18-22% |
+**Every calibration number recorded here before 2026-09-01 was measured on a bot that could not
+read opponents, had no memory and no mood.** `trackActions`, `updateMoods`, `rememberFoes` and
+`observe` all lived inside `poke()`, which only the server calls; the tools call `_decideNow()`
+directly and skipped the lot. `claimedStrength()` therefore always returned NEUTRAL and
+`credibility()` never saw a raise history. Roughly 600k hands of tuning went into a bot that does
+not exist — and it explains why the pro level kept looking weak and kept getting tightened: the
+tightening was aimed at a strength that was switched off.
 
-Ten hands of four level-3 bots, before and after:
+`senseTable()` now exists so the server and the tools take the same path. **If you add state the
+bots learn from, put it there, not in `poke`.**
+
+Three smaller versions of the same mistake, all fixed:
+
+- A new function named `observe` silently shadowed the existing `observe(st)` that records
+  revealed cards. Code ran, every test stayed green, half the memory was dead.
+  `lan/tests/test-bot-memory.mjs` now asserts the observable *result* of all three memory paths
+  rather than which function was called, because that is the only check that would have caught it.
+- `bank._setDir` did not clear the claimed-name set, so a tool opening a fresh table each round
+  could not re-seat the same names and quietly ran 5-6 handed after the roster wrapped.
+- Think time was read off the wall clock, so a tool that steps instantly made everyone look like
+  they acted without thinking — the exact signal `credibility()` reads as a prepared bluff.
+  `decide()` now records the think time the bot would really have used, and `poke()` shares its
+  own draw with it so the delay the table sees and the delay it reads are the same number.
+
+Two of these were bugs in the **live game**, not just the harness: `rememberFoes` ran on every
+`poke` during showdown instead of once per hand, inflating grudges and bluff-caught counts several
+times over; and the two think-time draws disagreed with each other.
+
+### Where each level stands
+
+10,000,000 hands, all 30 bots, 400 rounds, chips per 100 hands. Run it with:
 
 ```
-before   ปุ๊ก raise 24% call 12% fold 41%   |  after   ปุ๊ก raise 26% call  5% fold 42%
-         โบ๊ท raise 14% call 19% fold 38%   |          โบ๊ท raise 21% call 11% fold 42%
-         แมท raise  9% call 14% fold 45%   |          แมท raise 16% call 16% fold 37%
-         น้ำ  raise  0% call  0% fold 77%   |          น้ำ  raise 35% call 12% fold 29%
+for i in 0 1 2 3 4 5 6 7; do node lan/tools/watch-bots.mjs 1250000 25000 $i /tmp/wb/part$i.json & done
+node lan/tools/merge-watch.mjs /tmp/wb/part*.json
 ```
 
-A bot that never raised or called across thirteen decisions is the shape of the problem:
-it was not broken, it was correctly folding 79% of hands because that is what the numbers
-said to do. Every level now raises more often than it calls, which is the pattern good
-players actually show.
+| Level | chips/100 hands | VPIP | raise | showdown | busts/1000 | spread inside the level |
+|---|---|---|---|---|---|---|
+| 3 มืออาชีพ | **+6,230** | 27-32% | 21-23% | 8-10% | 6.7 | Vega +7,721 … Otto +4,471 |
+| 1 มือใหม่ | **-1,707** | 34-44% | 4-6% | 8-12% | 10.3 | Rudy -1,266 … Bruno -2,083 |
+| 2 นักพนัน | **-2,415** | 51-53% | 25% | 17-18% | 20.3 | Vince -1,491 … Tank -3,474 |
 
-Judge bot behaviour with the analyser pattern in the session scratchpad: walk the recorded
-hands and flag decisions that are wrong regardless of cards — folding when checking is free,
-calling more than twice the pot. Note that blinds are not recorded as actions, so preflop
-must start its running bet at the big blind or the analyser will report a folded-for-free
-case on every hand.
+Before this session's fixes the same run gave pro +11,286, beginner **+440** (break-even) and
+gambler -7,949 at 41.7 busts per 1000 hands.
+
+The beginner losing less than the gambler is not an inversion: the gambler puts far more money in,
+so more of it is lost. The ordering that matters is the one a human meets, and that one is right —
+see below.
+
+The spread inside a level stays narrow, which is the point: personality changes how a bot plays,
+not how well. A wide spread means one bot's traits are doing the work and the level itself is not
+calibrated.
+
+### What a human can do to them
+
+`play-as-human.mjs` seats a deliberately plain tight-aggressive human (tight preflop, value bet,
+fold to price, occasional semi-bluff heads-up) and reports big blinds per 100 hands. 40,000 hands
+per lineup — **2,000 hands is far too few to read a win rate here**: two 2,000-hand runs against
+pros gave -134 and +164, which is all noise.
+
+| Table | BB/100 for the human |
+|---|---|
+| pros only | **-35** — they beat it |
+| gamblers only | +71 |
+| beginners only | +165 |
+| mixed 3/3/2 | +88 |
+
+Before this session's fixes the mixed table paid +723 and pros were not measurable at all.
+
+### The two behaviour bugs the measurements found
+
+- **The beginner could not lose.** Break-even at +440/100 hands, because he put 23,000 into pots
+  per 100 hands while everyone else put in 73,000-84,000. He was not playing badly, he was not
+  playing — under pressure he folded. A real beginner loses by calling down with second pair.
+- **The gambler bled four times too fast** (-7,949/100, busting every 24 hands). Two thirds of it
+  went on turn and river, half of that from raising. He also had **no opponent count in his maths
+  at all**: one pair against four players scored exactly the same as against one.
+
+Both are fixed; see the commits around `59be4de`. The gambler's remaining leak is turn aggression,
+which is his character and is meant to stay.
+
+### Known and deliberate
+
+- Beginners raise only 5-6% of actions. Real recreational players are nearer 8-12%, but passivity
+  is level 1's signature tell and the owner's players should be able to read it.
+- Gamblers still bust about every 50 hands. That is a maniac, not a bug.
+- Pros run VPIP 31-36% against a table with six weak players, looser than a live TAG (22-28%),
+  because that table justifies it.
 
 ## Automated tests (must pass before any commit)
 
@@ -387,6 +455,10 @@ try/catch. Never touch `games/catch-sketch/words/` except the `-3` files (owner'
 
 ## Handoff / waiting on owner
 
-Nothing blocking. The playtest loop is closed. If it is ever restarted, start from the
+**The LAN server the owner had open on port 8080 is still running the pre-2026-09-01 code.**
+It has to be restarted to pick up the bot work; asked, not yet answered. A second server was
+started on port 8099 for verification and can be stopped once that is settled.
+
+Nothing else blocking. The playtest loop is closed. If it is ever restarted, start from the
 "Known remaining" list above rather than sending a fresh agent — those items are already
 reproduced, located in the source, and none of them needs another round to find.
