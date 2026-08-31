@@ -1436,6 +1436,72 @@ button { font-family: inherit; }
   var audioCtx = null, soundOn = true;
   try { soundOn = localStorage.getItem("bg.poker.sound") !== "off"; } catch (e) {}
 
+  /* ---------- สรุปยอดตอนหลุด/เซิร์ฟเวอร์ปิด ----------
+     เกิดได้ทั้งตอนเน็ตหลุด เครื่องที่รันเซิร์ฟเวอร์หลับ หรือเจ้าภาพปิดหน้าต่าง
+     ทุกกรณีต้องจบด้วยตารางที่อ่านได้ ไม่ใช่โต๊ะที่ค้าง */
+  function showFinalTally() {
+    var box = $("t-standings");
+    box.innerHTML = "";
+
+    var h = document.createElement("h3");
+    h.textContent = "หลุดจากโต๊ะ";
+    box.appendChild(h);
+
+    var sub = document.createElement("p");
+    sub.className = "hint-sm";
+    sub.style.margin = "0 0 8px";
+    sub.textContent = "การเชื่อมต่อขาด นี่คือยอดล่าสุดที่บันทึกไว้ได้";
+    box.appendChild(sub);
+
+    var rows = document.createElement("div");
+    rows.className = "rows";
+    if (view && view.seats) {
+      var list = [];
+      view.seats.forEach(function (x, i) {
+        if (x) list.push({ name: x.name, net: x.net, stack: x.stack, buy: x.boughtIn, me: i === mySeat });
+      });
+      list.sort(function (a, b) { return b.net - a.net; });
+      list.forEach(function (x) {
+        var row = document.createElement("div");
+        row.className = "row";
+        var left = document.createElement("span");
+        left.textContent = x.name + (x.me ? " (คุณ)" : "");
+        var mid = document.createElement("span");
+        mid.className = "num buy";
+        mid.textContent = x.buy.toLocaleString("th-TH") + " → " + x.stack.toLocaleString("th-TH");
+        var right = document.createElement("b");
+        right.textContent = (x.net >= 0 ? "+" : "") + x.net.toLocaleString("th-TH");
+        right.style.color = x.net > 0 ? "var(--good)" : (x.net < 0 ? "#ff6b5e" : "var(--muted)");
+        row.appendChild(left); row.appendChild(mid); row.appendChild(right);
+        rows.appendChild(row);
+      });
+    } else {
+      var none = document.createElement("p");
+      none.className = "hint-sm";
+      none.textContent = "ยังไม่ได้เริ่มเล่น จึงไม่มียอดให้สรุป";
+      rows.appendChild(none);
+    }
+    box.appendChild(rows);
+
+    var foot = document.createElement("div");
+    foot.className = "foot";
+    var again = document.createElement("button");
+    again.type = "button";
+    again.className = "btn-main";
+    again.textContent = "ต่อใหม่";
+    again.addEventListener("click", function () { location.reload(); });
+    foot.appendChild(again);
+    box.appendChild(foot);
+
+    /* ให้ตารางกินพื้นที่ได้เต็มที่ ตอนนี้ไม่ต้องเห็นไพ่กลางแล้ว */
+    $("table-area").classList.add("is-over");
+    box.classList.add("is-on");
+    /* ปุ่มลงมือใช้ไม่ได้แล้ว เก็บทิ้งไม่ให้กดหลอกตา */
+    $("act-row").innerHTML = "";
+    var tc = document.getElementById("btn-timecard"); if (tc) tc.remove();
+    var rb = document.getElementById("btn-rebuy"); if (rb) rb.remove();
+  }
+
   /* ---------- หน้าอธิบายชุดไพ่ ----------
      เล่นกับเพื่อนที่ไม่เคยเล่นโป๊กเกอร์ ต้องมีที่ให้เปิดดูว่าอะไรชนะอะไร
      ใช้ไพ่จริงจาก window.Cards ไม่ใช่ข้อความ เพราะเห็นรูปแล้วเข้าใจทันที
@@ -1699,8 +1765,14 @@ button { font-family: inherit; }
       dbg.closed++;
       dbgPush(dbg.errors, dbgTime() + " โซเก็ตปิด");
       $("btn-join").disabled = false;
-      if ($("game").classList.contains("is-on")) toast("หลุดจากโต๊ะ ลองเปิดหน้านี้ใหม่");
-      else $("join-err").innerHTML = hostedHint();
+      if ($("game").classList.contains("is-on")) {
+        /* ⚠️ หลุดกลางวง ห้ามปล่อยให้จอค้างอยู่เฉยๆ
+           คนเล่นอยากรู้ว่า "ตกลงใครได้เท่าไร" ไม่ใช่มองโต๊ะที่กดอะไรไม่ได้
+           ใช้ข้อมูลชุดสุดท้ายที่ได้มา ซึ่งพอสำหรับสรุปยอดทุกคน */
+        showFinalTally();
+      } else {
+        $("join-err").innerHTML = hostedHint();
+      }
     };
 
     ws.onerror = function () {

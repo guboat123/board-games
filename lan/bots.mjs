@@ -16,10 +16,16 @@ const NAMES = ["โบ๊ท", "แมท", "น้ำ", "ปุ๊ก", "ต้
    bet    = มือแข็งแค่ไหนถึงจะเปิดเดิมพันเองตอนไม่มีใครเดิมพัน
    raise  = มือแข็งแค่ไหนถึงจะเรซทับคนอื่น
    bluff  = โอกาสที่จะดันทั้งที่มือไม่ดี */
+/* ⚠️ ก่อนฟลอปกับหลังฟลอปต้องใช้คนละเกณฑ์
+   มือที่ได้ค่า 0.64 ก่อนฟลอปคือมือหายาก แต่หลังฟลอปคือของธรรมดา
+   ใช้เกณฑ์เดียวกันแล้วบอทเรซก่อนฟลอปแค่ 5% ทั้งที่คนเล่นตึงจริงเรซ 18-22%
+   (คนตึงจะ "เรซหรือพับ" ไม่ใช่ตามเฉยๆ) — ค่าข้างล่างวัดจากการสุ่ม 30,000 มือ
+   ให้ความถี่ออกมาใกล้คนเล่นจริง:
+     lv1 เล่น 77% เรซ 3%  · lv2 เล่น 40% เรซ 8%  · lv3 เล่น 28% เรซ 18% */
 const LEVEL = {
-  1: { name: "มือใหม่",  margin: -0.16, bet: 0.70, raise: 0.86, bluff: 0.02, think: [700, 1800],  sizing: 0.35 },
-  2: { name: "ปานกลาง", margin:  0.02, bet: 0.55, raise: 0.72, bluff: 0.08, think: [900, 2600],  sizing: 0.55 },
-  3: { name: "เก่ง",     margin:  0.08, bet: 0.48, raise: 0.64, bluff: 0.16, think: [1100, 3400], sizing: 0.75 }
+  1: { name: "มือใหม่",  margin: -0.16, preMargin: -0.18, bet: 0.70, raise: 0.86, preRaise: 0.78, bluff: 0.02, think: [700, 1800],  sizing: 0.35 },
+  2: { name: "ปานกลาง", margin:  0.02, preMargin: -0.04, bet: 0.55, raise: 0.72, preRaise: 0.60, bluff: 0.08, think: [900, 2600],  sizing: 0.55 },
+  3: { name: "เก่ง",     margin:  0.08, preMargin:  0.02, bet: 0.48, raise: 0.64, preRaise: 0.50, bluff: 0.16, think: [1100, 3400], sizing: 0.75 }
 };
 
 /* ความแข็งของชุดไพ่ที่ทำได้แล้ว แปลงเป็น "โอกาสชนะคร่าวๆ"
@@ -147,12 +153,14 @@ export function createBotManager(room, broadcast) {
        ตาม 20 ในกอง 500 กับตาม 500 ในกอง 500 คนละเรื่องกันคนละโลก
        ของเดิมดูแค่ "มือแข็งพอไหม" โดยไม่สนราคา จึงพับมือดีทิ้งเพราะเดิมพัน 20 */
     const price = toCall > 0 ? toCall / (potNow + toCall) : 0;
-    const worthCalling = toCall === 0 || eq >= price + lv.margin;
+    const margin = pre ? lv.preMargin : lv.margin;
+    const raiseAt = pre ? lv.preRaise : lv.raise;
+    const worthCalling = toCall === 0 || eq >= price + margin;
 
     /* ไม่เรซทับเดิมพันก้อนใหญ่ด้วยมือกลางๆ ไม่งั้นบอทจะสาดกันไปมาไม่จบ */
     const facingBig = toCall > me.stack * 0.3;
     const canRaise = me.stack > toCall &&
-                     eq >= lv.raise &&
+                     eq >= raiseAt &&
                      (!facingBig || eq >= 0.82);
 
     let msg;
