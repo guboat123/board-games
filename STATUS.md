@@ -40,7 +40,27 @@ dead-code grep), so B/C findings never run out. Severity, by contrast, did conve
 | 3 | 5 | 4 | 8 | all fixed + verified |
 | 4 | 6 | 7 | — | every round-3 fix held (100%); poker agent was stopped mid-run, no result |
 | 5 | 5 (A2) | 5 (A3) | 13 (A6) | first agent check of the poker fixes: 6 of 8 held, 2 failed |
-| 6 | running | running | running | first round judged by the new criterion |
+| 6 | 5 (A1) | 5 (**A0**) | 10 (A5) | first round judged by the new criterion; เดาสี is the first game to reach A=0 |
+| 7 | running | 3 (A1) | running | |
+
+Round 6 is where the cost of my own fixes showed clearly: 5 of poker's 10 findings were regressions
+from the round-5 fixes, including a real money bug (chips vanished from the table whenever someone
+pressed "← ออก" mid-hand, because the seat was deleted while its committed chips were still owed to
+the pot). The test added for it then caught a *second* bug in the same fix — if the leaver was the
+player on turn, the table stalled waiting for someone who had already walked away.
+
+Two recurring self-inflicted patterns worth naming:
+- **Declaring a property twice in one CSS rule.** `display: none` followed later by `display: flex`
+  in the same block meant the result panel could never hide.
+- **Putting a media query *before* the base rule it overrides.** Media queries add no specificity,
+  so the later rule wins and the whole responsive block silently does nothing. This happened once in
+  วาดให้ทาย and again in โป๊กเกอร์.
+
+Round 7 (เดาสี) showed the same shape one level up: the positional-word rule added in round 6 was
+itself over-broad (`กระดานโต้คลื่น` blocked) and bypassable with a space (`ตรง กลาง`). Fixed by
+matching on *where* the word sits — at the start of a token it is a noun, at the tail it is a
+location — and by re-checking the whitespace-stripped string the way the colour and coordinate
+rules already did.
 
 Round 5 is where the poker relay was finally stress-tested end to end, and it surfaced the worst
 defect of the whole project: pressing "← ออก" never released the seat or closed the socket, so the
