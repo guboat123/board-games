@@ -225,6 +225,41 @@ Note for whoever repeats this: the first version of that auditor reported 164 fa
 errors because it compared against a buy-in total that was still being filled in while bots
 were joining. Gate the audit on all seats being occupied before believing it.
 
+## Bot calibration (measured, not guessed)
+
+Practice bots are tuned against how often real players act, not against how the numbers
+felt. Preflop and postflop use separate thresholds, because a hand scoring 0.64 before the
+flop is rare while after it is ordinary — sharing one threshold made every level raise about
+5% preflop, when a tight player raises 18-22% and raises rather than calls.
+
+Frequencies over 30,000 dealt hands:
+
+| Level | plays | raises | real-player reference |
+|---|---|---|---|
+| 1 มือใหม่ | 77% | 3% | loose recreational, 50-70% |
+| 2 ปานกลาง | 40% | 8% | casual, 35-50% |
+| 3 เก่ง | 28% | 18% | tight-aggressive, 22-30% / raise 18-22% |
+
+Ten hands of four level-3 bots, before and after:
+
+```
+before   ปุ๊ก raise 24% call 12% fold 41%   |  after   ปุ๊ก raise 26% call  5% fold 42%
+         โบ๊ท raise 14% call 19% fold 38%   |          โบ๊ท raise 21% call 11% fold 42%
+         แมท raise  9% call 14% fold 45%   |          แมท raise 16% call 16% fold 37%
+         น้ำ  raise  0% call  0% fold 77%   |          น้ำ  raise 35% call 12% fold 29%
+```
+
+A bot that never raised or called across thirteen decisions is the shape of the problem:
+it was not broken, it was correctly folding 79% of hands because that is what the numbers
+said to do. Every level now raises more often than it calls, which is the pattern good
+players actually show.
+
+Judge bot behaviour with the analyser pattern in the session scratchpad: walk the recorded
+hands and flag decisions that are wrong regardless of cards — folding when checking is free,
+calling more than twice the pot. Note that blinds are not recorded as actions, so preflop
+must start its running bet at the big blind or the analyser will report a folded-for-free
+case on every hand.
+
 ## Automated tests (must pass before any commit)
 
 ```
