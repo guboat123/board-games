@@ -269,5 +269,54 @@ head("ประวัติมือ + เวลาที่ใช้ตัด�
   ok(t.history().length === 1, "ระหว่างเล่น ยังไม่ปิดสมุดมือที่สอง", t.history().length);
 }
 
+/* --------------------------------------------------------------- */
+head("หมดเวลาตัดสินใจ + การ์ดต่อเวลา");
+{
+  const t = createTable({ smallBlind: 10, bigBlind: 20, minBuyIn: 1, maxBuyIn: 100000,
+                          turnSeconds: 30, timeCards: 2, timeCardSeconds: 30 });
+  const a = t.sit("เอ", 0, 1000, "tokA");
+  const b = t.sit("บี", 1, 1000, "tokB");
+  const st = t._state;
+  t.action(a.seatId, { type: "start" });
+
+  const cur = st.current;
+  ok(st.seats[cur].timeCards === 2, "เริ่มมาได้การ์ดต่อเวลาคนละ 2 ใบ", st.seats[cur].timeCards);
+  ok(t.tick() === false, "ยังไม่หมดเวลา ห้ามเดินแทน");
+
+  /* ใช้การ์ด 1 ใบ ต้องได้เวลาเพิ่มจริง */
+  ok(!t.action(cur, { type: "timecard" }).error, "ใช้การ์ดต่อเวลาได้");
+  ok(st.seats[cur].timeCards === 1, "การ์ดลดลง 1 ใบ", st.seats[cur].timeCards);
+  ok(t.viewFor(cur).turnBudgetMs === 60000, "เวลาในตานี้เป็น 60 วิ", t.viewFor(cur).turnBudgetMs);
+
+  /* คนที่ไม่ถึงตา ใช้การ์ดไม่ได้ */
+  const other = st.seats.findIndex((x, i) => x && i !== cur);
+  ok(!!t.action(other, { type: "timecard" }).error, "ไม่ถึงตาตัวเอง ใช้การ์ดไม่ได้");
+
+  /* ย้อนเวลาไป 61 วินาที นาฬิกาต้องเดินแทน */
+  st.turnAt = Date.now() - 61000;
+  const before = st.current;
+  ok(t.tick() === true, "หมดเวลาแล้ว ระบบต้องเดินแทน");
+  ok(st.current !== before || st.phase !== "preflop", "ตาต้องเดินต่อ ไม่ค้าง",
+     { current: st.current, phase: st.phase });
+
+  /* เงินต้องไม่หายจากการเดินแทน */
+  const total = st.seats.reduce((n, x) => n + (x ? x.stack + x.committed : 0), 0);
+  ok(total === 2000, "หมดเวลาแล้วชิปรวมเท่าเดิม", total);
+
+  /* เวลาที่ซื้อไว้ใช้ได้เฉพาะตานั้น พอเปลี่ยนตาต้องกลับเป็น 30 วิ */
+  if (st.current >= 0) {
+    ok(t.viewFor(st.current).turnBudgetMs === 30000,
+       "เปลี่ยนตาแล้ว เวลาที่ซื้อไว้ต้องหมดอายุ", t.viewFor(st.current).turnBudgetMs);
+  }
+
+  /* โต๊ะที่ไม่จำกัดเวลา ต้องไม่มีใครถูกเดินแทน */
+  const t2 = createTable({ smallBlind: 10, bigBlind: 20, minBuyIn: 1, turnSeconds: 0 });
+  t2.sit("ซี", 0, 500, "tokC");
+  t2.sit("ดี", 1, 500, "tokD");
+  t2.action(0, { type: "start" });
+  t2._state.turnAt = Date.now() - 600000;
+  ok(t2.tick() === false, "โต๊ะไม่จำกัดเวลา ห้ามเดินแทนเด็ดขาด");
+}
+
 console.log(fail === 0 ? "\n=== ผ่านทั้งหมด ===" : "\n=== พัง " + fail + " ข้อ ===");
 process.exit(fail ? 1 : 0);

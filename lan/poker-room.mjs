@@ -20,7 +20,12 @@ export const DEFAULTS = {
   limitValue: 0,
   minBuyIn: 200,     /* ขอบเขตเท่านั้น แต่ละคนเลือกเองว่าจะเอาเท่าไหร่ */
   maxBuyIn: 100000,
-  defaultBuyIn: 1000 /* ค่าที่เติมให้ในช่องกรอก เปลี่ยนได้ */
+  defaultBuyIn: 1000, /* ค่าที่เติมให้ในช่องกรอก เปลี่ยนได้ */
+  /* เวลาตัดสินใจต่อตา · 0 = ไม่จำกัด (โต๊ะบ้านๆ ที่ไม่อยากให้ใครโดนบังคับพับ) */
+  turnSeconds: 30,
+  /* การ์ดต่อเวลาแบบทัวร์นาเมนต์: คนละกี่ใบต่อรอบเล่น และใบละกี่วินาที */
+  timeCards: 3,
+  timeCardSeconds: 30
 };
 
 export function createTable(opts = {}) {
@@ -43,6 +48,7 @@ export function createTable(opts = {}) {
     lastResult: null,        /* สรุปมือที่เพิ่งจบ */
     log: [],                 /* ข้อความสั้นๆ ให้โชว์ข้างโต๊ะ */
     turnAt: 0,               /* เวลาที่ตาเพิ่งเปลี่ยนมาถึงคนปัจจุบัน ใช้วัดว่าคิดนานแค่ไหน */
+    turnExtra: 0,            /* เวลาที่ซื้อเพิ่มด้วยการ์ดในตานี้ (มิลลิวินาที) */
     hand: null,              /* สมุดบันทึกของมือที่กำลังเล่น */
     hands: []                /* ประวัติมือที่จบแล้ว ใช้ย้อนดูรูปแบบการเล่น */
   };
@@ -69,6 +75,14 @@ export function createTable(opts = {}) {
   function setCurrent(n) {
     st.current = n;
     st.turnAt = n >= 0 ? Date.now() : 0;
+    /* เวลาที่ซื้อเพิ่มใช้ได้เฉพาะตานั้น ต้องล้างทุกครั้งที่เปลี่ยนตา */
+    st.turnExtra = 0;
+  }
+
+  /* เวลาทั้งหมดที่คนปัจจุบันมีในตานี้ · 0 = ไม่จำกัด */
+  function turnBudget() {
+    if (!cfg.turnSeconds) return 0;
+    return cfg.turnSeconds * 1000 + st.turnExtra;
   }
 
   /* บันทึกลงประวัติมือปัจจุบัน ใช้ย้อนดูรูปแบบการเล่นทีหลัง */
@@ -173,6 +187,7 @@ export function createTable(opts = {}) {
       connected: true,
       sitOut: false,
       lastAction: "",
+      timeCards: cfg.timeCards,   /* การ์ดต่อเวลาที่เหลือของคนนี้ */
       token: token      /* รหัสประจำเครื่อง ใช้พิสูจน์ตัวตนตอนกลับเข้ามา */
     };
     /* คนแรกที่นั่งลง = เจ้าภาพ จำไว้เลย ที่นั่งจะเปลี่ยนทีหลังไม่ได้ */
@@ -667,6 +682,12 @@ export function createTable(opts = {}) {
       },
       standings: st.standings,
       readyCount: readyPlayers().length,
+      /* คนที่ถึงตาคิดมานานแค่ไหนแล้ว (มิลลิวินาที) ใช้วาดนาฬิกาข้างชื่อ
+         ส่งค่าที่ผ่านไปแล้ว ไม่ใช่เวลาเริ่ม เพราะนาฬิกาของแต่ละเครื่องไม่ตรงกัน */
+      turnMs: st.turnAt ? Date.now() - st.turnAt : 0,
+      /* เวลาทั้งหมดที่คนปัจจุบันมีในตานี้ (รวมที่ซื้อด้วยการ์ดแล้ว) · 0 = ไม่จำกัด */
+      turnBudgetMs: turnBudget(),
+      timeCardSeconds: cfg.timeCardSeconds,
       log: st.log.slice(-8),
       openSeats: openSeats(),
       lastResult: st.lastResult,
@@ -682,6 +703,7 @@ export function createTable(opts = {}) {
         inHand: s.inHand,
         connected: s.connected,
         sitOut: s.sitOut,
+        timeCards: s.timeCards,
         lastAction: s.lastAction,
         /* ไพ่ในมือ: เห็นแค่ของตัวเอง หรือของทุกคนตอนเปิดไพ่ */
         cards: (i === mySeat || (st.lastResult && st.lastResult.showdown && !s.folded && s.cards.length))
@@ -741,6 +763,18 @@ export function createTable(opts = {}) {
       if (isFinite(sb) && sb > 0) cfg.smallBlind = sb;
       if (isFinite(bb) && bb > 0) cfg.bigBlind = bb;
       if (cfg.bigBlind < cfg.smallBlind) cfg.bigBlind = cfg.smallBlind * 2;
+      /* เวลาต่อตา 0 = ไม่จำกัด ตั้งได้เฉพาะก่อนเริ่มมือแรก เหมือนค่าอื่นของโต๊ะ */
+      if (msg.turnSeconds !== undefined) {
+        const ts = Math.floor(Number(msg.turnSeconds));
+        if (isFinite(ts) && ts >= 0) cfg.turnSeconds = ts;
+      }
+      if (msg.timeCards !== undefined) {
+        const tc = Math.floor(Number(msg.timeCards));
+        if (isFinite(tc) && tc >= 0) {
+          cfg.timeCards = tc;
+          for (const p3 of seated()) p3.timeCards = tc;
+        }
+      }
       if (msg.limitType === "none" || msg.limitType === "hands" || msg.limitType === "minutes") {
         cfg.limitType = msg.limitType;
         cfg.limitValue = Math.max(1, Math.floor(Number(msg.limitValue)) || 1);
@@ -763,14 +797,53 @@ export function createTable(opts = {}) {
       st.startedAt = 0;
       st.handNo = 0;
       st.phase = "waiting";
-      /* กำไรขาดทุนต้องเริ่มนับใหม่ ไม่งั้นรอบใหม่ขึ้นบวกตั้งแต่ยังไม่แจกไพ่ */
-      for (const p2 of seated()) { p2.boughtIn = p2.stack; p2.committed = 0; }
+      /* กำไรขาดทุนต้องเริ่มนับใหม่ ไม่งั้นรอบใหม่ขึ้นบวกตั้งแต่ยังไม่แจกไพ่
+         การ์ดต่อเวลาก็แจกใหม่ เพราะมันเป็นโควตาต่อ "รอบเล่น" ไม่ใช่ตลอดชีวิต */
+      for (const p2 of seated()) {
+        p2.boughtIn = p2.stack; p2.committed = 0;
+        p2.timeCards = cfg.timeCards;
+      }
       note("เริ่มรอบเล่นใหม่");
+      return {};
+    }
+
+    /* ใช้การ์ดต่อเวลา ได้เฉพาะตอนถึงตาตัวเองและยังมีการ์ดเหลือ
+       ต่อเวลาให้ "ตานี้" เท่านั้น พอเปลี่ยนตาเวลาที่ซื้อไว้จะถูกล้างใน setCurrent */
+    if (msg.type === "timecard") {
+      const s2 = st.seats[seatId];
+      if (!cfg.turnSeconds) return { error: "โต๊ะนี้ไม่จำกัดเวลาอยู่แล้ว" };
+      if (st.current !== seatId) return { error: "ใช้ได้ตอนถึงตาคุณเท่านั้น" };
+      if (!s2 || s2.timeCards <= 0) return { error: "การ์ดต่อเวลาหมดแล้ว" };
+      s2.timeCards--;
+      st.turnExtra += cfg.timeCardSeconds * 1000;
+      note(s2.name + " ใช้การ์ดต่อเวลา +" + cfg.timeCardSeconds + " วิ (เหลือ " + s2.timeCards + " ใบ)");
       return {};
     }
 
     if (msg.type === "act") return playerAction(seatId, msg);
     return { error: "คำสั่งไม่รู้จัก" };
+  }
+
+  /* ---------- นาฬิกาเดินเอง ----------
+     ตัวจับเวลาไม่ได้อยู่ในโมดูลนี้ ฝั่งเซิร์ฟเวอร์เรียก tick() ทุกวินาที
+     ทำแบบนี้เพราะโมดูลนี้ต้องเป็นตรรกะล้วน เทสต์ได้โดยไม่ต้องรอเวลาจริง
+     คืนค่า true เมื่อมีอะไรเปลี่ยน เซิร์ฟเวอร์จะได้รู้ว่าต้องส่ง state ใหม่ */
+  function tick(now) {
+    now = now || Date.now();
+    const budget = turnBudget();
+    if (!budget || st.current < 0 || !st.turnAt) return false;
+    if (st.phase === "waiting" || st.phase === "showdown") return false;
+    if (now - st.turnAt < budget) return false;
+
+    const s2 = st.seats[st.current];
+    if (!s2) return false;
+    /* หมดเวลาแล้วเดินแทนให้ตามมารยาทโต๊ะ: ไม่มีเงินต้องตามก็เคาะ มีก็พับ
+       ห้ามพับให้ถ้าเหลือคนเดียว เพราะเขาชนะไปแล้ว เงินจะหาย */
+    const toCall = st.currentBet - s2.bet;
+    const auto = (toCall <= 0 || inHand().length <= 1) ? "check" : "fold";
+    note(s2.name + " หมดเวลา ระบบ" + (auto === "check" ? "เคาะ" : "พับ") + "ให้");
+    playerAction(st.current, { action: auto });
+    return true;
   }
 
   /* มีใครยังต่ออยู่ไหม ใช้ตัดสินว่าจะเก็บห้องทิ้งได้หรือยัง */
@@ -802,5 +875,5 @@ export function createTable(opts = {}) {
      ไม่งั้นทุกการกดของทุกคนจะลากประวัติทั้งกองวิ่งข้ามเน็ตไปด้วย */
   function history() { return st.hands; }
 
-  return { sit, moveSeat, leave, disconnect, action, viewFor, openSeats, anyConnected, summary, history, _state: st, _cfg: cfg };
+  return { sit, moveSeat, leave, disconnect, action, tick, viewFor, openSeats, anyConnected, summary, history, _state: st, _cfg: cfg };
 }

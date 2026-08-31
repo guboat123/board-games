@@ -341,6 +341,54 @@ button { font-family: inherit; }
   60%      { transform: translateY(-1px) scale(1.01); }
 }
 .seat.is-knock .seat__box { animation: fx-knock .34s ease-in-out 2; }
+/* เคาะโต๊ะ: คลื่นแผ่จากมือคนเคาะ + โต๊ะสะเทือนนิดเดียว
+   ทั้งสองอย่างสั้นและเบา ถ้าแรงกว่านี้จะกวนสายตาเพราะทุกคนเคาะกันทั้งรอบ */
+.fx-ripple {
+  position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px;
+  border-radius: 50%; border: 2px solid rgba(255,255,255,.55);
+  animation: fx-ripple .62s cubic-bezier(.2,.7,.3,1) forwards;
+}
+@keyframes fx-ripple {
+  from { transform: scale(.4); opacity: .85; border-width: 3px; }
+  to   { transform: scale(9); opacity: 0; border-width: 1px; }
+}
+@keyframes fx-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20%      { transform: translate(0, 2px); }
+  45%      { transform: translate(-1px, -1px); }
+  70%      { transform: translate(1px, 1px); }
+}
+.table-area.is-shake { animation: fx-shake .26s ease-in-out 1; }
+/* ---------- นาฬิกาข้างชื่อคนที่ถึงตา ----------
+   วงเต็มที่ 30 วินาที เป็นตัวบอกว่า "คิดนานแล้วนะ" เฉยๆ ไม่ได้บังคับพับ
+   (โต๊ะนี้ไม่มีกติกาหมดเวลา ถ้าจะให้พับเองต้องเพิ่มที่ฝั่งเซิร์ฟเวอร์) */
+.seat__box { position: relative; }
+.seat__timer {
+  /* ⚠️ ต้องอยู่คนละมุมกับปุ่มดีลเลอร์ (.dealer อยู่ขวาบน) ไม่งั้นทับกันจนไม่เห็น D */
+  position: absolute; left: -8px; top: -8px; width: 26px; height: 26px;
+  border-radius: 50%; display: grid; place-items: center; pointer-events: none;
+  background: conic-gradient(var(--gold) calc(var(--p, 0) * 1%), rgba(255,255,255,.16) 0);
+}
+.seat__timer::before {
+  content: ""; position: absolute; inset: 3px; border-radius: 50%; background: #0e2a1c;
+}
+.seat__timer span {
+  position: relative; font-family: var(--mono); font-size: .62rem; font-weight: 700; color: var(--gold);
+}
+.seat__timer.is-long { background: conic-gradient(#ff8f84 100%, #ff8f84 0); }
+.seat__timer.is-long span { color: #ff8f84; }
+/* ---------- ตัดสินใจล่วงหน้า ---------- */
+.pre {
+  display: flex; gap: 6px; margin-top: 7px;
+}
+.pre__b {
+  flex: 1 1 0; padding: 9px 4px; font-family: inherit;
+  font-size: .76rem; font-weight: 700; line-height: 1.2;
+  color: var(--muted); background: #12301f;
+  border: 1px solid #2f5540; border-radius: 9px; cursor: pointer;
+}
+.pre__b.is-on { color: #06170f; background: var(--gold); border-color: var(--gold); }
+.pre__b:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
 .fx-banner {
   position: absolute; left: 50%; top: 27%;
   font-size: clamp(1.5rem, 7.5vw, 2.5rem); font-weight: 800; white-space: nowrap;
@@ -414,12 +462,16 @@ button { font-family: inherit; }
 }
 .seat__off { font-size: .66rem; color: #7b8f84; }
 
+/* ปุ่มดีลเลอร์ — ทำให้เหมือนชิปดีลเลอร์จริงบนโต๊ะ
+   ของเดิมเป็นวงกลมจางๆ 20px คนไม่ทันสังเกตว่ามีอยู่ */
 .dealer {
-  position: absolute; right: -7px; top: -7px;
-  width: 20px; height: 20px; border-radius: 50%;
-  background: var(--paper); color: #111;
-  font: 700 .68rem/20px var(--mono); text-align: center;
-  border: 1px solid #999;
+  position: absolute; right: -8px; top: -8px;
+  width: 25px; height: 25px; border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #ffffff, #ded7c4 70%, #b3a98f);
+  color: #14110a; font: 800 .78rem/25px var(--mono); text-align: center;
+  border: 2px solid var(--gold);
+  box-shadow: 0 2px 6px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.35);
+  z-index: 3;
 }
 .bet {
   position: absolute; left: 50%; transform: translateX(-50%);
@@ -521,7 +573,9 @@ button { font-family: inherit; }
   flex: 0 0 auto; padding: 9px 10px calc(9px + env(safe-area-inset-bottom));
   background: #082016; border-top: 1px solid #1d3a2b;
 }
-.act-row { display: flex; gap: 8px; }
+/* wrap ไว้เพื่อให้แถวตัดสินใจล่วงหน้าตกลงไปบรรทัดใหม่ ไม่เบียดกับแถบ "รอ ..." */
+.act-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.pre { flex: 1 0 100%; }
 .act {
   flex: 1 1 0; padding: 13px 8px;
   font-size: .95rem; font-weight: 700;
@@ -1356,6 +1410,61 @@ button { font-family: inherit; }
      ทำจาก div กับ CSS ล้วน ไม่มีไฟล์ภาพ ไม่มีไลบรารี ตามข้อจำกัดของโปรเจกต์
      ทุกชิ้นลบตัวเองทิ้ง ไม่งั้นเล่นหลายมือแล้วจะมีขยะค้างเป็นพันชิ้น */
   var lastActs = {}, lastCelebHand = -1;
+  /* นาฬิกาของตาปัจจุบัน ยึดเวลาที่ผ่านไปจากเซิร์ฟเวอร์ ไม่ใช่เวลาเริ่ม
+     เพราะนาฬิกาของแต่ละเครื่องไม่ตรงกัน ถ้ายึดเวลาเริ่มจะเพี้ยนเป็นนาที */
+  var turnSeat = -1, turnAnchor = 0;
+  /* ตัดสินใจล่วงหน้า: เก็บว่าเลือกอะไรไว้ และเลือกไว้ตอนมือ/รอบไหน */
+  var preAct = null, preAt = "";
+
+  function syncTurnClock() {
+    if (!view) return;
+    if (view.current !== turnSeat) {
+      turnSeat = view.current;
+      turnAnchor = Date.now() - (view.turnMs || 0);
+    } else if (typeof view.turnMs === "number" &&
+               Math.abs((Date.now() - turnAnchor) - view.turnMs) > 500) {
+      turnAnchor = Date.now() - view.turnMs;
+    }
+  }
+
+  /* ทำตามที่สั่งไว้ล่วงหน้า ทันทีที่ถึงตาเรา
+     ต้องล้างทิ้งเมื่อข้ามมือหรือข้ามรอบเดิมพัน ไม่งั้นคำสั่งเก่าจะไปโผล่ในสถานการณ์ที่เปลี่ยนไปแล้ว */
+  /* คำสั่งล่วงหน้าอยู่ได้นานแค่ไหน
+     พับ / เคาะ-ไม่ได้ก็พับ = ไม่มีทางเสียเงินเกินตั้งใจ อยู่ได้ทั้งมือ
+     ตามเท่าไหร่ก็ตาม = เสี่ยงโดนเรซก้อนใหญ่ในรอบถัดไป จึงหมดอายุเมื่อขึ้นรอบใหม่
+     ⚠️ เดิมล้างทุกครั้งที่ขึ้นรอบเดิมพัน ทำให้ในโต๊ะสองคนแทบไม่มีวันได้ใช้เลย
+     เพราะตาถัดไปของเรามักอยู่คนละรอบกับตอนที่กดสั่ง */
+  function preScope(kind) {
+    return kind === "call" ? view.handNo + "|" + view.phase : String(view.handNo);
+  }
+
+  function runPreAction() {
+    if (!view || !preAct) return;
+    var me2 = view.seats[mySeat];
+    if (!me2 || me2.folded || me2.allIn) { preAct = null; return; }
+    if (preAt !== preScope(preAct)) { preAct = null; return; }
+    if (view.current !== mySeat) return;
+    var a = preAct;
+    preAct = null;
+    if (a === "fold") send({ type: "act", action: "fold" });
+    else if (a === "call") send({ type: "act", action: view.toCall > 0 ? "call" : "check" });
+    else send({ type: "act", action: view.toCall > 0 ? "fold" : "check" });
+  }
+
+  /* นาฬิกาเดินในเครื่อง ระหว่างรอ state รอบถัดไป จะได้ไม่กระตุกเป็นช่วงๆ */
+  setInterval(function () {
+    if (!view || turnSeat < 0 || !view.turnBudgetMs) return;
+    var el = document.querySelector('.seat[data-seat="' + turnSeat + '"] .seat__timer');
+    var left = Math.max(0, view.turnBudgetMs - (Date.now() - turnAnchor));
+    if (el) {
+      el.style.setProperty("--p", (left / view.turnBudgetMs * 100).toFixed(1));
+      el.firstChild.textContent = Math.ceil(left / 1000);
+      el.classList.toggle("is-long", left <= 5000);
+    }
+    /* ปุ่มการ์ดต่อเวลาโผล่เฉพาะตอนใกล้หมดเวลา ไม่งั้นแถวปุ่มจะแน่นตลอดทั้งเกม */
+    var tc = document.getElementById("btn-timecard");
+    if (tc) tc.style.display = (turnSeat === mySeat && left <= 12000) ? "" : "none";
+  }, 200);
 
   function reducedMotion() {
     return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -1394,6 +1503,32 @@ button { font-family: inherit; }
       c.style.opacity = "0";
     }, delay);
     setTimeout(function () { if (c.parentNode) c.parentNode.removeChild(c); }, delay + 900);
+  }
+
+  /* เคาะโต๊ะ: คลื่นแผ่ออกจากที่นั่ง + โต๊ะสะเทือน + สั่นเครื่องถ้าเป็นเราเคาะเอง
+     การสั่นเป็นของเราคนเดียว ถ้าสั่นตามคนอื่นเคาะด้วยจะรำคาญมากในโต๊ะ 9 คน */
+  function knockTable(seatId) {
+    if (reducedMotion()) return;
+    setTimeout(function () {
+      var seatEl = document.querySelector('.seat[data-seat="' + seatId + '"]');
+      if (!seatEl) return;
+      var at = centerIn(seatEl);
+      var r = document.createElement("i");
+      r.className = "fx-ripple";
+      r.style.left = at.x + "px";
+      r.style.top = at.y + "px";
+      fxLayer().appendChild(r);
+      setTimeout(function () { if (r.parentNode) r.parentNode.removeChild(r); }, 700);
+
+      var area = $("table-area");
+      area.classList.remove("is-shake");
+      void area.offsetWidth;   /* บังคับให้คิดใหม่ ไม่งั้นเคาะติดกันสองครั้งจะไม่สะเทือนรอบสอง */
+      area.classList.add("is-shake");
+      setTimeout(function () { area.classList.remove("is-shake"); }, 320);
+    }, 0);
+    if (seatId === mySeat && navigator.vibrate) {
+      try { navigator.vibrate(18); } catch (e) {}
+    }
   }
 
   /* ชิปไหลจากที่นั่งไปกองกลาง เรียกตอนมีคนตาม/เพิ่ม/หมดหน้าตัก */
@@ -1487,6 +1622,9 @@ button { font-family: inherit; }
     justRevealed = !!(view.lastResult && view.lastResult.showdown) &&
                    view.handNo !== lastRevealHand;
     if (justRevealed) lastRevealHand = view.handNo;
+
+    syncTurnClock();
+    runPreAction();
 
     $("t-blinds").textContent = view.blinds.sb + " / " + view.blinds.bb;
     var me = view.seats[mySeat];
@@ -1829,7 +1967,8 @@ button { font-family: inherit; }
           var mid = document.createElement("span");
           mid.className = "num buy";
           mid.textContent = st2.boughtIn.toLocaleString("th-TH") + " → " +
-                            st2.stack.toLocaleString("th-TH");
+                            st2.stack.toLocaleString("th-TH") +
+                            (view.turnBudgetMs ? "  ⏱ " + (st2.timeCards || 0) : "");
           row.appendChild(mid);
 
           var net = document.createElement("b");
@@ -1947,6 +2086,7 @@ button { font-family: inherit; }
           (freshAct[seatId] === "ตาม" || freshAct[seatId] === "เพิ่มเป็น" || freshAct[seatId] === "หมดหน้าตัก")) {
         flyChip(seatId);
       }
+      if (freshAct[seatId] === "เคาะ") knockTable(seatId);
 
       var box = document.createElement("div");
       box.className = "seat__box";
@@ -1982,7 +2122,20 @@ button { font-family: inherit; }
         var d = document.createElement("span");
         d.className = "dealer";
         d.textContent = "D";
+        /* บอกให้ชัดว่าคืออะไร คนไทยหลายคนไม่รู้ว่า D = ดีลเลอร์ */
+        d.title = "ปุ่มดีลเลอร์ · คนนี้เป็นเจ้ามือรอบนี้";
+        d.setAttribute("aria-label", "ปุ่มดีลเลอร์");
         box.appendChild(d);
+      }
+
+      /* นาฬิกาของคนที่ถึงตา · เลขข้างในเดินเองด้วยตัวจับเวลาในเครื่อง */
+      if (seatId === view.current && view.turnBudgetMs) {
+        var tm = document.createElement("div");
+        tm.className = "seat__timer";
+        var ts = document.createElement("span");
+        ts.textContent = "0";
+        tm.appendChild(ts);
+        box.appendChild(tm);
       }
 
       box.style.position = "relative";
@@ -2047,11 +2200,46 @@ button { font-family: inherit; }
         (me.folded ? "คุณหมอบแล้ว" : (me.allIn ? "คุณหมดหน้าตักแล้ว" : "รอ " + (who ? who.name : "—"))) +
         "</div>";
       row.appendChild(wait);
+
+      /* ตัดสินใจล่วงหน้า พอถึงตาเราจะส่งให้เองทันที ไม่ต้องนั่งจ้องรอ
+         ล้างทิ้งอัตโนมัติเมื่อข้ามรอบเดิมพัน เพราะสถานการณ์เปลี่ยนไปแล้ว */
+      if (me.inHand && !me.folded && !me.allIn && view.phase !== "waiting") {
+        var pre = document.createElement("div");
+        pre.className = "pre";
+        [
+          { k: "checkfold", t: view.toCall > 0 ? "พับ ถ้ายังต้องเติม" : "เคาะ · ถ้าต้องเติมให้พับ" },
+          { k: "call", t: "ตามเท่าไหร่ก็ตาม" },
+          { k: "fold", t: "พับเลย" }
+        ].forEach(function (o) {
+          var pb = document.createElement("button");
+          pb.type = "button";
+          pb.className = "pre__b" + (preAct === o.k ? " is-on" : "");
+          pb.textContent = o.t;
+          pb.addEventListener("click", function () {
+            preAct = (preAct === o.k) ? null : o.k;
+            preAt = preAct ? preScope(preAct) : "";
+            paintActions();
+          });
+          pre.appendChild(pb);
+        });
+        row.appendChild(pre);
+      }
       return;
     }
 
     var toCall = view.toCall;
     var maxTarget = me.stack + me.bet;
+
+    /* การ์ดต่อเวลาแบบทัวร์นาเมนต์ · โผล่เฉพาะตอนใกล้หมดเวลา (ตัวจับเวลาเป็นคนเปิด/ปิด)
+       ถ้าโชว์ตลอด แถวปุ่มจะแน่นและคนจะกดทิ้งโดยไม่จำเป็น */
+    if (view.turnBudgetMs && me.timeCards > 0) {
+      var tcb = mkBtn("act", "+" + view.timeCardSeconds + " วินาที",
+        "การ์ดต่อเวลา เหลือ " + me.timeCards + " ใบ",
+        function () { send({ type: "timecard" }); });
+      tcb.id = "btn-timecard";
+      tcb.style.display = "none";
+      row.appendChild(tcb);
+    }
 
     row.appendChild(mkBtn("act act--fold", "หมอบ", null, function () {
       send({ type: "act", action: "fold" });

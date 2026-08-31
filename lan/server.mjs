@@ -160,6 +160,15 @@ const PING_MS = 15000;     /* เคาะถามทุกกี่มิล�
 const lobby = new Set();   /* เครื่องที่ยังไม่ได้นั่งโต๊ะ รอดูรายการโต๊ะ */
 
 /* รายการโต๊ะที่เปิดอยู่ ส่งให้หน้าเลือกโต๊ะ */
+/* นาฬิกาของทุกโต๊ะเดินที่นี่ที่เดียว โมดูลโต๊ะเป็นตรรกะล้วน ไม่มีตัวจับเวลาของตัวเอง
+   จะได้เทสต์ได้โดยไม่ต้องรอเวลาจริง */
+setInterval(() => {
+  for (const room of rooms.values()) {
+    try { if (room.table.tick()) broadcastState(room); }
+    catch (e) { log("tick error", room.code, e && e.message); }
+  }
+}, 1000);
+
 function roomList() {
   const out = [];
   for (const [code, room] of rooms) {
