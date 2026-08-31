@@ -20,6 +20,10 @@ let FILE = path.join(DIR, "bot-mind.json");
 let db = { version: 1, minds: {} };
 let loaded = false;
 let dirty = false;
+/* ⚠️ เครื่องมือวัดผลเล่นเป็นล้านมือ ถ้าเขียนไฟล์ทุกมือจะช้าจนวัดไม่ไหว
+   ปิดการเขียนได้ ความจำยังทำงานเต็มที่ในหน่วยความจำเหมือนเดิม แค่ไม่ข้ามการรีสตาร์ต */
+let autoSave = true;
+export function setAutoSave(v) { autoSave = !!v; }
 
 export function _setDir(dir) {
   DIR = dir;
@@ -40,7 +44,7 @@ function load() {
 
 /* เขียนแบบชั่วคราวแล้วเปลี่ยนชื่อทับ กันไฟล์พังตอนเครื่องดับกลางคัน */
 export function save() {
-  if (!dirty) return;
+  if (!autoSave || !dirty) return;
   dirty = false;
   try {
     fs.mkdirSync(DIR, { recursive: true });
@@ -89,7 +93,24 @@ export function noteReveal(botName, otherName, strong, weak) {
 /* ---------- ความจำต่อคู่แข่งรายคน ---------- */
 export function foeOf(botName, otherName) {
   const f = mind(botName).foes;
-  return f[otherName] || (f[otherName] = { hurt: 0, caught: 0, sticky: 0, seen: 0 });
+  const rec = f[otherName] ||
+    (f[otherName] = { hurt: 0, caught: 0, sticky: 0, seen: 0, acts: 0, folds: 0 });
+  /* ไฟล์เก่าไม่มีสองช่องนี้ เติมให้ตอนอ่าน จะได้ไม่ต้องล้างความจำเดิมทิ้ง */
+  if (rec.acts === undefined) { rec.acts = 0; rec.folds = 0; }
+  return rec;
+}
+
+/* ---------- "คนนี้หมอบบ่อยแค่ไหน" ----------
+   ⚠️ ของเดิมมีแต่ sticky ซึ่งพื้นเป็น 0 แปลว่า "ตามบ่อย" ได้อย่างเดียว
+   คนที่หมอบตลอด กับคนที่ยังไม่เคยเห็นเล่น จึงหน้าตาเหมือนกันหมด
+   ทั้งที่คนหมอบตลอดคือเป้าที่ควรโดนไล่มากที่สุดบนโต๊ะ
+   (พิสูจน์แล้วตอนผมลงไปนั่งเล่นเอง: ลงเล่น 20% ของมือ ไม่มีบอทตัวไหนไล่ผมสักครั้ง
+    เดิมพันของผมจึงได้เงินเต็มทุกครั้งที่มีของ — นั่นคือช่องที่ทำให้ผมได้ +336,390)
+   0.62 คือสัดส่วนการหมอบของคนเล่นปกติ เกิน 0.87 ถือว่าเป็นเป้าเต็มตัว */
+export function foldiness(botName, otherName) {
+  const f = foeOf(botName, otherName);
+  if (f.acts < 15) return 0;
+  return Math.max(0, Math.min(1, (f.folds / f.acts - 0.62) / 0.25));
 }
 
 export function markDirty() { dirty = true; }

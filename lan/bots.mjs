@@ -438,6 +438,13 @@ function decideBeginner(f) {
   const nearAllIn = !cheap && f.toCall > f.me.stack * (0.55 + nerve * 0.35);
   if (seen >= 0.90) return bet();
 
+  /* ⚠️ ของเดิมมือใหม่ไล่เฉพาะตอน seen >= 0.90 คือ "แทบชนะแน่" เท่านั้น
+     แปลว่า "มือใหม่ไล่ = มีของแน่นอน" ซึ่งอ่านออกตั้งแต่ครั้งแรกที่เห็น
+     วัดได้จริง: เขาไล่แค่ 3-4% ของท่าทั้งหมด ซึ่งไม่ใช่คน เป็นเครื่องตามไพ่
+     คนเพิ่งหัดที่ได้ของจะไล่ทันทีด้วยความตื่นเต้น (บางทีก็แค่คู่บน) ไม่ได้รอเก็บทีหลัง
+     และเป็นจังหวะที่เขาเสียเงินเยอะที่สุดด้วย ซึ่งก็ตรงกับความจริง */
+  if (got && !nearAllIn && seen >= 0.62 && Math.random() < 0.12 + nerve * 0.30) return bet();
+
   /* เกือบทั้งตัก: ต้องมั่นใจแค่ไหนถึงจะกล้า ขึ้นกับว่าเป็นคนแบบไหน
      ขี้กลัว (0.2) ต้องเกือบแน่นอน 0.90 · ใจถึง (0.6) แค่มือดีพอใช้ 0.72 ก็ลงแล้ว */
   if (nearAllIn) {
@@ -472,8 +479,16 @@ function decideGambler(f) {
   const invested = f.me.bet / Math.max(1, f.potNow);
   const nearStack = f.toCall >= f.me.stack * 0.6;
   const committed = Math.min(0.12, invested * 0.30) * (nearStack ? 0.25 : 1);
-  /* ไล่ลุ้นทุกทาง ให้น้ำหนักไพ่ลุ้นมากกว่าที่ควรเกือบเท่าตัว */
-  const chase = f.draw * 1.8;
+  /* ไล่ลุ้นทุกทาง ให้น้ำหนักไพ่ลุ้นมากกว่าที่ควรเกือบเท่าตัว
+     ⚠️ แต่ต้องเบาลงเมื่อเงินที่ต้องจ่ายเข้าใกล้ทั้งตัก
+     วัดที่ 100,000 มือ: นักพนันลงหมดหน้าตัก 24,014 ครั้ง ส่วนใหญ่ "ตามที่เทิร์น"
+     ซึ่งคือการเอาทั้งตักไปแลกกับไพ่ลุ้นที่มีโอกาสจริงราว 18% — แพ้แน่นอนในระยะยาว
+     ผลคือเขาล้มทุก 21 มือ แล้วซื้อเข้าใหม่ = เงินสดใหม่ไหลเข้าโต๊ะตลอดเวลา
+     ทำให้คนที่เล่นตึงที่สุดบนโต๊ะเก็บเงินก้อนนั้นไปฟรี ๆ ทั้งระบบจึงเพี้ยนตามไปด้วย
+     ความหลวมของนักพนันต้องอยู่ที่กองเล็ก-กลาง (ยังเป็นตัวเขาอยู่)
+     ไม่ใช่ตอนที่ต้องเอาทุกอย่างไปแลก ซึ่งแม้แต่คนที่ชอบเสี่ยงก็ยังคิดสองที */
+  const chaseCut = 1 - Math.min(1, f.toCall / Math.max(1, f.me.stack)) * 0.75;
+  const chase = f.draw * 1.8 * chaseCut;
   /* นักพนันประเมินพลาดปานกลาง และมักพลาดไปทางเข้าข้างตัวเอง */
   const eq = Math.max(0, Math.min(1, f.base + chase + wobble(MISREAD[2]) + 0.02));
 
@@ -492,6 +507,14 @@ function decideGambler(f) {
     return { type: "act", action: "check" };
   }
   if (eq >= 0.80) return bet(0.9 + Math.random());
+  /* ⚠️ วัดได้ว่านักพนันไล่ 18-24% ของท่า ซึ่งพอ ๆ กับมืออาชีพ
+     แปลว่าเขาไม่ใช่นักพนัน เขาเป็นคนตามทุกอย่าง ซึ่งเป็นคนละแบบกันคนละขั้ว
+     นักพนันจริงไล่ด้วยคู่สอง ด้วยไพ่ลุ้น ด้วยความรู้สึก — และนั่นคือเหตุผลที่อ่านเขาไม่ออก
+     ถ้าเขาไล่เฉพาะตอนมือแรงจริง คนอื่นก็แค่หมอบทุกครั้งที่เขาไล่ ก็จบ */
+  /* ไล่ทับได้เฉพาะตอนยังไม่ใช่การเอาทั้งตักไปแลก ไม่งั้นกลายเป็นเครื่องผลิตการล้ม */
+  if (eq >= 0.60 && f.toCall < f.me.stack * 0.35 && Math.random() < 0.32) {
+    return bet(0.6 + Math.random() * 0.7);
+  }
   /* นักพนันก็พอเดาออกเหมือนกัน แต่ให้น้ำหนักน้อยมาก เพราะความอยากอยู่ในมือชนะเหตุผลเสมอ
      (ตั้งใจให้เป็นแบบนี้ ไม่ใช่ลืมใส่) */
   const wary = Math.min(Math.max(0, f.threat - eq), 0.4) * 0.08;
@@ -508,6 +531,15 @@ function decideGambler(f) {
   /* นักพนันก็มีเส้นของตัวเอง แค่ต่ำกว่าคนอื่นมาก — เอาทั้งตักลงด้วยไพ่ที่ไม่มีอะไรเลย
      ไม่ใช่การพนัน เป็นการทิ้งเงิน */
   if (f.toCall >= f.me.stack * 0.65 && f.price >= 0.22 && eq < 0.48) {
+    return { type: "act", action: "fold" };
+  }
+  /* ⚠️ ริเวอร์ไม่เหลือไพ่ให้ลุ้นแล้ว "ตามไว้ก่อนเผื่อฟลุก" จึงไม่มีอะไรรองรับเลย
+     วัดได้จริง: นักพนันเปิดไพ่ราว 30% ของมือทั้งหมด และเป็นไพ่ขยะ 38-44% ของครั้งนั้น
+     = ใครก็ตามที่ไล่ค่าไพ่ใส่เขา ได้เงินเต็มทุกครั้งที่มีของจริง โดยไม่ต้องคิดอะไรเลย
+     นักพนันตัวจริงก็ยังวางไพ่ตอนไม่ได้อะไรเลยและราคาไม่ใช่เศษเงิน
+     เขาหลวมตอนยัง "มีลุ้น" ไม่ใช่ตอนที่รู้แล้วว่าไม่เหลืออะไร
+     (0.20 = ไพ่สูงล้วนหรือเล่นบอร์ด · ต่ำกว่า 12% ของกองถือว่าเศษเงิน ตามได้) */
+  if (f.view.phase === "river" && f.base <= 0.20 && f.price >= 0.12) {
     return { type: "act", action: "fold" };
   }
   /* ⚠️ ส่วนลด 0.18 หลวมเกินไป วัดที่ 10,000 มือแล้วนักพนันล้มทุก 11 มือ
@@ -692,9 +724,14 @@ export function createBotManager(room, broadcast) {
       const f = foeOf(b.name, x.name);
       if (x.lastKind === "call") f.sticky = Math.min(60, f.sticky + 1);
       else if (x.lastKind === "fold") f.sticky = Math.max(0, f.sticky - 1.6);
+      /* นับดิบไว้ต่างหาก เพื่อให้รู้ "สัดส่วน" การหมอบ ไม่ใช่แค่ "ตามบ่อยไหม" — ดู foldiness */
+      f.acts++;
+      if (x.lastKind === "fold") f.folds++;
+      mind.markDirty();
     }
   }
   let lastSeenHand = -1;
+  let foesHand = -1;      /* จดความจำต่อคู่แข่งไปแล้วในมือไหน */
   let showOffHand = -1;     /* ตัดสินใจขิงไปแล้วในมือไหน (กันทอยลูกเต๋าซ้ำ) */
 
   /* ---------- อารมณ์ที่ค้างข้ามมือ ----------
@@ -1106,6 +1143,73 @@ export function createBotManager(room, broadcast) {
     return Math.random() < want * factor;
   }
 
+  /* ---------- บอทหมดตัว: เติมชิปหรือลุกให้ตัวอื่นมาแทน ----------
+     ⚠️ แยกออกมาเป็นฟังก์ชันเพื่อให้เครื่องมือวัดผล (lan/tools/) เรียกใช้ "ทางเดียวกับเกมจริง" ได้
+     ของเดิมเครื่องมือวัดเติมชิปให้เองแบบไม่มีเงื่อนไข ซึ่งเป็นคนละเกมกับที่คนเล่นจริงเจอ:
+     บอทที่กระเป๋าติดลบครึ่งล้านยังนั่งเล่นต่อไม่มีวันจบ = เงินสดใหม่ไหลเข้าโต๊ะไม่จำกัด
+     ทุกตัวเลขที่วัดจากโต๊ะแบบนั้นจึงเชื่อไม่ได้ */
+  function settleBusted() {
+    const st = room.table._state;
+    for (const b of botSeats()) {
+      if (bench[b.seatId] !== undefined && st.handNo >= bench[b.seatId]) {
+        delete bench[b.seatId];
+        if (b.sitOut) room.table.action(b.seatId, { type: "sitout", value: false });
+      }
+      if (b.stack > 0) continue;
+
+      /* ---------- หมดตัวแล้วจะเอายังไงต่อ: เติมชิป หรือ ลุกให้ตัวอื่นมาแทน ----------
+         ⚠️ ต้องเป็นการตัดสินใจของบอทเอง ไม่ใช่เติมให้อัตโนมัติเสมอ
+         คนจริงที่หมดตัวก็เลือกสองทางนี้ และเลือกไม่เหมือนกันตามนิสัยกับเงินที่เหลือ
+         นักพนันแทบไม่เคยเลิก · มือใหม่โดนสองครั้งก็กลัวแล้วลุก
+         มืออาชีพลุกเมื่อโต๊ะนี้ไม่คุ้ม ซึ่งเป็นการตัดสินใจที่ถูกต้อง ไม่ใช่ขี้ขลาด */
+      bank.noteBust(b.name);
+      if (!wantsRebuy(b)) {
+        const gone = b.name, lv = b.botLevel;
+        bank.sync(gone, b.wallet, 0, Date.now());
+        bank.release(gone);
+        delete bench[b.seatId];
+        clearTimeout(pending[b.seatId]);
+        delete pending[b.seatId];
+        room.table.leave(b.seatId);
+        /* เรียกตัวใหม่ระดับเดียวกันมานั่งแทน โต๊ะจะได้ไม่ค่อยๆ ว่างลง
+           ถ้าระดับนั้นไม่ว่างเลย ก็ปล่อยที่นั่งว่างไว้ ดีกว่าลากตัวที่นั่งโต๊ะอื่นอยู่มา */
+        add(1, lv);
+        continue;
+      }
+
+      room.table.action(b.seatId, { type: "rebuy", amount: BUY_IN });
+      /* ซื้อชิปใหม่ = หยิบเงินออกจากกระเป๋าอีกก้อน ติดลบได้ นั่นคือเป็นหนี้ */
+      b.wallet = (typeof b.wallet === "number" ? b.wallet : bank.bankrollOf(b.name)) - BUY_IN;
+      const penalty = Math.min(Math.max(b.busts || 1, 1), 5);
+      room.table.action(b.seatId, { type: "sitout", value: true });
+      bench[b.seatId] = st.handNo + penalty;
+    }
+  }
+
+  /* ---------- สิ่งที่บอททุกตัว "เห็น" จากโต๊ะ แล้วเก็บเข้าความจำ ----------
+     ⚠️ ของเดิมโค้ดส่วนนี้ฝังอยู่ใน poke() ซึ่งมีแต่เซิร์ฟเวอร์จริงที่เรียก
+     เครื่องมือวัดผลเรียก _decideNow() ตรง ๆ จึงข้ามส่วนนี้ไปทั้งก้อน
+     แปลว่าตัวเลขทุกตัวที่วัดมา วัดจากบอทที่ "ไม่มีความจำ ไม่มีอารมณ์ ไม่ปรับตัว"
+     ทั้งที่นั่นคือสิ่งที่เจ้าของสั่งให้ใส่ — วัดผิดตัวมาตลอด
+
+     ⚠️ และ rememberFoes เคยถูกเรียกซ้ำทุกครั้งที่ poke ระหว่างโชว์ดาวน์
+     (เงื่อนไขเดิม st.handNo === moodHand เป็นจริงตลอดหลัง updateMoods ตั้งค่าแล้ว)
+     ความแค้นกับจำนวนครั้งที่จับบลัฟได้จึงถูกนับเกินจริงหลายเท่าในเกมจริง
+     ตอนนี้มี foesHand กันไว้ ให้จดได้มือละครั้งเดียว */
+  function senseTable() {
+    const st = room.table._state;
+    trackActions(st);
+    updateMoods(st);
+    /* ไพ่ที่เห็นคนอื่นเปิด ก็เป็นความจำเหมือนกัน ต้องอยู่ในชุดเดียวกันนี้ */
+    observe(st);
+    if (st.phase === "showdown" && st.handNo !== foesHand) {
+      foesHand = st.handNo;
+      rememberFoes(st);
+      mind.markDirty();
+      mind.save();   /* เขียนตอนจบมือ เสียได้มากที่สุดคือมือเดียว */
+    }
+  }
+
   /* เรียกทุกครั้งที่สถานะโต๊ะเปลี่ยน ถ้าถึงตาบอทให้ตั้งเวลาคิดแล้วค่อยลงมือ
      ตั้งเวลาแทนที่จะลงมือทันที เพื่อให้คนอ่านทันว่าเกิดอะไรขึ้น และดูเหมือนคนคิดจริง */
   function poke() {
@@ -1116,14 +1220,7 @@ export function createBotManager(room, broadcast) {
 
     /* จำไพ่ที่เพิ่งเห็น แล้วขิงถ้ามีจังหวะ ทำก่อนอย่างอื่นเสมอ
        เพราะเป็นข้อมูลของ "มือที่เพิ่งจบ" ซึ่งจะหายไปทันทีที่ขึ้นมือใหม่ */
-    trackActions(st);
-    updateMoods(st);
-    if (st.phase === "showdown" && st.handNo === moodHand) {
-      rememberFoes(st);
-      mind.markDirty();
-      mind.save();   /* เขียนตอนจบมือ เสียได้มากที่สุดคือมือเดียว */
-    }
-    observe(st);
+    senseTable();
     maybeShowOff(st);
     /* ⚠️ บันทึกเงินบอททุกครั้งที่จบมือ ไม่ใช่แค่ตอนลุกจากโต๊ะ
        ถ้าบันทึกแค่ตอนลุก พอเซิร์ฟเวอร์ถูกปิดกลางวง (ซึ่งเกิดบ่อยตอนแก้โค้ด)
@@ -1146,43 +1243,7 @@ export function createBotManager(room, broadcast) {
        ⚠️ นี่ไม่ใช่แค่บทลงโทษให้ดูสมจริง — บอท "ไม่ชอบโดนพัก" จริงๆ
        จำนวนครั้งที่ล้ม (s.busts) ถูกส่งเข้าไปในหัวบอทที่ decide แล้วกลายเป็น caution
        ยิ่งเคยโดนพักบ่อย ยิ่งต้องการไพ่ดีกว่าเดิมถึงจะสู้ และบลัฟน้อยลง */
-    if (st.phase === "waiting" || st.phase === "showdown") {
-      for (const b of botSeats()) {
-        /* ครบกำหนดพักแล้ว กลับมาเล่นได้ */
-        if (bench[b.seatId] !== undefined && st.handNo >= bench[b.seatId]) {
-          delete bench[b.seatId];
-          if (b.sitOut) room.table.action(b.seatId, { type: "sitout", value: false });
-        }
-        if (b.stack > 0) continue;
-
-        /* ---------- หมดตัวแล้วจะเอายังไงต่อ: เติมชิป หรือ ลุกให้ตัวอื่นมาแทน ----------
-           ⚠️ ต้องเป็นการตัดสินใจของบอทเอง ไม่ใช่เติมให้อัตโนมัติเสมอ
-           คนจริงที่หมดตัวก็เลือกสองทางนี้ และเลือกไม่เหมือนกันตามนิสัยกับเงินที่เหลือ
-           นักพนันแทบไม่เคยเลิก · มือใหม่โดนสองครั้งก็กลัวแล้วลุก
-           มืออาชีพลุกเมื่อโต๊ะนี้ไม่คุ้ม ซึ่งเป็นการตัดสินใจที่ถูกต้อง ไม่ใช่ขี้ขลาด */
-        bank.noteBust(b.name);
-        if (!wantsRebuy(b)) {
-          const gone = b.name, lv = b.botLevel;
-          bank.sync(gone, b.wallet, 0, Date.now());
-          bank.release(gone);
-          delete bench[b.seatId];
-          clearTimeout(pending[b.seatId]);
-          delete pending[b.seatId];
-          room.table.leave(b.seatId);
-          /* เรียกตัวใหม่ระดับเดียวกันมานั่งแทน โต๊ะจะได้ไม่ค่อยๆ ว่างลง
-             ถ้าระดับนั้นไม่ว่างเลย ก็ปล่อยที่นั่งว่างไว้ ดีกว่าลากตัวที่นั่งโต๊ะอื่นอยู่มา */
-          add(1, lv);
-          continue;
-        }
-
-        room.table.action(b.seatId, { type: "rebuy", amount: BUY_IN });
-        /* ซื้อชิปใหม่ = หยิบเงินออกจากกระเป๋าอีกก้อน ติดลบได้ นั่นคือเป็นหนี้ */
-        b.wallet = (typeof b.wallet === "number" ? b.wallet : bank.bankrollOf(b.name)) - BUY_IN;
-        const penalty = Math.min(Math.max(b.busts || 1, 1), 5);
-        room.table.action(b.seatId, { type: "sitout", value: true });
-        bench[b.seatId] = st.handNo + penalty;
-      }
-    }
+    if (st.phase === "waiting" || st.phase === "showdown") settleBusted();
 
     /* ---------- ใครมีสิทธิ์กด "เริ่มเล่น" / "มือต่อไป" ----------
        ⚠️ กติกา (เจ้าของสั่ง 2026-09-01): ถ้ามีคนจริงที่พร้อมเล่นอยู่ในโต๊ะ
@@ -1430,6 +1491,19 @@ export function createBotManager(room, broadcast) {
     });
     const unbluffable = Math.min(1, stickyHere / 25);
 
+    /* ⚠️ ไล่คนที่หมอบบ่อยได้ ต้องหมอบบ่อย "ทุกคน" ที่ยังอยู่ในมือ
+       เหลือคนขี้หมอบคนเดียวแต่มีคนตามทุกอย่างอีกคน = ไล่ไม่ขึ้น
+       จึงใช้ค่าต่ำสุดของคนที่ยังอยู่ ไม่ใช่ค่าเฉลี่ยหรือค่าสูงสุด */
+    let foldy = 1;
+    let anyFoe = false;
+    view.seats.forEach(function (x, i) {
+      if (!x || i === seatId || x.folded || !x.inHand) return;
+      anyFoe = true;
+      const ff = mind.foldiness(me.name, x.name);
+      if (ff < foldy) foldy = ff;
+    });
+    if (!anyFoe) foldy = 0;
+
     const facts = { pre, base, draw, live, me, view, seatId, lv, walletPressure, trait, wet, plan,
                     potNow, toCall, price, caution: caution + grudge, crowdFactor,
                     /* ⚠️ บลัฟใส่คนที่ตามทุกอย่าง = เผาเงินทิ้ง วัดที่ 100,000 มือแล้วเห็นชัด:
@@ -1441,8 +1515,10 @@ export function createBotManager(room, broadcast) {
                        กำไรตกจาก 21,138 เหลือ 14,372 เพราะบลัฟใส่ "มือใหม่" ยังได้ผลดีมาก
                        (มือใหม่หมอบ 39-45%) การห้ามเหมารวมจึงทิ้งกำไรส่วนนั้นไปด้วย
                        0.7 = ยังบลัฟได้บ้างเมื่อมีคนตามทุกอย่างอยู่ในมือ ซึ่งใกล้เคียงคนเล่นจริง */
-                    bluffing: bluffing && Math.random() > unbluffable * 0.7,
-                    cbet, actsLast, threat, threatName, threatCred, unbluffable };
+                    /* โต๊ะที่ทุกคนขี้หมอบ = โอกาสไล่ที่คนเล่นเป็นจะไม่ปล่อยผ่าน */
+                    bluffing: (bluffing || Math.random() < foldy * 0.30) &&
+                              Math.random() > unbluffable * 0.7,
+                    cbet, actsLast, threat, threatName, threatCred, unbluffable, foldy };
 
     /* ⚠️ แต่ละระดับใช้ "วิธีคิด" คนละแบบ ไม่ใช่เกณฑ์ชุดเดียวกันปรับตัวเลข
        (ดูคำอธิบายเหนือ decideBeginner / decideGambler / decidePro) */
@@ -1513,6 +1589,6 @@ export function createBotManager(room, broadcast) {
     return r;
   }
 
-  return { add, removeAll, poke, stop, _decideNow, _pendingStart, _addNamed,
+  return { add, removeAll, poke, stop, _decideNow, _pendingStart, _addNamed, settleBusted, senseTable,
            count: () => botSeats().length, LEVEL };
 }
