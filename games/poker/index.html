@@ -44,12 +44,17 @@ body {
 button { font-family: inherit; }
 
 /* ---------- หน้าเข้าห้อง ---------- */
+/* ⚠️ align-items:center ทำให้เนื้อหาที่สูงเกินจอ "ล้นออกทั้งสองด้าน"
+   แล้วเลื่อนได้แค่ด้านล่าง หัวการ์ด (ช่องชื่อ · รหัสห้อง) จะเลื่อนขึ้นไปหาไม่เจอ
+   เจอตอนกางตารางเงินบอทซึ่งสูงได้ถึง 46vh
+   margin:auto บนลูกให้ผลจัดกลางเหมือนกัน แต่ไม่ตัดส่วนที่ล้นด้านบนทิ้ง */
 .join-wrap {
   min-height: 100%;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; justify-content: center;
   padding: 22px 16px;
   background: radial-gradient(120% 90% at 50% 0%, #1b5c3c 0%, #071a12 70%);
 }
+.join { margin: auto; }
 .join {
   width: 100%; max-width: 380px;
   background: #0f231a;
@@ -738,19 +743,29 @@ button { font-family: inherit; }
      รอคนอื่น = แถบ "รอ ..." + แถวตัดสินใจล่วงหน้าอีกแถว = สูงกว่าเกือบเท่าตัว
      สลับไปมาทุกตา แถบไพ่ในมือจึงเด้งขึ้นลงตลอดเวลา และปุ่มแง้มดูไพ่ก็ย้ายที่ตาม
      ตรึงความสูงไว้เท่าสถานะที่สูงกว่า แล้วจัดปุ่มชิดล่าง ตำแหน่งปุ่มจึงนิ่งเสมอ */
-  min-height: 178px;
+  /* ⚠️ ต้องผูกกับความสูงจอด้วย ไม่ใช่ตัวเลขคงที่ล้วน
+     บนจอเตี้ยมาก (มือถือแนวนอน ~360px) ของที่หดไม่ได้รวมกันเกินความสูงจอ
+     แล้ว .table-area (flex 1 1 auto, min-height 0) ถูกบีบเหลือ 0
+     ปุ่ม Fold/Call/Raise ซึ่งจัดชิดล่างจะถูกดันตกออกนอกจอ และ #game ไม่มี scroll ให้เลื่อนตาม */
+  min-height: min(178px, 30vh);
   display: flex; flex-direction: column; justify-content: flex-end;
 }
-@media (max-height: 700px) { .actions { min-height: 160px; } }
+@media (max-height: 700px) { .actions { min-height: min(160px, 30vh); } }
 /* ⚠️ ปุ่มการ์ดต่อเวลาต้องลอยอยู่เหนือแถวปุ่ม ไม่ใช่แทรกอยู่ในแถว
    ถ้าอยู่ในแถว พอมันโผล่มาตอนเหลือ 12 วินาที ปุ่ม Fold/Check/Bet จะเลื่อนที่
    ซึ่งเป็นจังหวะที่คนกำลังจะกดพอดี = กดผิดปุ่ม
    ตำแหน่ง absolute ทำให้มันไม่กินพื้นที่ในผัง ปุ่มอื่นจึงอยู่นิ่งเสมอ */
 /* ปุ่มเติมชิปลอยมุมซ้ายเหนือแถว คนละมุมกับปุ่มการ์ดต่อเวลา จะได้ไม่ทับกัน */
+/* ⚠️ ต้องจำกัดความกว้างเหมือน #btn-timecard
+   ปุ่มนี้ลอยขึ้นไปอยู่ในแถบไพ่ในมือ ซึ่งมีปุ่มทอง "แง้มดูไพ่" อยู่ตรงกลาง
+   ป้าย "ชิปหมด เติมก่อนถึงจะเล่นต่อได้" ทำให้ปุ่มกว้าง ~174px ล้ำเข้าเขตปุ่มทอง ~60px
+   แล้วเพราะอยู่คนละ stacking context ที่ z-index เท่ากัน มันกินการกดแทน
+   = ตั้งใจแง้มดูไพ่ตอนจบมือ แต่กลายเป็นเปิดหน้าต่างเติมชิป */
 #btn-rebuy {
   position: absolute; left: 10px; bottom: 100%;
   z-index: 5; flex: 0 0 auto; width: auto;
-  margin-bottom: 8px; padding: 8px 12px;
+  max-width: 32vw;
+  margin-bottom: 8px; padding: 8px 10px;
   background: #123a26; border-color: var(--live); color: #bff0d2;
   box-shadow: 0 4px 14px rgba(0,0,0,.55);
 }
@@ -873,14 +888,17 @@ button { font-family: inherit; }
   cursor: pointer;
 }
 /* กางแล้วเห็นย้อนหลัง 8 บรรทัด ใหม่สุดอยู่บน
-   ⚠️ ต้องเป็น absolute ไม่งั้นมันดันโต๊ะกับแถบไพ่ในมือให้ขยับ
-   ซึ่งเป็นปัญหาที่เพิ่งแก้ไปว่าโซนต้องอยู่นิ่ง */
+   ⚠️ ห้ามใช้ position:absolute ที่นี่
+   แถบนี้เป็นลูกของ #game ซึ่งเป็น flex column ที่ไม่ได้ตั้ง position
+   ตัว containing block จึงกลายเป็นทั้งหน้าจอ แล้ว top ไปคิดจากมุมบนสุด
+   ผลคือกางทีไรกล่องกระโดดไปแปะขอบบน ทับแถบเครื่องมือ (ปุ่มออก · บอด · โต๊ะ·เงิน) ทั้งแถว
+   ให้ยืดอยู่กับที่ตามปกติ โต๊ะหดลงชั่วคราวไม่เป็นไร เพราะคนกดเปิดเองและกดปิดได้ */
 .log.is-open {
-  position: absolute; left: 0; right: 0; z-index: 45;
-  height: auto; max-height: 40vh; overflow-y: auto;
+  height: auto; max-height: 30vh; overflow-y: auto;
   white-space: normal; padding: 8px 12px;
-  background: rgba(6,26,18,.97); border-bottom: 1px solid #1d3a2b;
+  background: rgba(6,26,18,.97);
 }
+.log:focus-visible { outline: 2px solid var(--live); outline-offset: -2px; }
 .log.is-open div { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
 .toast {
   position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
@@ -923,7 +941,10 @@ button { font-family: inherit; }
    = เห็นทีละแถวเดียว ทั้งที่จุดประสงค์คือดูว่าใครมีอะไรบ้าง
    (บั๊กทรงเดียวกับตารางอันดับรอบ 7) ตอนนั้นกองจ่ายออกไปแล้ว ซ่อนบรรทัดกองได้
    แต่ไพ่กลางต้องเหลือไว้ ใช้อ่านชุดไพ่ของแต่ละคน */
-#t-result.is-many { max-height: 74%; }
+/* ⚠️ ลบทิ้งไม่ได้ทันที แต่ตอนนี้ไม่มีผลแล้ว: .result-stack > #t-result (1,1,0 เท่ากัน แต่มาทีหลัง)
+   ตั้ง max-height: none ทับ กองซ้อนเป็นคนคุมความสูงแทน
+   เก็บไว้เป็นบันทึกว่าทำไมคลาส is-many ถึงไม่มีผลกับกล่องนี้อีกต่อไป
+   (ยังมีผลกับ .table-area.is-many ที่ซ่อนบรรทัดกองกลาง) */
 /* ⚠️ ห้ามตั้งพื้นขั้นต่ำให้แถวคนแพ้
    ในกล่องนี้ .rows คือแถวของ "คนที่แพ้" ส่วนผู้ชนะอยู่ใน .win-box ซึ่งหดไม่ได้อยู่แล้ว
    ตั้ง min-height ไว้ที่นี่เท่ากับบังคับให้กล่องสูงขึ้นอีก 62px บนจอที่ไม่มีที่จะให้
@@ -965,8 +986,12 @@ button { font-family: inherit; }
      ไพ่กลางบนโต๊ะถูกยกมาไว้ในกล่องผลแล้ว การบังโต๊ะจึงไม่ใช่ปัญหาเท่าการอ่านผลไม่ได้ */
   max-height: 88%; pointer-events: none;
 }
+/* ⚠️ ต้องเป็น relative ไม่ใช่ static
+   ::after ของแอนิเมชันเด้ง (.result.is-pop::after) เป็น absolute inset:0
+   ถ้ากล่องเป็น static มันจะไปอิงกองซ้อนแทน แล้วแสงวาบกวาดทับโซนเงินไปด้วย
+   และ overflow:hidden ของกล่องผลก็คลิปไม่ได้ เพราะไม่ใช่ containing block ของมัน */
 .result-stack > .result {
-  position: static; transform: none; width: 100%;
+  position: relative; left: auto; bottom: auto; transform: none; width: 100%;
   z-index: auto; box-shadow: none; pointer-events: auto;
 }
 /* ⚠️ ต้องใช้ตัวเลือกที่มี id ด้วย ไม่งั้นแพ้ #t-result.is-many (1,1,0)
@@ -1214,14 +1239,14 @@ button { font-family: inherit; }
     <!-- ⚠️ สองโซนนี้ต้องอยู่ในกองซ้อนเดียวกัน
          .result ทุกกล่องเป็น position:absolute; bottom:6px เหมือนกันหมด
          ถ้าปล่อยไว้เฉยๆ สองกล่องจะทับกันสนิทที่จุดเดียวกัน
-         กองซ้อนนี้เป็นตัว absolute แทน ส่วนลูกกลับไปเป็น static แล้วเรียงลงมาตามปกติ -->
+         กองซ้อนนี้เป็นตัว absolute แทน ส่วนลูกเป็น relative แล้วเรียงลงมาตามปกติ -->
     <div class="result-stack" id="result-stack">
       <div class="result" id="t-result"></div>
       <!-- โซนเงินต้องเป็นกล่องแยก ไม่ใช่ส่วนท้ายของกล่องผล
            ตอนอยู่ในกล่องเดียวกัน .rows (แถวผู้ชนะ) ถูกตั้งไว้ให้ยืด-หดได้
            ส่วนแถบเงินหดไม่ได้ พอที่ไม่พอ แถวผู้ชนะจึงถูกบีบเหลือ 0px
            = จบมือแล้วไม่มีอะไรบอกว่าชนะด้วยชุดอะไร ซึ่งเป็นหัวใจของกล่องผล -->
-      <div class="result money-zone" id="t-money"></div>
+      <div class="result" id="t-money"></div>
     </div>
     <div class="result" id="t-standings"></div>
     <div class="result" id="t-table"></div>
@@ -1696,7 +1721,15 @@ button { font-family: inherit; }
       if (msg.type === "rooms") { window.__rooms = msg.rooms; paintTables(msg.rooms); paintSeatPicker(); }
       if (msg.type === "botbank") paintBank(msg.bots || []);
     };
-    lobbyWs.onerror = function () { $("tables-list").innerHTML = ""; $("join-err").innerHTML = hostedHint(); };
+    lobbyWs.onerror = function () {
+      $("tables-list").innerHTML = "";
+      $("join-err").innerHTML = hostedHint();
+      /* ⚠️ ต้องบอกด้วยว่าตารางเงินบอทโหลดไม่ได้
+         ไม่งั้นบนเว็บที่ไม่มีเซิร์ฟเวอร์ (GitHub Pages) มันจะค้างที่ "กำลังโหลด..." ตลอดกาล */
+      $("bank-list").innerHTML =
+        '<p class="hint-sm">ดูได้เฉพาะตอนต่อกับเครื่องที่เปิดโต๊ะอยู่ ' +
+        '(เงินบอทเก็บไว้ในเครื่องนั้น ไม่ได้อยู่บนเว็บ)</p>';
+    };
     lobbyWs.onclose = function () {
       lobbyWs = null;
       if (!lobbyWanted) return;
@@ -3389,8 +3422,9 @@ button { font-family: inherit; }
        ตอนชิปยังเยอะให้เป็นปุ่มจางๆ ไม่แย่งสายตาปุ่มหลัก แต่ยังกดได้ */
     var low = me2.stack < view.blinds.bb * 10;
 
+    /* ป้ายต้องสั้น ปุ่มนี้ลอยไปอยู่ข้างปุ่มทอง ข้อความยาว = ปุ่มกว้าง = ไปกินการกดของปุ่มทอง */
     var b = mkBtn("act", "เติมชิป",
-      me2.stack === 0 ? "ชิปหมด เติมก่อนถึงจะเล่นต่อได้" : "เหลือ " + me2.stack.toLocaleString("th-TH"),
+      me2.stack === 0 ? "ชิปหมด" : "เหลือ " + me2.stack.toLocaleString("th-TH"),
       function () {
         /* ⚠️ เติมเสริมกับซื้อเข้าครั้งแรกคนละเรื่อง เซิร์ฟเวอร์รับเติมเท่าไหร่ก็ได้ที่มากกว่า 0
            บังคับขั้นต่ำเท่าซื้อครั้งแรกทำให้คนที่อยากเติมนิดเดียวทำไม่ได้ */
@@ -4009,7 +4043,14 @@ button { font-family: inherit; }
       (isWin ? winBox : rows).appendChild(row);
     });
     box.appendChild(winBox);
-    if (rows.childNodes.length) box.appendChild(rows);
+    if (rows.childNodes.length) {
+      /* ป้ายคั่นบอกว่าที่เหลือคือคนที่แพ้ ไม่งั้นแถวล่างดูเหมือนผู้ชนะคนที่สอง */
+      var moreLbl = document.createElement("div");
+      moreLbl.className = "res-more";
+      moreLbl.textContent = "คนอื่นที่เปิดไพ่";
+      box.appendChild(moreLbl);
+      box.appendChild(rows);
+    }
 
     /* เปิดไพ่หลายคน = ต้องการที่มากกว่าปกติ ไม่งั้นเห็นทีละแถวเดียว */
     var many = list.length > 2;
