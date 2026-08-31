@@ -84,7 +84,8 @@ button { font-family: inherit; }
   color: #06170f; background: var(--gold);
   border: 0; border-radius: 11px; cursor: pointer;
 }
-.btn-main:disabled { opacity: .45; cursor: not-allowed; }
+/* เหตุผลเดียวกับ .act[disabled] ข้างล่าง ปุ่มทองพอหรี่แล้วตัวหนังสือจะหายไปกับพื้น */
+.btn-main:disabled { cursor: not-allowed; background: #24402f; color: #a9c8b6; }
 .btn-main:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
 .hint-sm { font-size: .78rem; color: var(--muted); margin: 6px 0 0; }
 
@@ -149,6 +150,32 @@ button { font-family: inherit; }
 .topbar .blinds { font-family: var(--mono); font-size: .9rem; color: var(--gold); }
 .topbar .hand { font-family: var(--mono); font-size: .72rem; color: var(--muted); }
 .topbar a { color: var(--muted); text-decoration: none; font-size: .85rem; }
+.topbtn {
+  flex: 0 0 auto; padding: 6px 10px; font-family: inherit;
+  font-size: .8rem; font-weight: 700;
+  color: var(--gold); background: #102b1e;
+  border: 1px solid #2b4b37; border-radius: 9px; cursor: pointer;
+}
+.topbtn:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+/* แผงสรุปโต๊ะ ใช้เปลือกเดียวกับกล่องผล แต่สูงกว่าเพราะมี 9 แถวเสมอ */
+#t-table.is-on { max-height: 84%; }
+#t-table .rows { min-height: 64px; }
+.mhead, .mrow {
+  display: grid; grid-template-columns: 1fr auto auto;
+  gap: 8px 10px; align-items: center; text-align: left;
+}
+.mhead { font-size: .7rem; color: var(--muted); padding-bottom: 4px; }
+.mrow { font-size: .85rem; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+.mrow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrow .num { font-family: var(--mono); }
+.mrow .buy { color: var(--muted); font-size: .76rem; }
+.mrow--free .nm { color: var(--muted); }
+.mseat {
+  padding: 5px 9px; font-family: inherit; font-size: .78rem; font-weight: 700;
+  color: #06170f; background: var(--gold); border: 0; border-radius: 8px; cursor: pointer;
+}
+.mseat[disabled] { background: #24402f; color: #a9c8b6; cursor: not-allowed; }
+.mseat:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
 
 /* ---------- โต๊ะ ---------- */
 .table-area { flex: 1 1 auto; position: relative; min-height: 0; padding: 10px; }
@@ -171,6 +198,43 @@ button { font-family: inherit; }
   /* ไพ่กลางคือสิ่งที่ทุกคนต้องอ่าน ต้องอยู่บนที่นั่งเสมอ */
   z-index: 3; pointer-events: none;
 }
+/* ---------- แจกไพ่ ----------
+   เฉพาะใบที่เพิ่งลงมาใหม่เท่านั้นที่วิ่ง ใบเดิมอยู่นิ่ง
+   ไม่งั้นทุกครั้งที่เซิร์ฟเวอร์ส่ง state มา (ทุกการกดของทุกคน) ไพ่ทั้งแถวจะกระตุกพร้อมกัน */
+@keyframes deal-in {
+  from { opacity: 0; transform: translateY(-46px) scale(.82) rotate(-8deg); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: none; }
+}
+.pc.is-dealt { animation: deal-in .38s cubic-bezier(.18,.85,.3,1) backwards; }
+/* ---------- เปิดไพ่ ----------
+   จังหวะเปิดไพ่คือจังหวะที่ทุกคนรออยู่ ให้ไพ่พลิกหงายทีละใบ ไม่ใช่เปลี่ยนภาพเฉยๆ
+   พลิกครั้งเดียวต่อมือ ไม่ใช่ทุกครั้งที่หน้าจอวาดใหม่ */
+@keyframes flip-in {
+  from { transform: rotateY(88deg) scale(.86); opacity: .2; }
+  to   { transform: none; opacity: 1; }
+}
+.pc.is-flip { animation: flip-in .46s cubic-bezier(.2,.85,.3,1) backwards; }
+/* ⚠️ ต้องคง translateX(-50%) ไว้ทุกเฟรม กล่องผลจัดกลางด้วย transform
+   ถ้าเฟรมไหนไม่ใส่ กล่องจะกระโดดไปชิดซ้ายระหว่างวิ่ง */
+@keyframes result-pop {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px) scale(.94); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+.result.is-pop { animation: result-pop .4s cubic-bezier(.2,.85,.3,1) backwards; }
+@keyframes win-pop {
+  from { transform: scale(.55); opacity: 0; }
+  60%  { transform: scale(1.18); opacity: 1; }
+  to   { transform: none; opacity: 1; }
+}
+/* ยอดเงินที่ได้เด้งตามมาทีหลังไพ่นิดหนึ่ง จะได้อ่านทันว่าใครได้เท่าไหร่ */
+.result.is-pop .row b { display: inline-block; animation: win-pop .5s .2s cubic-bezier(.2,.85,.3,1) backwards; }
+@keyframes pot-bump {
+  from { transform: scale(1); }
+  45%  { transform: scale(1.16); }
+  to   { transform: scale(1); }
+}
+.pot.is-bump { animation: pot-bump .32s ease-out; }
 .board { display: flex; gap: 5px; justify-content: center; }
 /* ไพ่กลางต้องแคบพอที่จะไม่ชนที่นั่งซ้าย/ขวา (อยู่ที่ 11% กับ 89% ของโต๊ะ)
    มุมไพ่ใบแรกกับใบที่ห้าคือที่พิมพ์เลขหน้าไพ่ไว้ ถ้าโดนทับก็อ่านไม่ออก
@@ -345,6 +409,17 @@ button { font-family: inherit; }
 .act--call  { background: #1d4030; border-color: #2f6a4a; }
 .act--raise { background: var(--gold); border-color: var(--gold); color: #06170f; }
 .act small { display: block; font-family: var(--mono); font-size: .72rem; font-weight: 500; opacity: .85; }
+/* ⚠️ ปุ่มที่กดไม่ได้ ห้ามหรี่ทั้งปุ่มด้วย opacity
+   ปุ่มทอง (.act--raise) เป็นตัวหนังสือสีเกือบดำบนพื้นทอง พอหรี่ทั้งก้อนเหลือ 32%
+   พื้นกับตัวหนังสือจางเข้าหาพื้นหลังพอๆ กัน contrast เหลือ 1.9:1 (อ่านออกต้องได้ 4.5:1)
+   ที่เจอจริงตอนเล่น: จบมือแล้วปุ่ม "มือต่อไป" กลายเป็นแผ่นเปล่า มองไม่เห็นทั้งชื่อปุ่ม
+   และไม่เห็นบรรทัดบอกเหตุผล คนเล่นจึงไม่รู้ว่าต้องเติมชิปก่อน = จบมือแล้วเล่นต่อไม่ได้
+   จึงให้ปุ่มที่กดไม่ได้มีชุดสีของตัวเอง ที่ยังอ่านออกทั้งชื่อปุ่มและเหตุผล */
+.act[disabled] {
+  opacity: 1; cursor: not-allowed;
+  background: #16301f; border-color: #2b4b37; color: #a9c8b6;
+}
+.act[disabled] small { opacity: 1; color: #93b3a0; }
 
 /* แผงใส่จำนวนเงิน: วงกลม -/+ กับแป้นตัวเลข ใช้นิ้วง่ายกว่าแถบเลื่อน */
 .bet-sheet {
@@ -445,7 +520,11 @@ button { font-family: inherit; }
 .result .row b { font-family: var(--mono); color: var(--good); }
 .result .hand-lbl { color: var(--muted); font-size: .78rem; }
 
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* ต้องปิด animation ด้วย ไม่ใช่แค่ transition
+   ไม่งั้นไพ่ยังวิ่งอยู่ ทั้งที่เครื่องตั้งไว้ว่าขอให้ลดการเคลื่อนไหว */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
@@ -523,6 +602,7 @@ button { font-family: inherit; }
       <div class="blinds" id="t-blinds">10 / 20</div>
       <div class="hand" id="t-hand">ห้อง —</div>
     </div>
+    <button type="button" class="topbtn" id="btn-table">โต๊ะ · เงิน</button>
     <div style="text-align:right">
       <div class="hand" id="t-me">—</div>
       <div class="blinds" id="t-left" style="font-size:.78rem"></div>
@@ -538,6 +618,7 @@ button { font-family: inherit; }
     </div>
     <div class="result" id="t-result"></div>
     <div class="result" id="t-standings"></div>
+    <div class="result" id="t-table"></div>
   </div>
 
   <div class="log" id="t-log"></div>
@@ -890,6 +971,12 @@ button { font-family: inherit; }
     try { if (ws) ws.close(); } catch (e) {}
   });
 
+  /* เปิด/ปิดแผงสรุปโต๊ะ */
+  $("btn-table").addEventListener("click", function () {
+    tablePanelOn = !tablePanelOn;
+    paintTablePanel();
+  });
+
   $("btn-leave").addEventListener("click", function (e) {
     if (view && view.phase !== "waiting" && view.phase !== "showdown") {
       if (!confirm("ยังเล่นมือนี้อยู่ ออกตอนนี้จะถือว่าหมอบและเสียเงินในกอง ออกเลยไหม")) {
@@ -1024,10 +1111,11 @@ button { font-family: inherit; }
 
   function paintHole() {
     var host = $("t-hole");
-    host.innerHTML = "";
-    if (!view || mySeat < 0) return;
+    if (!view || mySeat < 0) { host.innerHTML = ""; lastHoleSig = ""; return; }
     var me = view.seats[mySeat];
     if (!me || !me.cards.length) {
+      host.innerHTML = "";
+      lastHoleSig = "";
       $("hand-hint").textContent = view.phase === "waiting"
         ? "รอเริ่มมือใหม่" : "รอบนี้คุณไม่ได้ร่วมมือ";
       knob.disabled = true;
@@ -1038,8 +1126,26 @@ button { font-family: inherit; }
 
     /* ตอนเปิดไพ่แล้ว ไม่ต้องกดค้างอีก ทุกคนเห็นหมดแล้ว */
     var reveal = peeking || (view.lastResult && view.lastResult.showdown);
-    me.cards.forEach(function (c) {
-      host.appendChild(window.Cards.make(reveal ? c : "??", "lg"));
+    /* ⚠️ ห้ามวาดไพ่ใหม่ทุกครั้งที่ state เข้ามา
+       ตอนเริ่มมือ เซิร์ฟเวอร์ยิง state ติดกันหลายรอบ (แจกไพ่ · ลงบอด · ถึงตาใคร)
+       ถ้าวาดใหม่ทุกรอบ แอนิเมชันที่เพิ่งเริ่มจะถูกลบทิ้งกลางคัน = ไม่เห็นอะไรเลย
+       จึงวาดใหม่เฉพาะตอนเนื้อหาเปลี่ยนจริง แล้ววิ่งเฉพาะตอนขึ้นมือใหม่ */
+    var sig = view.handNo + "|" + (reveal ? "open" : "back") + "|" + me.cards.join(",");
+    if (sig === lastHoleSig) return;
+    var freshHole = view.handNo !== lastHoleHand;
+    lastHoleSig = sig;
+    lastHoleHand = view.handNo;
+    host.innerHTML = "";
+    me.cards.forEach(function (c, i) {
+      var el = window.Cards.make(reveal ? c : "??", "lg");
+      if (freshHole) {
+        el.classList.add("is-dealt");
+        el.style.animationDelay = (i * 110) + "ms";
+      } else if (justRevealed && reveal) {
+        el.classList.add("is-flip");
+        el.style.animationDelay = (i * 120) + "ms";
+      }
+      host.appendChild(el);
     });
   }
 
@@ -1064,8 +1170,18 @@ button { font-family: inherit; }
     return out;
   }
 
+  /* จำสภาพรอบก่อน ใช้ตัดสินว่า "ใบไหนเพิ่งลงมาใหม่" จะได้วิ่งเฉพาะใบนั้น */
+  var lastBoardLen = 0, lastBoardHand = -1, lastHoleHand = -1, lastPot = 0;
+  var lastBoardSig = "", lastHoleSig = "", lastRevealHand = -1, justRevealed = false;
+
   function render() {
     if (!view) return;
+
+    /* เพิ่งเปิดไพ่ในมือนี้หรือเปล่า ใช้สั่งให้พลิกไพ่ครั้งเดียว
+       ตั้งไว้ตรงนี้ก่อน paint ทุกตัว แล้วล้างทิ้งท้าย render */
+    justRevealed = !!(view.lastResult && view.lastResult.showdown) &&
+                   view.handNo !== lastRevealHand;
+    if (justRevealed) lastRevealHand = view.handNo;
 
     $("t-blinds").textContent = view.blinds.sb + " / " + view.blinds.bb;
     var me = view.seats[mySeat];
@@ -1076,21 +1192,49 @@ button { font-family: inherit; }
       turn: "เทิร์น", river: "ริเวอร์", showdown: "เปิดไพ่"
     };
     $("t-phase").textContent = PHASE[view.phase] || "";
-    $("t-pot").textContent = "กองกลาง " + view.pot.toLocaleString("th-TH");
+    var potEl = $("t-pot");
+    potEl.textContent = "กองกลาง " + view.pot.toLocaleString("th-TH");
+    /* กองโตขึ้น = มีคนลงเงิน ให้ตัวเลขเด้งบอกหน่อย จะได้รู้สึกว่ามีอะไรเกิดขึ้น */
+    if (view.pot > lastPot) {
+      potEl.classList.remove("is-bump");
+      void potEl.offsetWidth;   /* บังคับให้คิดใหม่ ไม่งั้นแอนิเมชันไม่เริ่มรอบสอง */
+      potEl.classList.add("is-bump");
+    }
+    lastPot = view.pot;
     $("t-hand").textContent = "ห้อง " + roomCode + (view.handNo ? " · มือที่ " + view.handNo : "");
     $("t-log").textContent = (view.log && view.log.length) ? view.log[view.log.length - 1] : "";
 
-    /* ไพ่กลาง 5 ช่อง */
+    /* ไพ่กลาง 5 ช่อง — ใบที่เพิ่งเปิดใหม่เท่านั้นที่วิ่งลงมา
+       ขึ้นมือใหม่ให้ถือว่าใหม่ทั้งแถว (ฟลอปลงพร้อมกัน 3 ใบ) */
     var board = $("t-board");
-    board.innerHTML = "";
-    for (var i = 0; i < 5; i++) {
-      board.appendChild(view.board[i]
-        ? window.Cards.make(view.board[i], "md")
-        : window.Cards.slot("md"));
+    var bsig = view.handNo + "|" + view.board.join(",");
+    if (bsig !== lastBoardSig) {
+      var freshFrom = (view.handNo !== lastBoardHand) ? 0 : lastBoardLen;
+      lastBoardSig = bsig;
+      lastBoardLen = view.board.length;
+      lastBoardHand = view.handNo;
+      board.innerHTML = "";
+      for (var i = 0; i < 5; i++) {
+        var cel;
+        if (view.board[i]) {
+          cel = window.Cards.make(view.board[i], "md");
+          if (i >= freshFrom) {
+            cel.classList.add("is-dealt");
+            cel.style.animationDelay = ((i - freshFrom) * 90) + "ms";
+          }
+        } else {
+          cel = window.Cards.slot("md");
+        }
+        board.appendChild(cel);
+      }
     }
 
-    /* ถ้าไม่ใช่ตาเราแล้ว ปิดแผงใส่เงินทิ้ง */
-    if (view.current !== mySeat) $("bet-sheet").classList.remove("is-on");
+    /* ปิดแผงใส่เงินอัตโนมัติ เฉพาะตอนที่มันเป็นแผง "เดิมพัน" และตาเราผ่านไปแล้ว
+       ⚠️ ห้ามปิดแผง "เติมชิป" (betOnConfirm ไม่ว่าง)
+       ตอนจบมือ view.current ไม่ใช่เราอยู่แล้วเสมอ ถ้าปิดด้วยเงื่อนไขเดียวกัน
+       แผงเติมชิปจะถูกปิดทิ้งทุกครั้งที่ state เข้ามา คนที่ชิปหมดกดยืนยันไม่ทัน
+       จึงเติมชิปไม่สำเร็จสักที และโต๊ะก็ไม่มีวันครบ 2 คนที่มีชิป = จบมือแล้วเล่นต่อไม่ได้ */
+    if (!betOnConfirm && view.current !== mySeat) $("bet-sheet").classList.remove("is-on");
 
     paintLimit();
     paintSeats();
@@ -1098,6 +1242,100 @@ button { font-family: inherit; }
     paintActions();
     paintResult();
     paintStandings();
+    paintTablePanel();
+    justRevealed = false;
+  }
+
+  /* ---------- แผงสรุปโต๊ะ: ใครนั่งตรงไหน ซื้อเข้าเท่าไหร่ ตอนนี้ได้เสียเท่าไหร่ ----------
+     รวมสองเรื่องไว้แผงเดียว เพราะมันคือคำถามเดียวกันของคนเล่นตอนมองไปรอบโต๊ะ
+     และช่องว่างในตารางนี้ก็เป็นปุ่มย้ายไปนั่งได้เลย ไม่ต้องมีหน้าจอแยกอีกอัน */
+  var tablePanelOn = false;
+
+  function paintTablePanel() {
+    var box = $("t-table");
+    if (!tablePanelOn || !view) { box.classList.remove("is-on"); box.innerHTML = ""; return; }
+    box.innerHTML = "";
+
+    var h = document.createElement("h3");
+    h.textContent = "โต๊ะ · เงิน";
+    box.appendChild(h);
+
+    var head = document.createElement("div");
+    head.className = "mhead";
+    head.innerHTML = "<span>ที่นั่ง</span><span>ซื้อเข้า → ชิปตอนนี้</span><span>ได้ / เสีย</span>";
+    box.appendChild(head);
+
+    var rows = document.createElement("div");
+    rows.className = "rows";
+    /* ย้ายที่นั่งกลางมือไม่ได้ ลำดับการเดินตาผูกกับเลขช่อง */
+    var canMove = view.phase === "waiting" || view.phase === "showdown";
+    var totalBuy = 0, totalStacks = 0;
+
+    for (var i = 0; i < view.seats.length; i++) {
+      (function (idx) {
+        var st2 = view.seats[idx];
+        var row = document.createElement("div");
+        row.className = "mrow" + (st2 ? "" : " mrow--free");
+
+        var nm = document.createElement("span");
+        nm.className = "nm";
+        nm.textContent = (idx + 1) + " · " +
+          (st2 ? st2.name + (idx === mySeat ? " (คุณ)" : "") : "ว่าง");
+        row.appendChild(nm);
+
+        if (st2) {
+          totalBuy += st2.boughtIn;
+          totalStacks += st2.stack;
+          var mid = document.createElement("span");
+          mid.className = "num buy";
+          mid.textContent = st2.boughtIn.toLocaleString("th-TH") + " → " +
+                            st2.stack.toLocaleString("th-TH");
+          row.appendChild(mid);
+
+          var net = document.createElement("b");
+          net.className = "num";
+          net.textContent = (st2.net >= 0 ? "+" : "") + st2.net.toLocaleString("th-TH");
+          net.style.color = st2.net > 0 ? "var(--good)"
+                          : (st2.net < 0 ? "#ff8f84" : "var(--muted)");
+          row.appendChild(net);
+        } else {
+          row.appendChild(document.createElement("span"));
+          var mv = document.createElement("button");
+          mv.type = "button";
+          mv.className = "mseat";
+          mv.textContent = "มานั่งตรงนี้";
+          mv.disabled = !canMove || idx === mySeat;
+          mv.addEventListener("click", function () {
+            send({ type: "moveseat", seatId: idx });
+            tablePanelOn = false;
+            paintTablePanel();
+          });
+          row.appendChild(mv);
+        }
+        rows.appendChild(row);
+      })(i);
+    }
+    box.appendChild(rows);
+
+    var foot = document.createElement("div");
+    foot.className = "foot";
+    var sum = document.createElement("p");
+    sum.className = "hint-sm";
+    sum.style.margin = "0 0 8px";
+    /* ชิปที่ลงกองไปแล้วยังเป็นของโต๊ะ ต้องนับรวม ไม่งั้นกลางมือยอดจะดูเหมือนหาย */
+    sum.textContent = "ซื้อเข้ารวม " + totalBuy.toLocaleString("th-TH") +
+                      " · ชิปบนโต๊ะรวม " + (totalStacks + view.pot).toLocaleString("th-TH") +
+                      (canMove ? "" : " · ย้ายที่นั่งได้ตอนจบมือ");
+    foot.appendChild(sum);
+    var close = document.createElement("button");
+    close.type = "button";
+    close.className = "btn-main";
+    close.textContent = "ปิด";
+    close.addEventListener("click", function () { tablePanelOn = false; paintTablePanel(); });
+    foot.appendChild(close);
+    box.appendChild(foot);
+
+    box.classList.add("is-on");
   }
 
   function paintSeats() {
@@ -1124,13 +1362,18 @@ button { font-family: inherit; }
       var cards = document.createElement("div");
       cards.className = "seat__cards";
       if (s.cards.length && !s.folded) {
-        s.cards.forEach(function (c) {
-          /* ไพ่ตัวเองบนโต๊ะยังคว่ำไว้ ดูได้จากแถบล่างเท่านั้น */
+        s.cards.forEach(function (c, ci) {
           /* ไพ่ตัวเองบนโต๊ะคว่ำตลอด ดูได้จากแถบล่างที่บังมือเท่านั้น
              ถ้าผูกกับ peeking ไพ่จะค้างหงายกลางจอหลังปล่อยปุ่ม */
           var faceUp = (view.lastResult && view.lastResult.showdown && !s.folded);
-          cards.appendChild(window.Cards.make(
-            (seatId === mySeat && !faceUp) ? "??" : (faceUp ? c : "??"), "sm"));
+          var cel = window.Cards.make(
+            (seatId === mySeat && !faceUp) ? "??" : (faceUp ? c : "??"), "sm");
+          /* ไพ่รอบโต๊ะพลิกไล่กันไป ทีละที่นั่ง ทีละใบ ให้เห็นว่าใครถืออะไร */
+          if (justRevealed && faceUp) {
+            cel.classList.add("is-flip");
+            cel.style.animationDelay = (seatId * 70 + ci * 110) + "ms";
+          }
+          cards.appendChild(cel);
         });
       }
       el.appendChild(cards);
@@ -1197,11 +1440,22 @@ button { font-family: inherit; }
 
     /* ยังไม่เริ่มมือ หรือมือเพิ่งจบ */
     if (view.phase === "waiting" || view.phase === "showdown") {
+      /* เหตุผลที่กดไม่ได้ต้องตรงกับความจริง
+         ของเดิมขึ้น "ต้องมีอย่างน้อย 2 คน" ทุกกรณี ทั้งที่ปกติคนครบอยู่แล้ว
+         แค่มีคนชิปหมด คนเล่นจึงงงว่าทำไมจบมือแล้วเล่นต่อไม่ได้ */
+      var alive = view.seats.filter(function (s) { return s && s.connected && !s.sitOut; });
+      var broke = alive.filter(function (s) { return s.stack <= 0; });
+      var why = null;
+      if (view.limit && view.limit.over) why = "รอบเล่นนี้จบแล้ว";
+      else if (view.readyCount < 2) {
+        if (alive.length < 2) why = "ต้องมีอย่างน้อย 2 คน";
+        else if (me.stack <= 0) why = "ชิปคุณหมด กดเติมชิปก่อน";
+        else why = "รอ " + broke.map(function (s) { return s.name; }).join(" · ") + " เติมชิป";
+      }
       var start = mkBtn("act act--raise",
-        view.phase === "showdown" ? "มือต่อไป" : "เริ่มเล่น",
-        view.readyCount >= 2 ? null : "ต้องมีอย่างน้อย 2 คน",
+        view.phase === "showdown" ? "มือต่อไป" : "เริ่มเล่น", why,
         function () { send({ type: "start" }); });
-      start.disabled = view.readyCount < 2 || (view.limit && view.limit.over);
+      start.disabled = !!why;
       row.appendChild(start);
 
       /* ชิปน้อยกว่า 10 บิ๊กบลายด์ ก็ควรเติมได้แล้ว ไม่ต้องรอให้หมดเกลี้ยง */
@@ -1510,8 +1764,13 @@ button { font-family: inherit; }
     var r = view.lastResult;
     /* จบรอบเล่นแล้วให้โชว์แค่สรุปรวม ไม่งั้นสองกล่องซ้อนกันอ่านไม่ออก */
     if (!r || view.phase !== "showdown" || (view.limit && view.limit.over)) {
-      box.classList.remove("is-on"); return;
+      box.classList.remove("is-on"); box.classList.remove("is-pop"); return;
     }
+
+    /* กล่องผลเด้งขึ้นมาครั้งเดียวตอนเปิดไพ่ ไม่ใช่ทุกครั้งที่วาดใหม่
+       ไม่งั้นมันจะกระตุกซ้ำทุกครั้งที่มีคนกดอะไรสักอย่าง */
+    if (justRevealed) box.classList.add("is-pop");
+    else if (view.handNo !== lastRevealHand) box.classList.remove("is-pop");
 
     box.innerHTML = "";
     var h = document.createElement("h3");

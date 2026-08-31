@@ -296,6 +296,20 @@ server.on("upgrade", (req, socket) => {
 
     if (!client.room) return;
 
+    /* ย้ายที่นั่งบนโต๊ะเดิม ต้องทำที่ชั้นนี้ ไม่ใช่ใน table.action
+       เพราะเลขที่นั่งของ client เก็บอยู่ตรงนี้ ถ้าโต๊ะย้ายแต่ client ยังถือเลขเดิม
+       คนคนนั้นจะสั่งการแทนช่องเก่า และเห็นไพ่ในมือของคนที่มานั่งช่องนั้นทีหลัง */
+    if (msg.type === "moveseat") {
+      const room = client.room;
+      const r = room.table.moveSeat(client.seatId, msg.seatId);
+      if (r.error) { send(client, { type: "error", message: r.error }); return; }
+      client.seatId = r.seatId;
+      send(client, { type: "joined", seatId: r.seatId, room: room.code });
+      broadcastState(room);
+      pushLobby();
+      return;
+    }
+
     /* ลุกจากโต๊ะเอง ต้องปล่อยที่นั่งจริง ไม่ใช่ทิ้งให้ค้างเหมือนเน็ตหลุด
        ไม่งั้นคนที่เหลือจะรอตาของคนที่เดินออกไปแล้วตลอดกาล */
     if (msg.type === "leave") {

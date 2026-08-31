@@ -156,6 +156,31 @@ export function createTable(opts = {}) {
     return { ok: true, seatId: idx, name: finalName, stack: chips };
   }
 
+  /* ย้ายไปนั่งช่องว่างอื่นบนโต๊ะเดิม ชิปและตัวตนติดตัวไปด้วย
+     ห้ามย้ายระหว่างเล่นมือ เพราะลำดับการเดินตาผูกกับเลขช่อง ย้ายกลางมือแล้วตาจะข้ามหรือวน
+     และห้ามย้ายไปทับช่องที่มีคนจองอยู่ แม้เจ้าของช่องจะหลุดไปแล้ว
+     ที่นั่งของคนที่หลุดยังถือชิปเขาอยู่ ใครย้ายไปทับได้ = ชิปเพื่อนหาย */
+  function moveSeat(seatId, target) {
+    const s = st.seats[seatId];
+    if (!s) return { error: "ไม่ได้นั่งอยู่ที่โต๊ะนี้" };
+    if (st.phase !== "waiting" && st.phase !== "showdown") {
+      return { error: "ย้ายที่นั่งระหว่างเล่นมือไม่ได้ รอมือนี้จบก่อน" };
+    }
+    const t = Math.floor(Number(target));
+    if (!(t >= 0 && t < MAX_SEATS)) return { error: "ไม่มีช่องนั้น" };
+    if (t === seatId) return { error: "นั่งช่องนี้อยู่แล้ว" };
+    if (st.seats[t]) return { error: "ช่องนั้นมีคนอยู่แล้ว" };
+
+    st.seats[t] = s;
+    st.seats[seatId] = null;
+    /* สิทธิ์เจ้าภาพผูกกับคน ไม่ใช่ช่อง ต้องย้ายตามไปด้วย ไม่งั้นเจ้าภาพเสียสิทธิ์ตั้งค่าโต๊ะ */
+    if (st.hostSeat === seatId) st.hostSeat = t;
+    /* ปุ่มดีลเลอร์เป็น "ตำแหน่งบนโต๊ะ" ไม่ใช่ของใครคนหนึ่ง จึงไม่ย้ายตาม
+       startHand เดินปุ่มไปช่องที่มีคนเล่นอยู่แล้ว ช่องว่างถูกข้ามเอง */
+    note(s.name + " ย้ายไปนั่งช่อง " + (t + 1));
+    return { ok: true, seatId: t };
+  }
+
   /* ลุกจากโต๊ะเอง ต่างจากหลุด: ปล่อยที่นั่งทันที ไม่ต้องรอหมดเวลา
      ถ้ายังอยู่ในมือ ให้ถือว่าหมอบก่อน เงินที่ลงไปแล้วอยู่ในกองตามกติกา */
   function leave(seatId) {
@@ -713,5 +738,5 @@ export function createTable(opts = {}) {
     };
   }
 
-  return { sit, leave, disconnect, action, viewFor, openSeats, anyConnected, summary, _state: st, _cfg: cfg };
+  return { sit, moveSeat, leave, disconnect, action, viewFor, openSeats, anyConnected, summary, _state: st, _cfg: cfg };
 }

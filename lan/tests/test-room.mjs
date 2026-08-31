@@ -191,5 +191,40 @@ head("ลุกกลางมือ เงินในโต๊ะต้อง�
      { onTable: onTable(), cashedOut, รวม: onTable() + cashedOut, ควรเป็น: boughtIn });
 }
 
+/* --------------------------------------------------------------- */
+head("ย้ายที่นั่งบนโต๊ะเดิม");
+{
+  const t = createTable({ smallBlind: 10, bigBlind: 20, minBuyIn: 1, maxBuyIn: 100000 });
+  const a = t.sit("เอ", 0, 1000, "tokA");
+  const b = t.sit("บี", 1, 500, "tokB");
+  const st = t._state;
+
+  /* ช่องที่มีคนอยู่ ห้ามย้ายไปทับ ไม่งั้นชิปของเจ้าของช่องหายทั้งก้อน */
+  ok(!!t.moveSeat(a.seatId, b.seatId).error, "ย้ายไปทับช่องที่มีคนอยู่ไม่ได้");
+
+  /* ย้ายไปช่องว่างได้ ชิปกับชื่อต้องติดตัวไปครบ */
+  const before = st.seats[a.seatId].stack;
+  const r = t.moveSeat(a.seatId, 5);
+  ok(r.ok && r.seatId === 5, "ย้ายไปช่องว่างได้", r);
+  ok(st.seats[0] === null, "ช่องเดิมต้องว่าง", st.seats[0]);
+  ok(st.seats[5] && st.seats[5].name === "เอ" && st.seats[5].stack === before,
+     "ชื่อกับชิปย้ายตามไปครบ", st.seats[5] && { name: st.seats[5].name, stack: st.seats[5].stack });
+
+  /* สิทธิ์เจ้าภาพผูกกับคน ไม่ใช่ช่อง เอานั่งคนแรกจึงต้องยังเป็นเจ้าภาพหลังย้าย */
+  ok(st.hostSeat === 5, "สิทธิ์เจ้าภาพย้ายตามคนไปด้วย", st.hostSeat);
+  ok(!t.action(5, { type: "config", smallBlind: 25, bigBlind: 50 }).error &&
+     t._cfg.smallBlind === 25, "ย้ายแล้วยังตั้งค่าโต๊ะได้", t._cfg.smallBlind);
+
+  /* ระหว่างเล่นมือห้ามย้าย ลำดับการเดินตาผูกกับเลขช่อง */
+  t.action(5, { type: "start" });
+  ok(st.phase !== "waiting" && st.phase !== "showdown", "มือเริ่มแล้ว", st.phase);
+  ok(!!t.moveSeat(5, 8).error, "ย้ายที่นั่งระหว่างเล่นมือไม่ได้");
+  ok(st.seats[5] !== null && st.seats[8] === null, "ที่นั่งต้องไม่ขยับระหว่างมือ");
+
+  /* เงินรวมบนโต๊ะต้องไม่เปลี่ยนเพราะการย้ายที่นั่ง */
+  const total = st.seats.reduce((n, x) => n + (x ? x.stack + x.committed : 0), 0);
+  ok(total === 1500, "ย้ายที่นั่งแล้วชิปรวมบนโต๊ะเท่าเดิม", total);
+}
+
 console.log(fail === 0 ? "\n=== ผ่านทั้งหมด ===" : "\n=== พัง " + fail + " ข้อ ===");
 process.exit(fail ? 1 : 0);
