@@ -144,3 +144,72 @@ const balanced = (t, where) => {
 }
 
 console.log("test-audit-fixes: ผ่านหมด");
+
+/* ---------- ย้ายที่นั่งแล้ว seatId ต้องตามไปด้วย ----------
+   finishHand จ่ายเงินโดยอ้าง s.seatId ถ้าไม่ตรงกับตำแหน่งจริง
+   เงินจะไปที่ช่องเดิม ซึ่งว่าง (เงินหาย) หรือเป็นของคนอื่น (จ่ายผิดคน) */
+{
+  const t = createTable("MOVE");
+  t.sit("A", null, 1000, "ta");
+  t.sit("B", null, 1000, "tb");
+  assert.equal(seat(t, 0).seatId, 0);
+  assert.ok(!t.moveSeat(0, 5).error, "ย้ายไปช่องว่างได้");
+  assert.equal(t._state.seats[5].seatId, 5, "seatId ต้องเป็นเลขช่องใหม่ ไม่ใช่ช่องเดิม");
+  assert.equal(t._state.seats[0], null);
+
+  /* เล่นให้จบหนึ่งมือ แล้วยอดต้องยังตรง */
+  const before = ledger(t);
+  t.action(5, { type: "start" });
+  let g = 0;
+  while (t._state.phase !== "showdown" && t._state.current >= 0 && g++ < 30) {
+    const cur = t._state.current;
+    t.action(cur, { type: "act", action: t.viewFor(cur).toCall > 0 ? "call" : "check" });
+  }
+  balanced(t, "จบมือหลังย้ายที่นั่ง");
+  assert.equal(ledger(t).bought, before.bought, "ยอดซื้อเข้าต้องไม่เปลี่ยน");
+}
+
+/* ---------- กลับเข้ามาด้วยเครื่องเดิมระหว่างรอเก็บที่นั่ง ต้องไม่โดนเก็บ ---------- */
+{
+  const t = createTable("REJOIN");
+  t.sit("A", null, 1000, "ta");
+  t.sit("B", null, 1000, "tb");
+  t.sit("C", null, 1000, "tc");
+  t.action(0, { type: "start" });
+  const who = t._state.current;
+  t.action(who, { type: "act", action: "raise", amount: 300 });
+  const tok = seat(t, who).token;
+  t.leave(who);
+  assert.ok(t._state.seats[who], "ยังอยู่ในมือ ที่นั่งต้องถูกคาไว้");
+  assert.equal(seat(t, who).leaving, true);
+
+  const back = t.sit("A-again", null, 1000, tok);
+  assert.equal(back.ok, true, "กลับเข้ามาด้วย token เดิมได้");
+  assert.equal(seat(t, who).leaving, false, "ธงกำลังจะลุกต้องถูกยกเลิก");
+
+  let g2 = 0;
+  while (t._state.phase !== "showdown" && t._state.current >= 0 && g2++ < 30) {
+    const cur = t._state.current;
+    t.action(cur, { type: "act", action: t.viewFor(cur).toCall > 0 ? "call" : "check" });
+  }
+  assert.ok(t._state.seats[who], "จบมือแล้วต้องยังนั่งอยู่ ไม่ใช่ถูกเก็บที่นั่งไป");
+  balanced(t, "กลับเข้ามาแล้วเล่นจบ");
+}
+
+/* ---------- โต๊ะไม่จำกัดเวลา ต้องมีเพดานสุดท้าย ไม่ค้างตลอดกาล ---------- */
+{
+  const t = createTable("NOCLOCK");
+  t.sit("A", null, 1000, "ta");
+  t.sit("B", null, 1000, "tb");
+  t.action(0, { type: "config", turnSeconds: 0 });
+  t.action(0, { type: "start" });
+  const stuckAt = t._state.current;
+  assert.ok(stuckAt >= 0, "มีคนถึงตา");
+  /* ยังไม่ถึงเพดาน ต้องไม่เดินแทน */
+  assert.equal(t.tick(Date.now() + 60000), false, "หนึ่งนาที ยังไม่ควรเดินแทน");
+  /* เกินเพดาน 3 นาที ต้องเดินแทนให้ ไม่งั้นโต๊ะค้างถาวร */
+  assert.equal(t.tick(Date.now() + 200000), true, "เกินเพดานแล้วต้องเดินแทน");
+  assert.notEqual(t._state.current, stuckAt, "ต้องเดินตาต่อไปแล้ว");
+}
+
+console.log("test-audit-fixes (รอบสอง): ผ่านหมด");

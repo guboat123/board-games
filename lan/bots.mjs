@@ -21,6 +21,59 @@ import * as bank from "./bot-bank.mjs";
    ("Ace ชนะด้วย High Card A" — Ace ตัวไหนคือคน ตัวไหนคือไพ่)
    ห้ามใช้: Ace / King / Queen / Jack / Joker / Flush / Straight / Chip / Pot / Raise
    และห้ามซ้ำกันข้ามระดับ เพราะกระเป๋าเงินผูกกับชื่ออย่างเดียว */
+/* ---------- นิสัยประจำตัวของบอทแต่ละตัว ----------
+   ⚠️ ระดับบอกว่า "คิดยังไง" (มือใหม่ดูว่ามีอะไรไหม · นักพนันไล่ลุ้น · มืออาชีพคิดจากราคา)
+   ส่วนตารางนี้บอกว่า "เป็นคนแบบไหน" ซึ่งทำให้สองตัวในระดับเดียวกันไม่เหมือนกัน
+   ถ้าไม่มีตารางนี้ Rex กับ Duke จะเล่นเหมือนกันเป๊ะ แล้วการจำว่าใครเป็นใครก็ไม่มีความหมาย
+
+   nerve    ใจถึงแค่ไหน 0=ระวังตัวมาก 1=บ้าบิ่น — คุมทั้งเพดานการลงเงินและเกณฑ์ที่จะไล่
+   bluffy   บลัฟบ่อยแค่ไหน (คูณกับค่าประจำระดับ)
+   tilt     เสียแล้วเสียศูนย์แค่ไหน 0=นิ่งสนิท 1=เสียแล้วรวน — คูณกับความกลัวจากหนี้/การล้ม
+   patience อดทนรอไพ่ดีแค่ไหน 0=เล่นแทบทุกมือ 1=รอเฉพาะมือที่ดีจริง (มีผลก่อนฟลอป)
+   label    คำที่คนอ่านเข้าใจ ใช้โชว์ในตารางเงินบอท
+
+   ค่าตั้งใจให้กระจาย ไม่ใช่สุ่ม — จะได้มีทั้งตัวที่น่ากลัว ตัวที่ไล่ออกง่าย และตัวที่จับทางยาก */
+const TRAITS = {
+  /* --- มือใหม่ --- */
+  Milo:    { nerve: 0.30, bluffy: 0.4, tilt: 0.9, patience: 0.7, label: "ขี้กลัว" },
+  Pip:     { nerve: 0.45, bluffy: 0.8, tilt: 0.8, patience: 0.4, label: "อยากลอง" },
+  Toby:    { nerve: 0.25, bluffy: 0.2, tilt: 1.0, patience: 0.8, label: "ระวังตัวมาก" },
+  Bruno:   { nerve: 0.60, bluffy: 0.6, tilt: 0.7, patience: 0.3, label: "ใจถึง" },
+  Ozzy:    { nerve: 0.40, bluffy: 1.2, tilt: 0.9, patience: 0.5, label: "ชอบหลอก" },
+  Rudy:    { nerve: 0.35, bluffy: 0.3, tilt: 1.1, patience: 0.6, label: "เสียแล้วรวน" },
+  Gus:     { nerve: 0.55, bluffy: 0.5, tilt: 0.6, patience: 0.5, label: "เรื่อยๆ" },
+  Wally:   { nerve: 0.20, bluffy: 0.1, tilt: 0.8, patience: 0.9, label: "รอไพ่ดีอย่างเดียว" },
+  Bobby:   { nerve: 0.50, bluffy: 0.7, tilt: 0.9, patience: 0.4, label: "ใจร้อน" },
+  Sammy:   { nerve: 0.38, bluffy: 0.4, tilt: 0.7, patience: 0.6, label: "ธรรมดา" },
+
+  /* --- นักพนัน --- */
+  Vince:   { nerve: 0.85, bluffy: 1.3, tilt: 0.9, patience: 0.2, label: "ลุยไม่คิด" },
+  Rocco:   { nerve: 0.75, bluffy: 0.9, tilt: 0.7, patience: 0.3, label: "ใจถึง" },
+  Gio:     { nerve: 0.60, bluffy: 1.5, tilt: 0.8, patience: 0.4, label: "หลอกเก่ง" },
+  Marco:   { nerve: 0.70, bluffy: 0.6, tilt: 1.0, patience: 0.3, label: "เสียแล้วไล่คืน" },
+  Sonny:   { nerve: 0.95, bluffy: 1.1, tilt: 0.6, patience: 0.1, label: "บ้าบิ่น" },
+  Rico:    { nerve: 0.55, bluffy: 0.8, tilt: 0.9, patience: 0.5, label: "พอประมาณ" },
+  Tank:    { nerve: 0.90, bluffy: 0.4, tilt: 0.5, patience: 0.2, label: "ดันอย่างเดียว" },
+  Buddy:   { nerve: 0.50, bluffy: 1.0, tilt: 1.1, patience: 0.4, label: "อารมณ์แปรปรวน" },
+  Lenny:   { nerve: 0.65, bluffy: 0.7, tilt: 0.8, patience: 0.35, label: "ชอบตาม" },
+  Frankie: { nerve: 0.80, bluffy: 1.2, tilt: 0.7, patience: 0.25, label: "กล้าได้กล้าเสีย" },
+
+  /* --- มืออาชีพ --- */
+  Rex:     { nerve: 0.70, bluffy: 1.2, tilt: 0.3, patience: 0.7, label: "ดุแต่คุมได้" },
+  Duke:    { nerve: 0.40, bluffy: 0.5, tilt: 0.2, patience: 0.9, label: "ตึงมาก" },
+  Vega:    { nerve: 0.60, bluffy: 1.4, tilt: 0.4, patience: 0.6, label: "บลัฟเป็นจังหวะ" },
+  Otto:    { nerve: 0.50, bluffy: 0.7, tilt: 0.2, patience: 0.8, label: "นิ่ง" },
+  Zed:     { nerve: 0.80, bluffy: 1.1, tilt: 0.4, patience: 0.5, label: "กดดันตลอด" },
+  Kai:     { nerve: 0.45, bluffy: 0.6, tilt: 0.3, patience: 0.85, label: "อดทน" },
+  Nico:    { nerve: 0.65, bluffy: 0.9, tilt: 0.35, patience: 0.65, label: "สมดุล" },
+  Sable:   { nerve: 0.55, bluffy: 1.5, tilt: 0.3, patience: 0.7, label: "จับทางยาก" },
+  Cole:    { nerve: 0.75, bluffy: 0.8, tilt: 0.25, patience: 0.6, label: "กล้าเมื่อคุ้ม" },
+  Ash:     { nerve: 0.35, bluffy: 0.4, tilt: 0.2, patience: 0.95, label: "รอจังหวะเดียว" }
+};
+
+const DEFAULT_TRAIT = { nerve: 0.5, bluffy: 1, tilt: 0.7, patience: 0.5, label: "ธรรมดา" };
+export function traitOf(name) { return TRAITS[name] || DEFAULT_TRAIT; }
+
 const ROSTER = {
   1: ["Milo", "Pip", "Toby", "Bruno", "Ozzy", "Rudy", "Gus", "Wally", "Bobby", "Sammy"],
   2: ["Vince", "Rocco", "Gio", "Marco", "Sonny", "Rico", "Tank", "Buddy", "Lenny", "Frankie"],
@@ -151,6 +204,41 @@ function drawStrength(hole, board) {
                  บลัฟมีจังหวะ ยิงต่อเนื่องเมื่อเป็นคนไล่ก่อนฟลอป ยอมทิ้งเร็วเมื่อราคาไม่คุ้ม
    =========================================================== */
 
+/* ---------- หน้าไพ่กลาง เปียกหรือแห้ง ----------
+   ⚠️ ต้องประเมินใหม่ทุกครั้งที่เปิดไพ่กลางเพิ่ม ไม่ใช่คิดครั้งเดียวตอนต้นมือ
+   บอร์ดที่มีดอกเดียวกันสามใบ หรือเรียงติดกัน = "เปียก" มีมือแรงๆ เป็นไปได้เยอะ
+   หนึ่งคู่บนบอร์ดแบบนั้นแทบไม่มีค่า และเดิมพันของคนอื่นก็น่าเชื่อน้อยลง (บลัฟง่าย)
+   บอร์ด "แห้ง" (ไพ่กระจาย ดอกต่างกัน) หนึ่งคู่ยังใช้ได้ และคนที่ดันมักมีของจริง
+   คืน 0 = แห้งสนิท · 1 = เปียกมาก */
+function boardWetness(board) {
+  if (!board || board.length < 3) return 0;
+  const cs = board.map(toNum).filter(x => x >= 0);
+  if (cs.length < 3) return 0;
+
+  let w = 0;
+  const suits = [0, 0, 0, 0];
+  cs.forEach(c => suits[c & 3]++);
+  const maxSuit = Math.max.apply(null, suits);
+  if (maxSuit >= 4) w += 0.55;
+  else if (maxSuit === 3) w += 0.35;
+
+  const ranks = cs.map(c => c >> 2).sort((a, b) => a - b);
+  let connect = 0;
+  for (let i = 1; i < ranks.length; i++) {
+    const gap = ranks[i] - ranks[i - 1];
+    if (gap === 0) continue;
+    if (gap <= 2) connect++;
+  }
+  w += Math.min(connect, 3) * 0.13;
+
+  /* บอร์ดมีคู่ = มีโอกาสเป็นตอง/ฟูลเฮาส์ ทำให้มือกลางๆ อันตรายขึ้น */
+  const counts = {};
+  ranks.forEach(r => { counts[r] = (counts[r] || 0) + 1; });
+  if (Object.keys(counts).some(k => counts[k] >= 2)) w += 0.12;
+
+  return Math.max(0, Math.min(1, w));
+}
+
 /* ---------- เพดานการลงเงินต่อหนึ่งท่า ----------
    ⚠️ นี่คือสิ่งที่ทำให้ "เงินรู้สึกเป็นเงินจริง" มากกว่าเกณฑ์ตัดสินใจทั้งหมดรวมกัน
    ของเดิมไม่มีเพดานเลย ขนาดเดิมพัน = เงินสูงสุดบนโต๊ะ + ขั้นต่ำ + สัดส่วนของกอง
@@ -160,14 +248,17 @@ function drawStrength(hole, board) {
 
    หลักคือ "ยิ่งมั่นใจยิ่งกล้าลงเยอะ" ไม่ใช่ลงเยอะตลอดเวลา
    และคนที่กระเป๋าบางต้องลงน้อยลงอีก เพราะเขามีน้อยจะเสีย */
-function commitCap(eq, walletPressure) {
+function commitCap(eq, walletPressure, nerve) {
   var base;
   if (eq >= 0.90) base = 1.00;       /* มือแทบชนะแน่ ลงได้หมด */
   else if (eq >= 0.80) base = 0.55;
   else if (eq >= 0.68) base = 0.32;
   else if (eq >= 0.52) base = 0.18;
   else base = 0.10;                  /* มือกลางๆ ห้ามเสี่ยงเกินหนึ่งในสิบของตัก */
-  return base * (1 - walletPressure * 0.45);
+  /* ใจถึงหรือระวังตัว มีผลตรงนี้มากที่สุด — คนใจถึงกล้าใส่เงินมากกว่าด้วยไพ่เท่ากัน
+     ช่วง 0.65 ถึง 1.35 เท่า พอให้รู้สึกต่าง แต่ไม่ถึงกับคนละเกม */
+  var byNerve = 0.65 + (nerve === undefined ? 0.5 : nerve) * 0.7;
+  return base * byNerve * (1 - walletPressure * 0.45);
 }
 
 /* คิดยอดเรซจริง โดยไม่ให้เกินทั้งเพดานเทียบกอง และเพดานเทียบตัก */
@@ -178,7 +269,7 @@ function raiseTo(f, eq, potMult) {
   /* เพดานเทียบกอง: เดิมพันเกินกองมากๆ ไม่มีเหตุผลรองรับ นอกจากมือแทบชนะแน่ */
   var potCeil = f.view.currentBet + Math.round(f.potNow * (eq >= 0.9 ? 2.5 : 1.3));
   /* เพดานเทียบตัก: ห้ามใส่เงินเข้าไปในมือนี้เกินสัดส่วนที่มั่นใจ */
-  var stackCeil = f.me.bet + Math.round(f.me.stack * commitCap(eq, f.walletPressure || 0));
+  var stackCeil = f.me.bet + Math.round(f.me.stack * commitCap(eq, f.walletPressure || 0, f.trait.nerve));
 
   var target = Math.min(want, Math.max(potCeil, minTarget), Math.max(stackCeil, minTarget));
   /* ต่ำกว่าขั้นต่ำไม่ได้ และเกินที่มีก็ไม่ได้ */
@@ -246,7 +337,11 @@ function decideGambler(f) {
 /* ---------- 3 มืออาชีพ ---------- */
 function decidePro(f) {
   const lv = f.lv;
-  const eq = Math.max(0, Math.min(1, f.base + f.draw + (f.bluffing ? 0.26 : 0) +
+  /* ⚠️ มือเดียวกันบนบอร์ดต่างกัน มีค่าไม่เท่ากัน
+     หนึ่งคู่บนบอร์ดสามดอกเดียวกัน แทบไม่มีค่า แต่บนบอร์ดแห้งยังใช้สู้ได้
+     ยิ่งมือกลางๆ ยิ่งโดนหักเยอะ ส่วนมือแรงจริง (ตองขึ้นไป) แทบไม่กระทบ */
+  const fragile = Math.max(0, 0.72 - f.base) * f.wet * 0.5;
+  const eq = Math.max(0, Math.min(1, f.base + f.draw - fragile + (f.bluffing ? 0.26 : 0) +
                                      (Math.random() - 0.5) * 0.08));
 
   /* ตำแหน่งมีผลจริง: ได้เดินท้ายแปลว่าเห็นคนอื่นตัดสินใจก่อน เล่นกว้างขึ้นได้
@@ -255,10 +350,16 @@ function decidePro(f) {
   const latePos = f.actsLast ? -0.03 : 0.02;
 
   /* ⚠️ อ่านคนเป็นคือสิ่งที่แยกมืออาชีพออกจากคนอื่นจริงๆ
-     ถ้าเดาว่าคู่แข่งแรงกว่ามือเรา ต้องใช้ไพ่ดีกว่าเดิมถึงจะสู้ — ไม่ใช่ดูแค่ราคาคุ้มไหม
-     เพดาน 0.12 เพื่อไม่ให้กลายเป็นหมอบทุกครั้งที่มีคนดัน (ซึ่งจะโดนบลัฟไล่ออกจากมือทุกที) */
+     ถ้าเดาว่าคู่แข่งแรงกว่ามือเรา ต้องใช้ไพ่ดีกว่าเดิมถึงจะสู้ — ไม่ใช่ดูแค่ราคาคุ้มไหม */
   const readGap = Math.min(Math.max(0, f.threat - eq), 0.4) * 0.30;
-  const margin = (f.pre ? lv.preMargin : lv.margin) + f.caution + latePos + readGap;
+
+  /* ⚠️ และต้องกล้าจับบลัฟด้วย ไม่ใช่กลัวทุกคนที่ดัน
+     ถ้าท่าที่เขาแสดงเชื่อถือได้ต่ำ (บลัฟเป็นนิสัย · ยิงต่ออัตโนมัติ · เดิมพันขั้วสุด · ตัวต่อตัว)
+     ให้ตามเบามือลง คนที่ไม่เคยจับบลัฟเลยจะถูกไล่ออกจากมือทุกครั้งที่ไม่ได้ไพ่ดี
+     ซึ่งแพ้ทางคนที่บลัฟเป็นแบบไม่มีทางสู้ */
+  const catchBluff = Math.max(0, 0.6 - f.threatCred) * 0.22;
+
+  const margin = (f.pre ? lv.preMargin : lv.margin) + f.caution + latePos + readGap - catchBluff;
   const raiseAt = f.pre ? lv.preRaise : lv.raise;
   const worthCalling = f.toCall === 0 || eq >= f.price + margin;
 
@@ -268,14 +369,40 @@ function decidePro(f) {
 
   const sized = (mult) => raiseTo(f, eq, mult);
 
-  if (canRaise) return sized(lv.sizing * (0.6 + Math.random() * 0.7));
+  /* ---------- สร้างกองเมื่อคิดว่าจะชนะ ----------
+     ⚠️ เดิมพันใหญ่ที่สุดเท่าที่ทำได้ ไม่ใช่การเล่นที่ดี มันไล่คนออกจากมือ
+     มือแรงต้องการ "คนตาม" ไม่ใช่ "คนหมอบ" — ได้กองเล็กที่มีคนตามสามสตรีท
+     ยังมากกว่าได้กองใหญ่ที่ไม่มีใครสู้
+     ขนาดจึงอิงว่า "เขาน่าจะตามแค่ไหน" ซึ่งก็คือค่าที่เราเดามือเขาไว้
+     เขาดูมีของ = เดิมพันใหญ่ได้ เขาดูไม่มีอะไร = ต้องเล็กลงไม่งั้นเขาทิ้ง
+     ยกเว้นริเวอร์ที่มือแทบชนะแน่ ตอนนั้นเขาลงมาเยอะแล้ว เดิมพันใหญ่ได้เต็มที่ */
+  const river = f.view.phase === "river";
+  function valueMult() {
+    if (eq >= 0.9 && river) return 0.9 + Math.random() * 0.5;
+    return 0.4 + f.threat * 0.65 + Math.random() * 0.15;
+  }
+
+  /* ⚠️ ลงเงินไปแล้วเกินครึ่งของที่มี แล้วยังได้ราคาดี = ทิ้งไม่ได้
+     คนจริงไม่หมอบทิ้งเงินครึ่งตักที่ลงไปแล้วเพราะไพ่ขาดไปนิดเดียว
+     ของเดิมคิดจาก "คุ้มไหมถ้าเริ่มนับใหม่ตอนนี้" ซึ่งถูกในทางทฤษฎี
+     แต่ทำให้บอทหมอบในจังหวะที่ไม่มีคนไหนหมอบ = ดูไม่เหมือนคน */
+  const potCommitted = f.me.bet + (f.me.stack > 0 ? 0 : 0) >= 0 &&
+                       f.toCall > 0 && f.toCall <= f.me.stack &&
+                       f.me.bet >= f.me.stack * 0.9 && f.price < 0.45;
+
+  if (canRaise && !f.plan.trap) {
+    return sized(eq >= 0.72 ? valueMult() : lv.sizing * (0.6 + Math.random() * 0.7));
+  }
   if (f.toCall === 0) {
+    /* แกล้งอ่อนด้วยมือแรงมาก: เคาะผ่านเพื่อให้คนอื่นกล้าเดิมพัน แล้วค่อยเก็บทีหลัง */
+    if (f.plan.trap) return { type: "act", action: "check" };
     if ((eq >= lv.bet || f.cbet) && f.me.stack > f.view.blinds.bb) {
-      return sized(lv.sizing * (0.5 + Math.random() * 0.6));
+      return sized(eq >= 0.72 ? valueMult() : lv.sizing * (0.5 + Math.random() * 0.6));
     }
     return { type: "act", action: "check" };
   }
-  if (worthCalling) return { type: "act", action: "call" };
+  if (worthCalling || potCommitted) return { type: "act", action: "call" };
+  /* บลัฟแล้วโดนสู้กลับ ต้องรู้จักเลิก ไม่ใช่ยิงต่อจนหมดตัว */
   return { type: "act", action: "fold" };
 }
 
@@ -299,6 +426,45 @@ export function createBotManager(room, broadcast) {
   const reads = {};         /* ชื่อ -> { n, strong, weak } */
   let lastSeenHand = -1;
   let showOffHand = -1;     /* ตัดสินใจขิงไปแล้วในมือไหน (กันทอยลูกเต๋าซ้ำ) */
+
+  /* ---------- แผนประจำสตรีทของบอทแต่ละตัว ----------
+     ⚠️ นี่คือสิ่งที่ทำให้บอท "ดูเหมือนคน" มากที่สุดในบรรดาทั้งหมด
+     ของเดิมทอยลูกเต๋าใหม่ทุกครั้งที่ถูกถามว่าจะทำอะไร บอทตัวเดียวกันในรอบเดิมพันเดียวกัน
+     จึงบลัฟบ้าง ไม่บลัฟบ้าง สลับไปมา — คนดูอยู่เห็นแล้วอ่านไม่ออกว่ามันคิดอะไร
+     ซึ่งตรงกับที่เจ้าของบอกว่า "action งงๆ ไม่ makesense"
+
+     คนจริงตัดสินใจ "แนวทางของรอบนี้" ครั้งเดียวตอนเห็นไพ่ใหม่ แล้วเดินตามนั้น
+     จะบลัฟ ก็บลัฟทั้งรอบ · จะแกล้งอ่อน ก็แกล้งทั้งรอบ · เปลี่ยนใจเมื่อมีข้อมูลใหม่จริงๆ เท่านั้น */
+  const plans = {};   /* seatId -> { key, bluff, trap, giveUp } */
+
+  function planFor(seatId, view, base, trait, lv, wet) {
+    const key = view.handNo + "|" + view.phase;
+    const p = plans[seatId];
+    if (p && p.key === key) return p;
+
+    /* บลัฟเป็น "แผนของรอบนี้" ไม่ใช่การทอยใหม่ทุกท่า
+       ยิ่งคนเหลือน้อยยิ่งคุ้ม ยิ่งบอร์ดเปียกยิ่งเชื่อได้ (อ้างว่าติดชุดง่าย) */
+    const crowd = view.seats.filter(function (x, i) {
+      return x && x.inHand && !x.folded && i !== seatId;
+    }).length;
+    const crowdOk = crowd <= 1 ? 1.6 : (crowd === 2 ? 0.9 : 0.25);
+    const bluff = base < 0.5 &&
+                  Math.random() < lv.bluff * trait.bluffy * crowdOk * (0.7 + wet * 0.6);
+
+    /* แกล้งอ่อนด้วยมือแรงมาก (slow play) — คนจริงทำเพื่อให้คนอื่นกล้าลงเงิน
+       เดิมพันทันทีทุกครั้งที่ได้มือแรง = อ่านง่ายเกินไป และได้กองเล็กกว่าที่ควร
+       ทำเฉพาะตอนคนเหลือน้อยและบอร์ดไม่เปียก ไม่งั้นแกล้งอ่อนแล้วโดนแซงฟรีๆ */
+    const trap = base >= 0.86 && crowd <= 2 && wet < 0.4 &&
+                 Math.random() < (0.34 * (1.2 - trait.nerve));
+
+    /* ยิงบลัฟแล้วต้องรู้ด้วยว่าจะเลิกเมื่อไหร่
+       คนที่ยิงต่อไปเรื่อยๆ ทุกสตรีทจนหมดตัวไม่ใช่คนบลัฟเป็น เป็นคนไม่ยอมแพ้
+       ใจถึงมาก = ยิงได้หลายกระบอกกว่า */
+    const giveUp = Math.random() < (0.55 - trait.nerve * 0.3);
+
+    plans[seatId] = { key: key, bluff: bluff, trap: trap, giveUp: giveUp };
+    return plans[seatId];
+  }
   let seenThisHand = {};    /* เก็บไพ่ของใครไปแล้วบ้างในมือนี้ (กันนับซ้ำ) */
 
   /* ---------- เดาว่าคนอื่นถืออะไร ----------
@@ -307,7 +473,7 @@ export function createBotManager(room, broadcast) {
      คนดันสองครั้งในมือเดียว มักไม่ได้ถือไพ่ขยะ — นั่นคือข้อมูล ไม่ใช่การโกง
      ต่างจาก reads (ความจำข้ามมือจากไพ่ที่เคยเปิด) ตัวนี้เป็นของ "มือนี้เท่านั้น" */
   let actHand = -1;
-  const acts = {};          /* seatId -> { raises, calls, checks, sig } */
+  const acts = {};          /* seatId -> { raises, calls, checks, preRaise, streetRaise, sig } */
 
   function trackActions(st) {
     if (st.handNo !== actHand) {
@@ -317,41 +483,102 @@ export function createBotManager(room, broadcast) {
     for (let i = 0; i < st.seats.length; i++) {
       const x = st.seats[i];
       if (!x) { delete acts[i]; continue; }
-      const rec = acts[i] || (acts[i] = { raises: 0, calls: 0, checks: 0, sig: "" });
+      const rec = acts[i] ||
+        (acts[i] = { raises: 0, calls: 0, checks: 0, preRaise: 0, streetRaise: 0,
+                     phase: "", sig: "", turnAt: 0, lastMs: 0 });
+      /* ⚠️ จับเวลาที่เขาใช้คิด — เป็นข้อมูลที่คนนั่งโต๊ะเดียวกันเห็นเหมือนกันหมด ไม่ใช่การโกง
+         เริ่มจับตอนถึงตาเขา หยุดตอนท่าเขาเปลี่ยน */
+      if (st.current === i && !rec.turnAt) rec.turnAt = Date.now();
+      if (st.current !== i && rec.turnAt) {
+        rec.lastMs = Date.now() - rec.turnAt;
+        rec.turnAt = 0;
+      }
+      /* ขึ้นสตรีทใหม่ ให้เริ่มนับการดันของสตรีทนั้นใหม่
+         "ดันหนึ่งครั้งในฟลอป" กับ "ดันครั้งที่สามในริเวอร์" คนละความหมายกันคนละโลก */
+      if (rec.phase !== st.phase) { rec.phase = st.phase; rec.streetRaise = 0; }
       const sig = (x.lastKind || "") + "|" + (x.lastAction || "") + "|" + x.bet;
       if (!x.lastKind || sig === rec.sig) continue;
       rec.sig = sig;
-      if (x.lastKind === "raise" || x.lastKind === "bet") rec.raises++;
-      else if (x.lastKind === "call") rec.calls++;
+      if (x.lastKind === "raise" || x.lastKind === "bet") {
+        rec.raises++;
+        rec.streetRaise++;
+        if (st.phase === "preflop") rec.preRaise++;
+      } else if (x.lastKind === "call") rec.calls++;
       else if (x.lastKind === "check") rec.checks++;
     }
   }
 
-  /* ค่าประมาณความแรงของมือคนที่นั่งช่อง i (0..1) จากสิ่งที่มองเห็นล้วนๆ */
-  function guessStrength(view, i) {
+  const NEUTRAL = 0.45;   /* ค่ากลางของมือที่ "ยอมลงเงินเล่นต่อ" ไม่ใช่ของไพ่สุ่มทั้งสำรับ */
+
+  /* ---------- (ก) เขากำลังอ้างว่ามือแรงแค่ไหน ---------- */
+  function claimedStrength(view, i) {
     const x = view.seats[i];
     if (!x || !x.inHand || x.folded) return 0;
     const a = acts[i] || { raises: 0, calls: 0, checks: 0 };
 
-    /* เริ่มที่ค่ากลางของมือที่ "ยอมลงเงินเล่นต่อ" ไม่ใช่ค่ากลางของไพ่สุ่มทั้งสำรับ */
-    let g = 0.45;
-    g += Math.min(a.raises, 3) * 0.13;   /* ดันหนึ่งครั้ง = แรงขึ้นชัดเจน */
+    let g = NEUTRAL;
+    g += Math.min(a.raises, 3) * 0.13;   /* ดันหนึ่งครั้ง = อ้างว่าแรงขึ้นชัดเจน */
     g += Math.min(a.calls, 3) * 0.02;    /* ตามเฉยๆ บอกอะไรน้อยมาก */
     g -= Math.min(a.checks, 3) * 0.045;  /* เคาะผ่านบ่อย มักไม่มีอะไร */
 
-    /* ลงเงินก้อนใหญ่เทียบกอง = อ้างว่ามือแรง จะจริงหรือบลัฟก็ต้องเผื่อไว้ */
     const potNow = typeof view.potForBet === "number" ? view.potForBet : view.pot;
     if (potNow > 0 && x.bet > 0) g += Math.min(x.bet / potNow, 1.5) * 0.06;
-
-    /* ลงหมดหน้าตักแล้ว = เขาตัดสินใจไปแล้วว่าคุ้ม ให้น้ำหนักเพิ่ม */
     if (x.allIn) g += 0.05;
 
-    /* ผสมกับความจำข้ามมือ: คนที่เคยเปิดไพ่แข็งซ้ำๆ ให้เชื่อมากขึ้น
-       คนที่เคยเปิดไพ่ขยะบ่อย ให้หักออก เพราะท่าดันของเขาเชื่อได้น้อยกว่า */
-    const rd = readOf(x.name);
-    if (rd.n >= 3) g += (rd.strong - rd.weak) / rd.n * 0.10;
-
     return Math.max(0.05, Math.min(0.95, g));
+  }
+
+  /* ---------- (ข) ที่เขาอ้าง เชื่อได้แค่ไหน ----------
+     ⚠️ ส่วนนี้คือหัวใจ ถ้าเชื่อทุกท่าที่เห็นตรงๆ บอทจะโดนบลัฟไล่ออกจากมือทุกครั้ง
+     คนเล่นเป็นไม่ได้ถามว่า "เขาดันไหม" แต่ถามว่า "ในสถานการณ์นี้ เขาดันด้วยของจริงบ่อยแค่ไหน"
+
+     สิ่งที่ทำให้ท่าดัน "เชื่อได้น้อยลง":
+       · คนนั้นเคยเปิดไพ่ขยะให้เห็นบ่อย = บลัฟเป็นนิสัย
+       · ยิงต่อในฟลอปหลังเป็นคนไล่ก่อนฟลอป = ท่าอัตโนมัติ แทบไม่ได้บอกอะไร
+       · เดิมพันใหญ่เกินกอง = ขั้วสุด ไม่ของจริงก็ลมเปล่า จึงเชื่อได้แค่ครึ่งเดียว
+       · ตัวต่อตัว = ขโมยกองง่าย บลัฟคุ้ม
+     สิ่งที่ทำให้ "เชื่อได้มากขึ้น":
+       · มีคนอยู่ในมือหลายคน = บลัฟผ่านยาก แทบไม่มีใครกล้า
+       · ดันซ้ำในสตรีทเดียวกัน (เรซทับ) = คนบลัฟส่วนใหญ่ไม่ยิงซ้ำ
+       · ยังดันอยู่ถึงริเวอร์ = ผ่านด่านมาหมดแล้ว */
+  function credibility(view, i, live) {
+    const x = view.seats[i];
+    const a = acts[i] || { raises: 0, streetRaise: 0, preRaise: 0 };
+    let c = 0.72;
+
+    const rd = readOf(x.name);
+    if (rd.n >= 3) c -= (rd.weak - rd.strong) / rd.n * 0.35;
+
+    c += Math.min(Math.max(live - 1, 0), 3) * 0.06;
+    if (view.phase === "flop" && a.preRaise > 0 && a.streetRaise === 1) c -= 0.18;
+    if (a.streetRaise >= 2) c += 0.14;
+    if (view.phase === "river" && a.streetRaise >= 1) c += 0.08;
+
+    const potNow = typeof view.potForBet === "number" ? view.potForBet : view.pot;
+    if (potNow > 0 && x.bet > potNow * 1.2) c -= 0.12;
+    if (live <= 1) c -= 0.10;
+
+    /* ⚠️ เวลาที่เขาใช้ตัดสินใจก็เป็นข้อมูล
+       ลงเงินทันทีแทบไม่คิด = ท่าที่เตรียมไว้อยู่แล้ว (ยิงต่ออัตโนมัติ หรือบลัฟที่วางแผนไว้)
+         คนที่ถือของจริงมักหยุดคิดว่า "จะเอาเท่าไหร่ถึงจะมีคนตาม" อย่างน้อยแวบหนึ่ง
+       นั่งคิดนานแล้วค่อยลง = ชั่งน้ำหนักจริง มักมีของ หรืออย่างน้อยก็ตั้งใจ
+       ผลไม่แรง (±0.1) เพราะเป็นสัญญาณอ่อน ใช้ประกอบ ไม่ใช่ใช้ตัดสิน */
+    if (a.lastMs > 0 && (a.streetRaise > 0 || x.bet > 0)) {
+      if (a.lastMs < 900) c -= 0.10;
+      else if (a.lastMs > 3200) c += 0.08;
+    }
+
+    return Math.max(0.15, Math.min(0.95, c));
+  }
+
+  /* ---------- (ค) รวมสองอย่าง = สิ่งที่ควรกลัวจริง ----------
+     ไม่ใช่ "เขาอ้างว่าแรงเท่าไหร่" และไม่ใช่ "ไม่เชื่อเลย" แต่คือค่าเฉลี่ยถ่วงน้ำหนัก
+     เชื่อ 100% → กลัวเท่าที่เขาอ้าง · เชื่อ 0% → กลับไปที่ค่ากลาง เหมือนไม่มีข้อมูล */
+  function guessStrength(view, i, live) {
+    const claimed = claimedStrength(view, i);
+    if (claimed === 0) return 0;
+    const cred = credibility(view, i, live);
+    return NEUTRAL + (claimed - NEUTRAL) * cred;
   }
   const bench = {};         /* seatId -> กลับมาเล่นได้ตอนจบมือที่เท่าไหร่ */
   let bankedHand = -1;      /* บันทึกเงินบอทของมือไหนไปแล้ว */
@@ -473,6 +700,28 @@ export function createBotManager(room, broadcast) {
     }
   }
 
+  /* ---------- เวลาคิด ----------
+     ⚠️ ของเดิมสุ่มในช่วงเดียวตลอด ทุกการตัดสินใจใช้เวลาเท่ากันหมด
+     คนจริงไม่เป็นแบบนั้น: ไพ่ขยะเจอเดิมพันใหญ่ = ทิ้งแทบทันที
+     ส่วนจังหวะที่ก้ำกึ่งจริงๆ (ราคาพอดีกับมือ) จะนั่งคิดนาน
+     เวลาคิดคือสิ่งที่คนอีกฝั่งโต๊ะอ่านได้ ถ้ามันคงที่ ทุกคนรู้ทันทีว่าเป็นเครื่อง */
+  function thinkMs(lv, view, me) {
+    const lo = lv.think[0], hi = lv.think[1];
+    if (!me || !me.cards || !me.cards.length) return lo;
+    const potNow = typeof view.potForBet === "number" ? view.potForBet : view.pot;
+    const price = view.toCall > 0 ? view.toCall / (potNow + view.toCall) : 0;
+    const eq = view.phase === "preflop" ? preflopStrength(me.cards)
+                                        : madeStrength(me.cards, view.board);
+    /* ยิ่งใกล้เส้นตัดสินใจ ยิ่งคิดนาน · ห่างจากเส้นมาก = ตอบได้เลย */
+    const close = 1 - Math.min(Math.abs(eq - price - 0.05) / 0.35, 1);
+    let ms = lo + (hi - lo) * (0.25 + close * 0.75);
+    /* กองใหญ่ก็คิดนานขึ้นอีกหน่อย เงินเยอะขึ้นคนก็ลังเลขึ้น */
+    if (potNow > 0 && view.toCall > potNow * 0.6) ms *= 1.25;
+    /* ไม่มีอะไรต้องคิด (เคาะผ่านฟรี) ตอบเร็ว */
+    if (view.toCall === 0 && eq < 0.4) ms *= 0.45;
+    return Math.round(ms * (0.85 + Math.random() * 0.3));
+  }
+
   /* หมดตัวแล้วจะเติมชิปเล่นต่อ หรือลุกจากโต๊ะ
      ตัดสินจากนิสัยประจำระดับ + เงินที่เหลือจริงในกระเป๋า */
   function wantsRebuy(b) {
@@ -587,7 +836,7 @@ export function createBotManager(room, broadcast) {
 
     const lv = LEVEL[me.botLevel] || LEVEL[2];
     const view = room.table.viewFor(cur);
-    const wait = lv.think[0] + Math.random() * (lv.think[1] - lv.think[0]);
+    const wait = thinkMs(lv, view, me);
 
     pending[cur] = setTimeout(() => {
       delete pending[cur];
@@ -624,6 +873,9 @@ export function createBotManager(room, broadcast) {
     /* ⚠️ ล้มโต๊ะมาแล้วกี่รอบ = บทเรียนที่บอทควรจำ ไม่ใช่เริ่มใหม่แบบไม่รู้อะไรเลย
        ยิ่งล้มบ่อยยิ่งเล่นระวังขึ้น (ต้องการไพ่ดีกว่าเดิมถึงจะสู้) และบลัฟน้อยลง
        จำกัดเพดานไว้ ไม่งั้นบอทที่ซวยติดกันจะกลายเป็นหมอบทุกมือจนไม่มีใครอยากเล่นด้วย */
+    /* นิสัยประจำตัว — ผูกกับ "ชื่อ" ไม่ใช่ระดับ สองตัวในระดับเดียวกันจึงไม่เหมือนกัน */
+    const trait = traitOf(me.name);
+
     const busts = Math.min(me.busts || 0, 3);
 
     /* ⚠️ หนี้กดดันการตัดสินใจจริง ไม่ใช่แค่ตัวเลขโชว์
@@ -645,9 +897,13 @@ export function createBotManager(room, broadcast) {
        บอทแต่ละตัวจึงค่อยๆ มีนิสัยของตัวเองจากประวัติที่ต่างกัน
        ส่วน "ผลต่อการตัดสินใจ" ยังต้องมีเพดาน ไม่งั้นบอทที่เจ๊งหนักจะหมอบทุกมือ
        และบอทที่รวยมากจะลุยมั่วทุกมือ — ทั้งคู่เล่นด้วยไม่สนุกพอๆ กัน */
-    const downFear = Math.min(Math.max(0, 1 - ratio / 0.5), 1) * 0.10;
-    const debtFear = (debt > 0 ? 0.05 : 0) + downFear;
-    const boldness = Math.min(Math.max(0, ratio - 1.5) / 2, 1) * 0.06;
+    /* ⚠️ ความกลัวต้องคูณด้วยนิสัย "เสียแล้วรวนแค่ไหน" (tilt)
+       Otto ที่นิ่ง (0.2) เสียไปครึ่งตักก็ยังเล่นเหมือนเดิม
+       Rudy ที่รวนง่าย (1.1) เสียเท่ากันแล้วเล่นคนละคน — นั่นคือสิ่งที่ทำให้จำแต่ละตัวได้ */
+    const downFear = Math.min(Math.max(0, 1 - ratio / 0.5), 1) * 0.10 * trait.tilt;
+    const debtFear = (debt > 0 ? 0.05 * trait.tilt : 0) + downFear;
+    /* คนใจถึงได้กำไรแล้วยิ่งกล้า คนระวังตัวได้กำไรก็ยังระวังเหมือนเดิม */
+    const boldness = Math.min(Math.max(0, ratio - 1.5) / 2, 1) * 0.06 * (0.4 + trait.nerve);
 
     /* ---------- อ่านคนที่กำลังดันเราอยู่ ----------
        ต้องรู้ว่ากำลังสู้กับใคร ไม่ใช่สู้กับ "ราคา" เฉยๆ
@@ -668,10 +924,16 @@ export function createBotManager(room, broadcast) {
       respect = (pressureRead.strong - pressureRead.weak) / pressureRead.n * 0.09;
     }
 
-    const caution = busts * 0.03 + respect + debtFear - boldness;
+    /* ความอดทนมีผลก่อนฟลอปเป็นหลัก — คนอดทนรอมือดี คนใจร้อนเล่นแทบทุกมือ
+       ช่วง ±0.05 พอให้ความถี่การเล่นต่างกันเห็นได้ใน 20-30 มือ */
+    const patienceGap = pre ? (trait.patience - 0.5) * 0.10 : 0;
+    const caution = busts * 0.03 + respect + debtFear - boldness + patienceGap;
 
-    const bluffing = Math.random() <
-      lv.bluff * crowdFactor * (1 - busts * 0.2) * (debt > 0 ? 0.4 : 1);
+    /* แผนของรอบเดิมพันนี้ ตัดสินครั้งเดียวแล้วเดินตาม (ดู planFor)
+       ยังคูณด้วยสภาพจิตใจตอนนี้: ล้มมาเยอะหรือเป็นหนี้ ก็ไม่ค่อยกล้าบลัฟ */
+    const plan = planFor(seatId, view, base, trait, lv, wet);
+    const bluffing = plan.bluff && !(busts >= 2 && Math.random() < 0.5) &&
+                     !(debt > 0 && Math.random() < 0.6);
 
     /* เดิมพันต่อเนื่อง: คนที่เป็นคนไล่ก่อนฟลอป มักยิงต่อในฟลอปไม่ว่าไพ่จะออกยังไง
        เพราะเขาแสดงความแข็งไปแล้ว คนอื่นที่ไม่ได้อะไรก็มักทิ้ง
@@ -704,16 +966,24 @@ export function createBotManager(room, broadcast) {
     /* ⚠️ เดาว่าคู่แข่งที่ยังสู้อยู่ "น่าจะถืออะไร" แล้วเอาตัวที่แรงที่สุดมาเป็นตัววัด
        ของเดิมบอทสู้กับ "ราคา" อย่างเดียว โดยไม่สนว่าคนที่ดันมาน่าจะมีอะไร
        ซึ่งเป็นเหตุผลที่มันดูกล้าแบบไม่มีเหตุผล — มันไม่ได้กำลังไม่กลัว มันแค่ไม่รู้ */
-    let threat = 0, threatName = "";
+    let threat = 0, threatName = "", threatCred = 1;
     view.seats.forEach(function (x, i) {
-      if (i === seatId) return;
-      const g = guessStrength(view, i);
-      if (g > threat) { threat = g; threatName = x ? x.name : ""; }
+      if (i === seatId || !x || !x.inHand || x.folded) return;
+      const g = guessStrength(view, i, live);
+      if (g > threat) {
+        threat = g;
+        threatName = x.name;
+        threatCred = credibility(view, i, live);
+      }
     });
 
-    const facts = { pre, base, draw, live, me, view, seatId, lv, walletPressure,
+    /* ⚠️ ประเมินหน้าไพ่กลางใหม่ทุกครั้งที่ตัดสินใจ (คือทุกครั้งที่เปิดไพ่เพิ่มด้วย)
+       ค่ามือของเราขึ้นกับบอร์ดที่เปิดมา ไม่ใช่คงที่ทั้งมือ */
+    const wet = pre ? 0 : boardWetness(view.board);
+
+    const facts = { pre, base, draw, live, me, view, seatId, lv, walletPressure, trait, wet, plan,
                     potNow, toCall, price, caution, crowdFactor, bluffing, cbet, actsLast,
-                    threat, threatName };
+                    threat, threatName, threatCred };
 
     /* ⚠️ แต่ละระดับใช้ "วิธีคิด" คนละแบบ ไม่ใช่เกณฑ์ชุดเดียวกันปรับตัวเลข
        (ดูคำอธิบายเหนือ decideBeginner / decideGambler / decidePro) */

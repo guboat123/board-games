@@ -996,83 +996,13 @@ button { font-family: inherit; }
 }
 /* ⚠️ ต้องใช้ตัวเลือกที่มี id ด้วย ไม่งั้นแพ้ #t-result.is-many (1,1,0)
    แล้วเพดาน 74% เดิมจะกลับมาคุมทั้งที่กองซ้อนคุมความสูงให้แล้ว */
-/* ⚠️ กล่องผลต้องได้ที่ก่อนเสมอ (1 1 auto) ส่วนโซนเงินยอมหดได้ (0 1 auto)
-   ของเดิมกลับกัน: โซนเงินหดไม่ได้เลย พอมี 9 คนมันกิน 148px จากกองที่มี 164px
-   กล่องผลจึงเหลือ 34px ทั้งที่ของข้างในสูง 238px
-   ลูกทุกตัวยกเว้น .rows หดไม่ได้ มันจึงทะลุออกนอกกล่องแล้วโดน overflow:hidden ตัดทิ้ง
-   ผลที่คนเล่นเห็นคือ "จบมือแล้วไม่มีแถวผู้ชนะ" เหลือแค่หัวกล่องกับไพ่กลาง */
+/* ⚠️ กล่องผลได้พื้นที่ทั้งกอง ไม่มีอะไรมาแย่งแล้ว
+   เคยมีโซนเงินอยู่ใต้กล่องนี้ซึ่งหดไม่ได้ มันกิน 148px จากกองที่มี 164px
+   กล่องผลจึงเหลือ 34px ทั้งที่ของข้างในสูง 238px แล้วแถวผู้ชนะทะลุออกไปโดนตัดทิ้ง
+   ย้ายโซนเงินไปอยู่ในแผง "โต๊ะ · เงิน" แล้ว ปัญหานี้จึงหมดไปที่ต้นเหตุ */
 .result-stack > #t-result { flex: 1 1 auto; min-height: 0; max-height: none; }
-.result-stack > #t-money  { flex: 0 1 auto; min-height: 0; max-height: 30%; overflow-y: auto; }
 
-/* ---------- โซนเงิน ----------
-   ⚠️ ต้องเตี้ยไว้ ตัวมันหดไม่ได้ (flex 0 0 auto) ทุกพิกเซลที่มันกิน
-   คือพิกเซลที่หายไปจากแถวผู้ชนะ ซึ่งเป็นของสำคัญกว่า
-   จึงไม่มีหัวข้อแยก ใช้ป้ายบรรทัดเดียว และลดขอบในลงจาก 16px */
-#t-money.is-on { display: block; overflow-y: auto; cursor: pointer; padding: 8px 10px; }
-#t-money .lbl { display: block; font-size: .66rem; color: var(--muted); margin-bottom: 5px; }
-#t-money .chip { font-size: .72rem; padding: 2px 6px; }
-.table-area.is-many .pot { visibility: hidden; }
-#t-standings .rows { min-height: 64px; }
-/* ต้องเป็น flex ไม่ใช่ block ไม่งั้น flex ของลูกไม่ทำงาน
-   แถวอันดับจะยืดเต็มเนื้อหา แล้วดันปุ่ม "เริ่มรอบเล่นใหม่" ตกออกนอกจอ */
-/* ⚠️ กันของล้นออกนอกกรอบแผงถาวร
-   เคยใส่กล่องเพิ่มบอทไว้ในส่วนท้าย ซึ่งไม่ยอมหด มันเลยทะลุลงไปอยู่ใต้แผง
-   โดนของอื่นทับจนมองไม่เห็น และไม่มีอะไรฟ้องว่าผิด
-   เนื้อหาที่ยาวต้องเลื่อนใน .rows เท่านั้น */
-.result.is-on { display: flex; flex-direction: column; overflow: hidden; }
-.result h3 { margin: 0 0 4px; font-size: 1.1rem; color: var(--gold); }
-.result .row { display: flex; justify-content: space-between; gap: 10px; font-size: .85rem; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
-/* แถวตารางอันดับมีสองช่อง (ชื่อ | ยอด) ไม่ใช่สามช่องเหมือนแถวผลมือ */
-.result .row--rank { display: grid; grid-template-columns: 1fr auto; align-items: baseline; }
-.result .row b { font-family: var(--mono); color: var(--good); }
-/* ---------- ตารางผลตอนเปิดไพ่ ----------
-   3 ช่อง: ไพ่ | ชื่อ+ชุดไพ่ | ยอดที่ได้  เรียงตรงกันทุกแถว อ่านไล่ลงมาได้
-   ผู้ชนะอยู่กล่องบนที่ไม่เลื่อน คนที่แพ้อยู่ในกล่องเลื่อนข้างล่าง */
-.result .row {
-  display: grid; grid-template-columns: auto 1fr auto;
-  align-items: center; gap: 10px;
-  padding: 7px 2px; text-align: left;
-}
-.res-cards { display: flex; gap: 3px; flex: 0 0 auto; margin: 0; }
-.res-cards .pc--sm { width: 30px; font-size: 9.2px; }
-.res-mid { min-width: 0; }
-.res-name { font-weight: 700; font-size: .88rem; white-space: nowrap;
-            overflow: hidden; text-overflow: ellipsis; }
-.result .hand-lbl { display: block; margin: 1px 0 0; color: var(--muted); font-size: .76rem; }
-.res-amt { font-family: var(--mono); color: var(--good); font-size: .92rem; }
 
-/* กล่องผู้ชนะ อยู่กับที่เสมอ ไม่เลื่อนหนีสายตา */
-.win-box { flex: 0 0 auto; }
-
-/* ---------- แถบเงินสะสมท้ายกล่องผล ----------
-   ⚠️ ต้องอยู่นอกส่วนที่เลื่อนได้ (flex: 0 0 auto) เหมือน .win-box
-   ถ้าอยู่ใน .rows มันจะถูกดันหายตอนมีคนเปิดไพ่หลายคน ซึ่งเป็นจังหวะที่ต้องเห็นที่สุด */
-/* ⚠️ ทุกกฎในบล็อกนี้ต้องขึ้นต้นด้วย #t-money
-   เคยเขียนเป็น .res-money ตอนที่แถบเงินยังอยู่ท้ายกล่องผล
-   พอย้ายออกมาเป็นกล่องแยก (id t-money) ชื่อคลาสเดิมไม่มีในหน้าอีกแล้ว
-   กฎทั้งชุดจึงตายเงียบ: ชิปกลายเป็นบล็อกเต็มบรรทัด ไม่มีกรอบ ไม่มีช่องไฟ
-   ตัวหนังสือสามตัวติดกันเป็นพืด และที่แย่ที่สุดคือ v--up / v--dn ไม่มีสี
-   = ได้กับเสียเป็นสีเดียวกัน ซึ่งเป็นสิ่งเดียวที่ต้องแยกออกได้ในวินาทีเดียว */
-#t-money { text-align: center; cursor: pointer; }
-#t-money .lbl {
-  display: block; font-size: .66rem; color: var(--muted);
-  margin-bottom: 5px; letter-spacing: .02em;
-}
-/* จัดกลาง ไม่ชิดซ้าย — จำนวนคนบนโต๊ะไม่คงที่ (2-9 คน) แถวสุดท้ายจึงไม่เต็มเสมอ
-   ชิดซ้ายแล้วแถวสุดท้ายห้อยอยู่ข้างเดียว ดูเหมือนวางไม่เสร็จ */
-#t-money .chips { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
-#t-money .chip {
-  display: flex; align-items: baseline; gap: 5px;
-  background: #0d2519; border: 1px solid #1d3a2b; border-radius: 7px;
-  padding: 2px 6px; font-size: .72rem;
-}
-#t-money .chip.is-me { border-color: var(--gold); }
-#t-money .chip .n { color: #cfe3d7; max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#t-money .chip .b { font-family: var(--mono); font-size: .66rem; color: var(--muted); }
-#t-money .chip .v { font-family: var(--mono); font-weight: 700; }
-#t-money .v--up { color: var(--good); }
-#t-money .v--dn { color: #ff6b5e; }
-#t-money .v--flat { color: var(--muted); }
 /* ---------- ตารางเงินบอท (หน้าก่อนเข้าเกม) ---------- */
 .bank-box { margin: 10px 0 4px; text-align: left; }
 .bank-box > summary {
@@ -1081,22 +1011,42 @@ button { font-family: inherit; }
 }
 .bank-box > summary::-webkit-details-marker { display: none; }
 .bank-box > summary:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
-.bank-head, .bank-row {
-  display: grid; grid-template-columns: 1fr auto auto auto;
-  gap: 8px; align-items: baseline; padding: 4px 0;
+/* ⚠️ ตารางสี่คอลัมน์บนการ์ดกว้าง ~300px แน่นเกินอ่านบนมือถือ
+   ตัวเลขสามชุดเบียดกันจนแยกไม่ออกว่าอันไหนคืออะไร
+   เปลี่ยนเป็นแถวสองบรรทัด: บรรทัดบน = ใคร กับ มีเท่าไหร่ · บรรทัดล่าง = รายละเอียด
+   แล้วแบ่งกลุ่มตามระดับ เพราะเงินตั้งต้นคนละก้อน (5,000 / 20,000 / 100,000)
+   เอาตัวเลขข้ามระดับมาเรียงรวมกันจึงเทียบกันไม่ได้เลย */
+.bank-grp {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  font-size: .74rem; font-weight: 700; color: var(--gold);
+  margin: 14px 0 6px; padding-bottom: 4px;
+  border-bottom: 1px solid rgba(216,164,65,.3);
 }
-.bank-head {
-  font-size: .62rem; color: var(--muted); letter-spacing: .04em;
-  border-bottom: 1px solid rgba(255,255,255,.12);
+.bank-grp:first-child { margin-top: 2px; }
+.bank-grp span { font-size: .64rem; font-weight: 400; color: var(--muted); }
+
+.bank-row {
+  padding: 8px 9px; margin-bottom: 5px; border-radius: 10px;
+  background: rgba(255,255,255,.04);
 }
-.bank-row { font-size: .78rem; border-bottom: 1px solid rgba(255,255,255,.06); }
-.bank-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bank-row .lv { font-family: var(--mono); font-size: .6rem; color: var(--muted); }
-.bank-row .num { font-family: var(--mono); }
+.bank-row.is-busy { background: rgba(216,164,65,.11); box-shadow: inset 0 0 0 1px rgba(216,164,65,.4); }
+.bank-row__top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.bank-row .nm {
+  font-size: .95rem; font-weight: 700; color: #e6f2ea;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bank-row .now { font-family: var(--mono); font-size: .98rem; font-weight: 700; flex: 0 0 auto; }
+.bank-row__bot { display: flex; gap: 12px; align-items: baseline; margin-top: 4px; font-size: .7rem; color: var(--muted); }
+.bank-row .delta { font-family: var(--mono); font-weight: 700; }
 .bank-row .up { color: var(--good); }
 .bank-row .dn { color: #ff6b5e; }
-.bank-row .busy { color: var(--gold); font-size: .6rem; }
-#bank-list { max-height: 46vh; overflow-y: auto; }
+.bank-row .busy { color: var(--gold); margin-left: auto; font-weight: 700; }
+/* แถบบอกว่าเหลือกี่ส่วนของเงินตั้งต้น อ่านภาพรวมได้เร็วกว่าตัวเลข */
+.bank-bar { height: 3px; border-radius: 2px; background: rgba(255,255,255,.1); margin-top: 6px; overflow: hidden; }
+.bank-bar i { display: block; height: 100%; border-radius: 2px; }
+/* ⚠️ ต้องเห็นได้หมด ไม่ใช่ตัดที่ 46vh แล้วเดาเอาว่ายังมีต่อ
+   เลื่อนในกล่องตัวเองได้ และการ์ดหน้าเข้าร่วมก็เลื่อนได้ทั้งใบอยู่แล้ว */
+#bank-list { max-height: 62vh; overflow-y: auto; padding-right: 2px; }
 /* บรรทัดอธิบายใต้ชื่อ ใช้ตอบคำถาม "ทำไมชนะแล้วชิปลด" */
 .res-why { font-size: .64rem; color: var(--muted); margin-top: 2px; line-height: 1.35; }
 .row--win .res-why { color: #e8cf9a; }
@@ -1243,13 +1193,13 @@ button { font-family: inherit; }
          .result ทุกกล่องเป็น position:absolute; bottom:6px เหมือนกันหมด
          ถ้าปล่อยไว้เฉยๆ สองกล่องจะทับกันสนิทที่จุดเดียวกัน
          กองซ้อนนี้เป็นตัว absolute แทน ส่วนลูกเป็น relative แล้วเรียงลงมาตามปกติ -->
+    <!-- ⚠️ กล่องผลอยู่ในกองซ้อนของตัวเองใบเดียว
+         เคยมีโซน "เงินสะสมทั้งโต๊ะ" อยู่ใต้กล่องนี้ด้วย แต่เอาออกแล้ว (เจ้าของสั่ง)
+         เหตุผล: ตอนจบมือ คนอยากรู้แค่ "ใครชนะด้วยอะไร และเราได้เสียเท่าไหร่มือนี้"
+         ยอดสะสมทั้งโต๊ะเป็นคนละคำถาม และมันแย่งที่จนแถวผู้ชนะถูกบีบหายไปหลายรอบ
+         ยอดสะสมย้ายไปอยู่ในปุ่ม "โต๊ะ · เงิน" บนแถบบน ซึ่งห่างแค่แตะเดียว -->
     <div class="result-stack" id="result-stack">
       <div class="result" id="t-result"></div>
-      <!-- โซนเงินต้องเป็นกล่องแยก ไม่ใช่ส่วนท้ายของกล่องผล
-           ตอนอยู่ในกล่องเดียวกัน .rows (แถวผู้ชนะ) ถูกตั้งไว้ให้ยืด-หดได้
-           ส่วนแถบเงินหดไม่ได้ พอที่ไม่พอ แถวผู้ชนะจึงถูกบีบเหลือ 0px
-           = จบมือแล้วไม่มีอะไรบอกว่าชนะด้วยชุดอะไร ซึ่งเป็นหัวใจของกล่องผล -->
-      <div class="result" id="t-money"></div>
     </div>
     <div class="result" id="t-standings"></div>
     <div class="result" id="t-table"></div>
@@ -1665,46 +1615,68 @@ button { font-family: inherit; }
       host.appendChild(none);
       return;
     }
-    var head = document.createElement("div");
-    head.className = "bank-head";
-    head.innerHTML = "<span>บอท</span><span>เงินตอนนี้</span><span>ได้ / เสีย</span><span>ล้ม</span>";
-    host.appendChild(head);
 
-    list.forEach(function (b) {
-      var row = document.createElement("div");
-      row.className = "bank-row";
+    /* แบ่งตามระดับ แล้วเรียงจากรวยไปจนในแต่ละระดับ
+       ข้ามระดับเทียบกันไม่ได้ เพราะเงินตั้งต้นคนละก้อน */
+    [["มือใหม่", 5000], ["นักพนัน", 20000], ["มืออาชีพ", 100000]].forEach(function (g) {
+      var inGroup = list.filter(function (b) { return BOT_LEVEL_OF[b.name] === g[0]; })
+                        .sort(function (a, b) { return b.bankroll - a.bankroll; });
+      if (!inGroup.length) return;
 
-      var nm = document.createElement("span");
-      nm.className = "nm";
-      nm.textContent = b.name;
-      var lv = document.createElement("span");
-      lv.className = "lv";
-      lv.textContent = " " + (BOT_LEVEL_OF[b.name] || "");
-      nm.appendChild(lv);
-      if (b.busy) {
-        var bz = document.createElement("span");
-        bz.className = "busy";
-        bz.textContent = " · กำลังเล่น";
-        nm.appendChild(bz);
-      }
+      var h = document.createElement("div");
+      h.className = "bank-grp";
+      var gn = document.createElement("b");
+      gn.textContent = g[0];
+      var gs = document.createElement("span");
+      gs.textContent = "เริ่มด้วย " + g[1].toLocaleString("th-TH");
+      h.appendChild(gn); h.appendChild(gs);
+      host.appendChild(h);
 
-      var now = document.createElement("span");
-      now.className = "num";
-      now.textContent = b.bankroll.toLocaleString("th-TH");
-      /* ติดลบ = เป็นหนี้ ต้องเห็นทันทีว่าเป็นคนละเรื่องกับ "มีเงินน้อย" */
-      if (b.bankroll < 0) now.className += " dn";
+      inGroup.forEach(function (b) {
+        var row = document.createElement("div");
+        row.className = "bank-row" + (b.busy ? " is-busy" : "");
 
-      var pl = b.bankroll - b.start;
-      var d = document.createElement("span");
-      d.className = "num " + (pl > 0 ? "up" : (pl < 0 ? "dn" : ""));
-      d.textContent = (pl > 0 ? "+" : (pl < 0 ? "−" : "")) + Math.abs(pl).toLocaleString("th-TH");
+        var top = document.createElement("div");
+        top.className = "bank-row__top";
+        var nm = document.createElement("span");
+        nm.className = "nm";
+        nm.textContent = b.name;
+        var now = document.createElement("span");
+        /* ติดลบ = เป็นหนี้ ต้องอ่านออกทันทีว่าคนละเรื่องกับ "มีเงินน้อย" */
+        now.className = "now" + (b.bankroll < 0 ? " dn" : "");
+        now.textContent = (b.bankroll < 0 ? "−" : "") +
+                          Math.abs(b.bankroll).toLocaleString("th-TH");
+        top.appendChild(nm); top.appendChild(now);
+        row.appendChild(top);
 
-      var bu = document.createElement("span");
-      bu.className = "num";
-      bu.textContent = b.busts || 0;
+        var bot = document.createElement("div");
+        bot.className = "bank-row__bot";
+        var pl = b.bankroll - b.start;
+        var d = document.createElement("span");
+        d.className = "delta " + (pl > 0 ? "up" : (pl < 0 ? "dn" : ""));
+        d.textContent = (pl > 0 ? "+" : (pl < 0 ? "−" : "")) + Math.abs(pl).toLocaleString("th-TH");
+        var bu = document.createElement("span");
+        bu.textContent = "ล้ม " + (b.busts || 0);
+        bot.appendChild(d); bot.appendChild(bu);
+        if (b.busy) {
+          var bz = document.createElement("span");
+          bz.className = "busy";
+          bz.textContent = "\u25CF กำลังเล่น";
+          bot.appendChild(bz);
+        }
+        row.appendChild(bot);
 
-      row.appendChild(nm); row.appendChild(now); row.appendChild(d); row.appendChild(bu);
-      host.appendChild(row);
+        /* แถบส่วนที่เหลือเทียบเงินตั้งต้น เต็ม = เท่าทุน · ว่าง = ใกล้หมด */
+        var bar = document.createElement("div");
+        bar.className = "bank-bar";
+        var fill = document.createElement("i");
+        fill.style.width = Math.round(Math.max(0, Math.min(1, b.bankroll / b.start)) * 100) + "%";
+        fill.style.background = pl > 0 ? "var(--good)" : (b.bankroll < 0 ? "#ff6b5e" : "var(--gold)");
+        bar.appendChild(fill);
+        row.appendChild(bar);
+
+        host.appendChild(row);
+      });
     });
   }
 
@@ -2686,7 +2658,6 @@ button { font-family: inherit; }
     paintHole();
     paintActions();
     paintResult();
-    paintMoneyZone();
     paintStandings();
     paintTablePanel();
 
@@ -3056,27 +3027,39 @@ button { font-family: inherit; }
     return wrap;
   }
 
+  /* ---------- แผงโต๊ะ: หนึ่งแท็บ = หนึ่งเรื่อง ----------
+     ⚠️ เดิมยัดทุกอย่างไว้ในแท็บ "เงิน" แท็บเดียว: กล่องเพิ่มบอท + วงย้ายที่นั่ง
+     + ตารางเงิน 9 แถว + ปุ่มพักมือ + ปุ่มเลิกเล่น + ยอดรวม + ปุ่มปิด
+     สูงรวมกันเกิน 800px ในกล่องที่มีที่ ~300px ต้องเลื่อนหาทุกอย่าง และอ่านไม่ออกว่าอะไรเป็นอะไร
+     แยกเป็นห้าแท็บ แต่ละแท็บตอบคำถามเดียว จะได้ไม่ต้องเลื่อนหาและไม่ต้องเดา */
   function paintTablePanel() {
     var box = $("t-table");
     if (!tablePanelOn || !view) { box.classList.remove("is-on"); box.innerHTML = ""; return; }
     box.innerHTML = "";
 
+    var TABS = [
+      ["money", "เงิน",   "ใครซื้อเข้าเท่าไหร่ ตอนนี้ได้เสียเท่าไหร่"],
+      ["seats", "ที่นั่ง",  "ย้ายที่นั่ง · พักมือ · เลิกเล่นรอบนี้"],
+      ["bots",  "บอท",    "เรียกบอทมาซ้อม เลือกระดับได้"],
+      ["log",   "รอบนี้",  "ย้อนดูว่าแต่ละมือเล่นกันยังไง"],
+      ["all",   "สะสม",   "สถิติสะสมรายคน ข้ามวง"]
+    ];
+    var cur = TABS.filter(function (t) { return t[0] === panelTab; })[0] || TABS[0];
+
     var h = document.createElement("h3");
-    h.textContent = "โต๊ะ · เงิน";
+    h.textContent = "โต๊ะ · " + cur[1];
     box.appendChild(h);
 
-    /* สองแท็บในแผงเดียว เพราะเป็นคำถามชุดเดียวกันของคนเล่น
-       "ตอนนี้ใครได้ใครเสีย" กับ "เมื่อกี้ใครเล่นยังไง" */
     var tabs = document.createElement("div");
     tabs.className = "ptabs";
-    [["money", "เงิน"], ["log", "รอบนี้"], ["all", "สะสม"]].forEach(function (t) {
+    TABS.forEach(function (t) {
       var b = document.createElement("button");
       b.type = "button";
       b.className = "ptab" + (panelTab === t[0] ? " is-on" : "");
       b.textContent = t[1];
       b.addEventListener("click", function () {
         panelTab = t[0];
-        /* ขอประวัติตอนกดเท่านั้น ไม่ได้ติดมากับ state ทุกครั้ง */
+        /* ขอข้อมูลตอนกดเท่านั้น ไม่ได้ติดมากับ state ทุกครั้ง */
         if (t[0] === "log") send({ type: "history" });
         if (t[0] === "all") send({ type: "profiles" });
         paintTablePanel();
@@ -3085,22 +3068,94 @@ button { font-family: inherit; }
     });
     box.appendChild(tabs);
 
-    /* ⚠️ กล่องเพิ่มบอทต้องอยู่บนสุด เห็นทันทีที่เปิดแผง
-       เคยวางไว้ล่างสุดใต้ตารางเงิน 9 แถว ต้องเลื่อนลงไปไกลถึงเจอ
-       ซึ่งเท่ากับไม่มีปุ่มสำหรับคนใช้จริง
-       ⚠️ แต่ใส่เฉพาะแท็บ "เงิน" เท่านั้น มันเป็นเรื่องของ "ใครนั่งอยู่บนโต๊ะ"
-       สองแท็บที่เหลือเป็นตัวเลขล้วน กล่องบอทสูงเกือบ 200px ไปกินที่จนตัวเลข
-       ถูกตัดหัวตัดท้าย เห็นแค่แถวเดียว ทั้งที่คนเปิดมาเพื่อดูตัวเลข */
-    if (panelTab === "log") { paintHistoryInto(box); box.classList.add("is-on"); return; }
-    if (panelTab === "all") { paintProfilesInto(box); box.classList.add("is-on"); return; }
+    /* คำอธิบายสั้นๆ ว่าแท็บนี้ตอบอะไร คนจะได้ไม่ต้องกดไล่ทีละอันเพื่อหา */
+    var sub = document.createElement("p");
+    sub.className = "hint-sm";
+    sub.style.cssText = "margin:0 0 10px; font-size:.68rem";
+    sub.textContent = cur[2];
+    box.appendChild(sub);
 
-    box.appendChild(buildBotBox());
+    if (panelTab === "log")  { paintHistoryInto(box); box.classList.add("is-on"); return; }
+    if (panelTab === "all")  { paintProfilesInto(box); box.classList.add("is-on"); return; }
+    if (panelTab === "bots") { paintBotsInto(box);    box.classList.add("is-on"); return; }
+    if (panelTab === "seats"){ paintSeatsInto(box);   box.classList.add("is-on"); return; }
+    paintMoneyInto(box);
+    box.classList.add("is-on");
+  }
 
+  /* ---------- แท็บ เงิน ---------- */
+  function paintMoneyInto(box) {
+    var head = document.createElement("div");
+    head.className = "mhead";
+    head.innerHTML = "<span>ที่นั่ง</span><span>ซื้อเข้า → ตอนนี้</span><span>ได้ / เสีย</span>";
+    box.appendChild(head);
+
+    var rows = document.createElement("div");
+    rows.className = "rows";
+    var totalBuy = 0, totalStacks = 0;
+
+    view.seats.forEach(function (st2, idx) {
+      if (!st2) return;   /* ช่องว่างไม่เกี่ยวกับเรื่องเงิน ไปดูที่แท็บที่นั่ง */
+      totalBuy += st2.boughtIn;
+      totalStacks += st2.stack;
+
+      var row = document.createElement("div");
+      row.className = "mrow";
+
+      var nm = document.createElement("span");
+      nm.className = "nm";
+      nm.textContent = (idx + 1) + " · " + st2.name + (idx === mySeat ? " (คุณ)" : "");
+      row.appendChild(nm);
+
+      var mid = document.createElement("span");
+      mid.className = "num buy";
+      mid.textContent = st2.boughtIn.toLocaleString("th-TH") + " → " +
+                        st2.stack.toLocaleString("th-TH");
+      /* รายละเอียดรองอยู่บรรทัดล่าง ไม่เบียดบรรทัดหลักจนอ่านไม่ออก */
+      var extra = [];
+      if (st2.busts) extra.push("ล้ม " + st2.busts);
+      if (view.turnBudgetMs) extra.push("การ์ดต่อเวลา " + (st2.timeCards || 0));
+      if (typeof st2.wallet === "number") {
+        extra.push(st2.wallet < 0
+          ? "หนี้ " + Math.abs(st2.wallet).toLocaleString("th-TH")
+          : "กระเป๋า " + st2.wallet.toLocaleString("th-TH"));
+      }
+      if (extra.length) {
+        var w = document.createElement("small");
+        w.style.cssText = "display:block; font-size:.62rem; color:var(--muted)";
+        w.textContent = extra.join(" · ");
+        if (typeof st2.wallet === "number" && st2.wallet < 0) w.style.color = "#ff8f84";
+        mid.appendChild(w);
+      }
+      row.appendChild(mid);
+
+      var net = document.createElement("b");
+      net.className = "num";
+      net.textContent = (st2.net >= 0 ? "+" : "−") + Math.abs(st2.net).toLocaleString("th-TH");
+      net.style.color = st2.net > 0 ? "var(--good)"
+                      : (st2.net < 0 ? "#ff8f84" : "var(--muted)");
+      row.appendChild(net);
+      rows.appendChild(row);
+    });
+    box.appendChild(rows);
+
+    var foot = document.createElement("div");
+    foot.className = "foot";
+    var sum = document.createElement("p");
+    sum.className = "hint-sm";
+    sum.style.margin = "0 0 8px";
+    /* ชิปที่ลงกองไปแล้วยังเป็นของโต๊ะ ต้องนับรวม ไม่งั้นกลางมือยอดจะดูเหมือนหาย */
+    sum.textContent = "ซื้อเข้ารวม " + totalBuy.toLocaleString("th-TH") +
+                      " · ชิปบนโต๊ะรวม " + (totalStacks + view.pot).toLocaleString("th-TH");
+    foot.appendChild(sum);
+    foot.appendChild(closeBtn());
+    box.appendChild(foot);
+  }
+
+  /* ---------- แท็บ ที่นั่ง ---------- */
+  function paintSeatsInto(box) {
     /* ย้ายที่นั่งกลางมือไม่ได้ ลำดับการเดินตาผูกกับเลขช่อง */
     var canMove = view.phase === "waiting" || view.phase === "showdown";
-
-    /* วงโต๊ะเรียงแบบเดียวกับที่เห็นจริง (ตัวเราอยู่ล่างสุด) จะได้รู้ว่าย้ายไปแล้วนั่งข้างใคร
-       ช่องว่างในวงนี้คือปุ่มย้ายที่นั่ง ไม่ต้องมีปุ่มซ้ำในตารางเงินอีก */
     box.appendChild(buildSeatRing(view.seats, {
       order: seatOrder(),
       mySeat: mySeat,
@@ -3114,93 +3169,16 @@ button { font-family: inherit; }
       }
     }));
 
-    var head = document.createElement("div");
-    head.className = "mhead";
-    head.innerHTML = "<span>ที่นั่ง</span><span>ซื้อเข้า → ชิปตอนนี้</span><span>ได้ / เสีย</span>";
-    box.appendChild(head);
-
     var rows = document.createElement("div");
     rows.className = "rows";
-    var totalBuy = 0, totalStacks = 0;
 
-    for (var i = 0; i < view.seats.length; i++) {
-      (function (idx) {
-        var st2 = view.seats[idx];
-        var row = document.createElement("div");
-        row.className = "mrow" + (st2 ? "" : " mrow--free");
-
-        var nm = document.createElement("span");
-        nm.className = "nm";
-        nm.textContent = (idx + 1) + " · " +
-          (st2 ? st2.name + (idx === mySeat ? " (คุณ)" : "") : "ว่าง");
-        row.appendChild(nm);
-
-        if (st2) {
-          totalBuy += st2.boughtIn;
-          totalStacks += st2.stack;
-          var mid = document.createElement("span");
-          mid.className = "num buy";
-          mid.textContent = st2.boughtIn.toLocaleString("th-TH") + " → " +
-                            st2.stack.toLocaleString("th-TH") +
-                            (st2.busts ? "  (ล้ม " + st2.busts + ")" : "") +
-                            (view.turnBudgetMs ? "  ⏱ " + (st2.timeCards || 0) : "");
-          /* กระเป๋าเงินนอกโต๊ะ (บอทเท่านั้น) — ชิปบนโต๊ะคือเงินที่หยิบมาเล่น
-             อันนี้คือเงินที่เหลืออยู่จริง ติดลบ = เป็นหนี้ ซึ่งกดดันการเล่นของบอทจริงๆ */
-          if (typeof st2.wallet === "number") {
-            var w = document.createElement("small");
-            w.style.cssText = "display:block; font-size:.62rem; opacity:.9";
-            w.textContent = st2.wallet < 0
-              ? "หนี้ " + Math.abs(st2.wallet).toLocaleString("th-TH")
-              : "กระเป๋า " + st2.wallet.toLocaleString("th-TH");
-            w.style.color = st2.wallet < 0 ? "#ff8f84" : "var(--muted)";
-            mid.appendChild(w);
-          }
-          row.appendChild(mid);
-
-          var net = document.createElement("b");
-          net.className = "num";
-          net.textContent = (st2.net >= 0 ? "+" : "") + st2.net.toLocaleString("th-TH");
-          net.style.color = st2.net > 0 ? "var(--good)"
-                          : (st2.net < 0 ? "#ff8f84" : "var(--muted)");
-          row.appendChild(net);
-        } else {
-          /* ช่องว่างไม่ต้องมีปุ่มซ้ำ ย้ายที่นั่งทำที่วงโต๊ะข้างบนแล้ว
-             ตารางนี้มีหน้าที่เดียวคือบอกเรื่องเงิน */
-          var sp = document.createElement("span");
-          sp.className = "num buy";
-          sp.textContent = "—";
-          row.appendChild(sp);
-          row.appendChild(document.createElement("span"));
-        }
-        rows.appendChild(row);
-      })(i);
-    }
-    box.appendChild(rows);
-
-    var foot = document.createElement("div");
-    foot.className = "foot";
-    var sum = document.createElement("p");
-    sum.className = "hint-sm";
-    sum.style.margin = "0 0 8px";
-    /* ชิปที่ลงกองไปแล้วยังเป็นของโต๊ะ ต้องนับรวม ไม่งั้นกลางมือยอดจะดูเหมือนหาย */
-    sum.textContent = "ซื้อเข้ารวม " + totalBuy.toLocaleString("th-TH") +
-                      " · ชิปบนโต๊ะรวม " + (totalStacks + view.pot).toLocaleString("th-TH");
-    foot.appendChild(sum);
-    /* ---------- บอทซ้อมเล่น ----------
-       ไว้ซ้อมตอนยังไม่มีคนมาเล่นด้วย เซิร์ฟเวอร์เป็นคนคุมบอทเอง
-       บอทเห็นเฉพาะไพ่ตัวเองกับไพ่กลางเหมือนคน ไม่ได้แอบดูสำรับ
-       ระดับต่างกันที่ "ตัดสินใจดีแค่ไหน" ไม่ใช่ "โกงมากแค่ไหน" */
-    /* กล่องเพิ่มบอทถูกย้ายไปไว้ใต้แท็บแล้ว (ดู buildBotBox) */
-
-    /* พักมือ = ยังนั่งอยู่ ชิปยังอยู่ แต่ไม่ถูกแจกไพ่รอบต่อไป
-       เซิร์ฟเวอร์รองรับมาตลอด แต่ไม่เคยมีปุ่มให้กด */
+    /* พักมือ = ยังนั่งอยู่ ชิปยังอยู่ แต่ไม่ถูกแจกไพ่รอบต่อไป */
     var meNow = view.seats[mySeat];
     if (meNow) {
       var so = document.createElement("button");
       so.type = "button";
       so.className = "act";
-      so.style.width = "100%";
-      so.style.marginBottom = "8px";
+      so.style.cssText = "width:100%; margin-bottom:8px";
       if (meNow.sitOut) {
         so.textContent = "กลับมาเล่น";
         so.appendChild(makeSub("ตอนนี้พักอยู่ ไม่ได้รับไพ่"));
@@ -3216,17 +3194,12 @@ button { font-family: inherit; }
       rows.appendChild(so);
     }
 
-    /* ---------- เลิกเล่นรอบนี้ ----------
-       ⚠️ ตัวเลือก "ไม่จำกัด" เขียนว่า "เล่นไปเรื่อยๆ จนกดเลิกเอง"
-       แต่ไม่เคยมีปุ่มเลิกอยู่จริง มีแค่ "← ออก" ซึ่งคือลุกจากโต๊ะคนเดียว ไม่ใช่ปิดรอบ
-       คนที่เลือกไม่จำกัดจึงไม่มีทางได้เห็นตารางสรุปรอบเลย
-       ปุ่มนี้ปิดรอบให้ทั้งโต๊ะ แล้วขึ้นตารางสรุป (เริ่มรอบใหม่ได้จากตารางนั้น) */
+    /* เลิกเล่นรอบนี้ — ตัวเลือก "ไม่จำกัด" เขียนว่าเล่นจนกดเลิกเอง ปุ่มนี้คือปุ่มนั้น */
     if (!view.limit || !view.limit.over) {
       var stop = document.createElement("button");
       stop.type = "button";
       stop.className = "act";
-      stop.style.width = "100%";
-      stop.style.marginBottom = "8px";
+      stop.style.cssText = "width:100%; margin-bottom:8px";
       var canStop = view.phase === "waiting" || view.phase === "showdown";
       stop.disabled = !canStop;
       stop.textContent = "เลิกเล่นรอบนี้";
@@ -3241,16 +3214,30 @@ button { font-family: inherit; }
       });
       rows.appendChild(stop);
     }
+    box.appendChild(rows);
 
+    var foot = document.createElement("div");
+    foot.className = "foot";
+    foot.appendChild(closeBtn());
+    box.appendChild(foot);
+  }
+
+  /* ---------- แท็บ บอท ---------- */
+  function paintBotsInto(box) {
+    box.appendChild(buildBotBox());
+    var foot = document.createElement("div");
+    foot.className = "foot";
+    foot.appendChild(closeBtn());
+    box.appendChild(foot);
+  }
+
+  function closeBtn() {
     var close = document.createElement("button");
     close.type = "button";
     close.className = "btn-main";
     close.textContent = "ปิด";
     close.addEventListener("click", function () { tablePanelOn = false; paintTablePanel(); });
-    foot.appendChild(close);
-    box.appendChild(foot);
-
-    box.classList.add("is-on");
+    return close;
   }
 
   function makeSub(text) {
@@ -4089,66 +4076,6 @@ button { font-family: inherit; }
 
     box.classList.add("is-on");
   }
-
-  /* ---------- โซนเงิน: ใครซื้อเข้าเท่าไหร่ ตอนนี้ได้เสียเท่าไหร่ ----------
-     ⚠️ เป็นกล่องแยกของตัวเอง ไม่ใช่ส่วนท้ายของกล่องผล
-     เคยรวมอยู่ในกล่องเดียวกัน แล้วมันไปเบียดแถวผู้ชนะจนเหลือ 0px
-     คนเล่นจึงเห็นแต่ตัวเลขเงิน แต่ไม่เห็นว่าชนะด้วยชุดอะไร ซึ่งกลับหัวกลับหางกัน
-     ตัวเลขชุดนี้มีในแผง "โต๊ะ · เงิน" อยู่แล้ว แต่จังหวะที่คนอยากรู้จริงคือตอนมือเพิ่งจบ
-     ยอดในกล่องผลข้างบนคือเงิน "มือนี้" ส่วนโซนนี้คือ "สะสมทั้งโต๊ะ" คนละตัว */
-  function paintMoneyZone() {
-    var box = $("t-money");
-    if (!view || mySeat < 0 || view.phase !== "showdown" ||
-        (view.limit && view.limit.over)) {
-      box.classList.remove("is-on"); box.innerHTML = ""; return;
-    }
-
-    /* ไม่มีหัวข้อแยก ป้ายบรรทัดเดียวพอ — ทุกพิกเซลที่โซนนี้กิน
-       คือพิกเซลที่หายไปจากแถวผู้ชนะ ซึ่งสำคัญกว่า */
-    box.innerHTML = "";
-    var lbl = document.createElement("span");
-    lbl.className = "lbl";
-    lbl.textContent = "เงินสะสมทั้งโต๊ะ · ซื้อเข้า → ได้ / เสีย  (แตะเพื่อดูตารางเต็ม)";
-    box.appendChild(lbl);
-
-    var chips = document.createElement("div");
-    chips.className = "chips";
-    /* เรียงจากได้มากไปเสียมาก อ่านลำดับได้โดยไม่ต้องเทียบตัวเลขเอง */
-    var moneyRows = [];
-    view.seats.forEach(function (sm, im) {
-      if (sm) moneyRows.push({ i: im, name: sm.name, buy: sm.boughtIn, net: sm.net, busts: sm.busts || 0 });
-    });
-    moneyRows.sort(function (a, b) { return b.net - a.net; });
-    moneyRows.forEach(function (m) {
-      var c = document.createElement("div");
-      c.className = "chip" + (m.i === mySeat ? " is-me" : "");
-      var n = document.createElement("span");
-      n.className = "n";
-      n.textContent = m.name;
-      var bq = document.createElement("span");
-      bq.className = "b";
-      /* ล้มแล้วเติมใหม่กี่รอบต้องเห็นด้วย ไม่งั้น "ซื้อเข้า 6,000" ดูเหมือนซื้อหนักตั้งแต่แรก
-         ทั้งที่จริงคือซื้อ 2,000 แล้วล้มไปสองรอบ ซึ่งคนละเรื่องกันเลย */
-      bq.textContent = m.buy.toLocaleString("th-TH") +
-                       (m.busts ? " (ล้ม " + m.busts + ")" : "") + " →";
-      var v = document.createElement("span");
-      v.className = "v " + (m.net > 0 ? "v--up" : (m.net < 0 ? "v--dn" : "v--flat"));
-      v.textContent = (m.net > 0 ? "+" : (m.net < 0 ? "−" : "")) +
-                      Math.abs(m.net).toLocaleString("th-TH");
-      c.appendChild(n); c.appendChild(bq); c.appendChild(v);
-      chips.appendChild(c);
-    });
-    box.appendChild(chips);
-    box.classList.add("is-on");
-  }
-
-  /* แตะโซนเงินแล้วเปิดตารางเต็ม — ผูกครั้งเดียวตอนเริ่ม ไม่ใช่ทุกครั้งที่วาดใหม่
-     ไม่งั้นตัวรับเหตุการณ์จะซ้อนกันเพิ่มขึ้นเรื่อยๆ ทุกมือ */
-  $("t-money").addEventListener("click", function () {
-    panelTab = "money";
-    tablePanelOn = true;
-    paintTablePanel();
-  });
 
 })();
 </script>
