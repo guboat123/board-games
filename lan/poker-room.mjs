@@ -594,8 +594,10 @@ export function createTable(opts = {}) {
         showdown: !!(st.lastResult && st.lastResult.showdown),
         payouts: (st.lastResult && st.lastResult.payouts || [])
           .map(x => ({ name: x.name, amount: x.amount })),
+        /* ต้องเก็บ put ด้วย ไม่งั้นย้อนดูประวัติแล้วไม่รู้ว่าใครเสียไปเท่าไหร่
+           (หน้าจอมีให้ดูตอนจบมือ แต่ไฟล์ประวัติหายไป ซึ่งเป็นที่ที่ใช้ศึกษาจริง) */
         reveal: (st.lastResult && st.lastResult.reveal || [])
-          .map(x => ({ name: x.name, hand: x.hand, cards: x.cards }))
+          .map(x => ({ name: x.name, hand: x.hand, cards: x.cards, put: x.put }))
       };
       st.hands.push(st.hand);
       if (st.hands.length > MAX_HISTORY) st.hands.shift();
