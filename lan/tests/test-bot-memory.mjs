@@ -114,7 +114,76 @@ console.log("\n--- จดความจำได้มือละครั้�
   mgr.stop();
 }
 
-/* ---------- 4 หมดตัวแล้วต้องเดินตามทางเดียวกับเกมจริง ---------- */
+/* ---------- 4 senseTable ต้องทำครบทั้งสามอย่าง ไม่ใช่แค่บางอย่าง ----------
+   ⚠️ เคยพลาดมาแล้ว: ฟังก์ชันใหม่ตั้งชื่อชนกับ observe(st) ที่มีอยู่เดิม
+   ตัวหลังถูกทับเงียบ ๆ (ประกาศทีหลังชนะ) ไพ่ที่เห็นคนอื่นเปิดจึงไม่ถูกจดเลย
+   โค้ดยังรันผ่าน เทสต์เดิมยังเขียว แต่ความจำครึ่งหนึ่งตายไปโดยไม่มีใครรู้
+   เทสต์นี้จึงเช็ค "ผลลัพธ์" ของทั้งสามอย่างพร้อมกัน ไม่ใช่เช็คว่าเรียกฟังก์ชันไหน */
+console.log("\n--- senseTable ต้องจดครบ: ท่าที่เห็น · ไพ่ที่เปิด · อารมณ์ ---");
+{
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "memfull-"));
+  bank._setDir(dir); mind._setDir(dir); mind.setAutoSave(false);
+  const table = createTable({ smallBlind: 10, bigBlind: 20, minBuyIn: 200, turnSeconds: 0 });
+  const mgr = createBotManager({ table: table }, () => {});
+  const watcher = table.sit("คนดู", null, 100000, "watcher-mem");
+  table._state.seats[watcher.seatId].connected = true;
+  table._state.seats[watcher.seatId].sitOut = true;
+  const NAMES = [["Otto", 3], ["Zed", 3], ["Marco", 2], ["Tank", 2], ["Toby", 1], ["Gus", 1]];
+  for (const [n, lv] of NAMES) mgr._addNamed(n, lv);
+  const st = table._state;
+
+  for (let h = 0; h < 200; h++) {
+    if (table.action(watcher.seatId, { type: "start" }).error) break;
+    let guard = 0;
+    while (st.phase !== "showdown" && st.phase !== "waiting" && guard++ < 200) {
+      const cur = st.current;
+      if (cur < 0) break;
+      if (!mgr._decideNow(cur)) {
+        const v = table.viewFor(cur);
+        table.action(cur, { type: "act", action: v.toCall > 0 ? "call" : "check" });
+      }
+      mgr.senseTable();
+    }
+    mgr.senseTable();
+    mgr.settleBusted();
+    if (st.seats.filter(x => x && x.isBot).length < 3) break;
+  }
+
+  let sawActs = 0, sawReads = 0, sawMood = 0;
+  for (const [n] of NAMES) {
+    const sum = mind.summaryOf(n);
+    if (sum.mood.tilt > 0 || sum.mood.confidence > 0 || sum.mood.boredom > 0) sawMood++;
+    for (const [m] of NAMES) {
+      if (m === n) continue;
+      if (mind.foeOf(n, m).acts > 0) sawActs++;
+      if (mind.readOf(n, m).n > 0) sawReads++;
+    }
+  }
+  ok("จดท่าที่เห็นคนอื่นทำ (trackActions)", sawActs > 0, sawActs);
+  ok("จดไพ่ที่เห็นคนอื่นเปิด (observe)", sawReads > 0, sawReads);
+  ok("อารมณ์ขยับตามผลที่เจอ (updateMoods)", sawMood > 0, sawMood);
+  mgr.stop();
+  bank._setDir(tmp); mind._setDir(tmp); mind.setAutoSave(false);
+}
+
+/* ---------- 5 เปิดโต๊ะรอบใหม่ ต้องเรียกชื่อเดิมกลับมาได้ ----------
+   ⚠️ bank.claim กันไม่ให้บอทตัวเดียวนั่งสองโต๊ะพร้อมกัน ซึ่งถูกแล้ว
+   แต่ _setDir (เปลี่ยนโฟลเดอร์ข้อมูล = คนละโลก) ไม่เคยล้างรายชื่อที่จองไว้
+   เครื่องมือวัดผลที่เปิดโต๊ะใหม่ทุกรอบจึงเรียกชื่อเดิมกลับมาไม่ได้
+   โต๊ะรอบหลัง ๆ มีคนน้อยลงเรื่อย ๆ แบบเงียบ ๆ และไม่มีอะไรฟ้องเลย */
+console.log("\n--- เปิดโต๊ะรอบใหม่ ต้องเรียกชื่อเดิมกลับมาได้ ---");
+{
+  const d1 = fs.mkdtempSync(path.join(os.tmpdir(), "busy1-"));
+  bank._setDir(d1);
+  ok("จองชื่อครั้งแรกได้", bank.claim("Sable") === true);
+  ok("จองชื่อเดิมซ้ำในโลกเดียวกันไม่ได้", bank.claim("Sable") === false);
+  const d2 = fs.mkdtempSync(path.join(os.tmpdir(), "busy2-"));
+  bank._setDir(d2);
+  ok("เปลี่ยนโฟลเดอร์ข้อมูลแล้ว ต้องจองชื่อเดิมได้อีก", bank.claim("Sable") === true);
+  bank._setDir(tmp);
+}
+
+/* ---------- 6 หมดตัวแล้วต้องเดินตามทางเดียวกับเกมจริง ---------- */
 console.log("\n--- settleBusted เปิดให้เครื่องมือวัดเรียกได้ ---");
 {
   const table = createTable({ smallBlind: 10, bigBlind: 20, minBuyIn: 200, turnSeconds: 0 });

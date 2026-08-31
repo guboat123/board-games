@@ -328,6 +328,8 @@ while (handsPlayed < HANDS) {
   myBoughtTotal += myBought;
   tableResults.push({ net, bought: myBought, who: seatedNow });
   mgr.stop();
+  /* คืนชื่อทุกตัวที่ยังนั่งอยู่ ไม่งั้นวงหน้าเรียกกลับมาไม่ได้ */
+  for (const s2 of st.seats) if (s2 && s2.isBot) bank.release(s2.name);
   try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) { /* ลบไม่ได้ก็ไม่เป็นไร */ }
 }
 

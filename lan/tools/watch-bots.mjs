@@ -195,6 +195,8 @@ while (handsDone < TOTAL) {
     if (st.seats.filter(s => s && s.isBot).length < 4) break;
   }
   mgr.stop();
+  /* คืนชื่อทุกตัวที่ยังนั่งอยู่ ไม่งั้นรอบหน้าเรียกกลับมาไม่ได้ */
+  for (const s of st.seats) if (s && s.isBot) bank.release(s.name);
   try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) { /* ลบไม่ได้ก็ไม่เป็นไร */ }
 }
 
