@@ -68,7 +68,11 @@ window.Cards = (function () {
      สีต้องเขียนเป็น rgb() ไม่ใช่ #rrggbb
      ส่วน url(#id) ที่อ้าง gradient/pattern เขียน # ตรงๆ ได้ encodeURIComponent จะแปลงเป็น %23 ให้เอง
      (ถ้าเขียน %23 ไว้เองจะโดนเข้ารหัสซ้ำเป็น %2523 แล้วลายหายทั้งใบ) */
-  var DRAGON_SVG = [
+  /* ลายกรอบ+เมฆ วาดเป็น SVG ตัวมังกรใช้รูปจริง (ดู .pc--back ใน cards.css)
+     ⚠️ สีต้องเขียนเป็น rgb() ไม่ใช่ #rrggbb — # ในสีจะถูกอ่านเป็น fragment ของ URL
+     ส่วน url(#id) ที่อ้าง gradient/pattern เขียน # ตรงๆ ได้ encodeURIComponent แปลงเป็น %23 ให้เอง
+     (ถ้าเขียน %23 ไว้เองจะโดนเข้ารหัสซ้ำเป็น %2523 แล้วลายหายทั้งใบ) */
+  var FRAME_SVG = [
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 140">',
     '<defs>',
       '<linearGradient id="g" x1="0" y1="0" x2="1" y2="1">',
@@ -76,63 +80,30 @@ window.Cards = (function () {
         '<stop offset="0.45" stop-color="rgb(245,222,163)"/>',
         '<stop offset="1" stop-color="rgb(172,124,56)"/>',
       '</linearGradient>',
-      /* เมฆจีนซ้ำเป็นพื้นหลังจางๆ ไม่ให้พื้นโล่งเกินไป */
       '<pattern id="cl" width="22" height="22" patternUnits="userSpaceOnUse">',
         '<path d="M2 15a4 4 0 018 0 4 4 0 018 0" fill="none" stroke="rgb(126,44,38)" stroke-width="1.1" opacity="0.55"/>',
       '</pattern>',
     '</defs>',
-
-    /* พื้นแดงเข้มเกือบดำ แบบไพ่สำรับจีน */
     '<rect width="100" height="140" fill="rgb(26,10,11)"/>',
     '<rect width="100" height="140" fill="url(#cl)"/>',
-
-    /* กรอบทองสองชั้น + ลายประแจจีนที่มุมทั้งสี่ */
     '<rect x="5" y="5" width="90" height="130" rx="5" fill="none" stroke="url(#g)" stroke-width="1.7"/>',
     '<rect x="9.5" y="9.5" width="81" height="121" rx="3" fill="none" stroke="url(#g)" stroke-width="0.55" opacity="0.7"/>',
     '<path d="M13 13h9v3.2h-5.8v5.8H13zM87 13h-9v3.2h5.8v5.8H87zM13 127h9v-3.2h-5.8v-5.8H13zM87 127h-9v-3.2h5.8v-5.8H87z" fill="url(#g)" opacity="0.92"/>',
-
-    /* วงกลมล้อมตัวมังกร */
-    '<circle cx="50" cy="70" r="33" fill="none" stroke="url(#g)" stroke-width="0.9" opacity="0.55"/>',
-
-    /* ---- ตัวมังกร ----
-       ลำตัวเป็นเส้นโค้งขดรอบเดียว หัวอยู่บนซ้าย หางม้วนเข้าด้านใน
-       วาดสองชั้น: ชั้นล่างหนาเป็นตัว ชั้นบนบางเป็นเกล็ด */
-    '<g fill="none" stroke="url(#g)" stroke-linecap="round" stroke-linejoin="round">',
-      '<path d="M43 53C29 59 25 75 35 85c10 10 28 8 34-4 5-10 0-20-10-20-7 0-11 6-9 12" stroke-width="4.2"/>',
-      '<path d="M43 53C29 59 25 75 35 85c10 10 28 8 34-4" stroke-width="1.1" opacity="0.6" stroke-dasharray="0.8 3.2"/>',
-
-      /* ขาหน้า-ขาหลัง พร้อมเล็บสามนิ้ว */
-      '<path d="M31 70l-8-3m8 3l-8 2m8-2l-6-6" stroke-width="1.5"/>',
-      '<path d="M62 88l7 5m-7-5l8 1m-8-1l5 7" stroke-width="1.5"/>',
-
-      /* ครีบหลัง */
-      '<path d="M37 57l-3-5m1 11l-5-3m2 12l-6-1" stroke-width="1.2" opacity="0.85"/>',
-
-      /* หัว: ปากแหลม เขาโค้งไปหลัง หนวดยาวสองเส้น */
-      '<path d="M41 47c4-3 9-2 11 2" stroke-width="1.6"/>',
-      '<path d="M35 44c-6 2-9 7-8 12" stroke-width="1.3" opacity="0.9"/>',
-      '<path d="M33 52c-7-1-11 3-12 8" stroke-width="1.1" opacity="0.75"/>',
-    '</g>',
-    /* ปากอ้า (รูปทึบ) */
-    '<path d="M43 53l-11-6 4-4 9 5z" fill="url(#g)"/>',
-    /* ตา */
-    '<circle cx="40.5" cy="50" r="1.25" fill="rgb(210,64,52)"/>',
-
-    /* ลูกแก้วที่มังกรไล่คว้า */
-    '<circle cx="59" cy="71" r="4.2" fill="none" stroke="url(#g)" stroke-width="1.2"/>',
-    '<circle cx="59" cy="71" r="1.6" fill="url(#g)"/>',
     '</svg>'
   ].join("");
 
-  /* ใส่กฎ background-image เข้าไปครั้งเดียวตอนโหลด
-     ต้องทำใน JS เพราะ data URI ยาวมาก เขียนใน .css แล้วอ่าน/แก้ไม่ไหว */
+  /* ใส่กฎ background เข้าไปครั้งเดียวตอนโหลด
+     ⚠️ สองชั้น: รูปมังกรอยู่บน กรอบ+พื้นอยู่ล่าง เรียงตามลำดับใน background-image
+     ต้องทำใน JS เพราะ data URI ของกรอบยาวมาก เขียนใน .css แล้วอ่าน/แก้ไม่ไหว
+     ส่วนตัวมังกรเป็นไฟล์รูปจริง จึงอ้างด้วย path สัมพัทธ์ ใช้ได้ทั้ง http และ file:// */
   function installBack() {
     if (document.getElementById("pc-back-style")) return;
     var st = document.createElement("style");
     st.id = "pc-back-style";
-    st.textContent = ".pc--back{background-image:url(\"data:image/svg+xml," +
-      encodeURIComponent(DRAGON_SVG).replace(/'/g, "%27") +
-      "\");background-size:100% 100%;background-repeat:no-repeat;}";
+    st.textContent = ".pc--back{background-image:url(\"img/dragon.png\"),url(\"data:image/svg+xml," +
+      encodeURIComponent(FRAME_SVG).replace(/'/g, "%27") +
+      "\");background-size:66% auto,100% 100%;" +
+      "background-position:center center,center center;background-repeat:no-repeat,no-repeat;}";
     document.head.appendChild(st);
   }
   installBack();
