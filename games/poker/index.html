@@ -870,7 +870,18 @@ button { font-family: inherit; }
   flex: 0 0 auto; height: 24px; overflow: hidden;
   padding: 3px 12px; font-size: .74rem; color: var(--muted);
   background: #061a12; white-space: nowrap; text-overflow: ellipsis;
+  cursor: pointer;
 }
+/* กางแล้วเห็นย้อนหลัง 8 บรรทัด ใหม่สุดอยู่บน
+   ⚠️ ต้องเป็น absolute ไม่งั้นมันดันโต๊ะกับแถบไพ่ในมือให้ขยับ
+   ซึ่งเป็นปัญหาที่เพิ่งแก้ไปว่าโซนต้องอยู่นิ่ง */
+.log.is-open {
+  position: absolute; left: 0; right: 0; z-index: 45;
+  height: auto; max-height: 40vh; overflow-y: auto;
+  white-space: normal; padding: 8px 12px;
+  background: rgba(6,26,18,.97); border-bottom: 1px solid #1d3a2b;
+}
+.log.is-open div { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
 .toast {
   position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
   background: rgba(0,0,0,.85); color: #fff; padding: 9px 16px;
@@ -1201,7 +1212,8 @@ button { font-family: inherit; }
     <div class="result" id="t-table"></div>
   </div>
 
-  <div class="log" id="t-log"></div>
+  <div class="log" id="t-log" role="button" tabindex="0"
+       title="แตะเพื่อดูข้อความย้อนหลัง"></div>
 
   <div class="hand-area" id="hand-area">
     <div class="hand-hint" id="hand-hint">กดค้างที่ปุ่มทองเพื่อแง้มดูไพ่</div>
@@ -1869,7 +1881,7 @@ button { font-family: inherit; }
       v.seats.forEach(function (x, i) {
         if (x) L.push("  " + (i + 1) + " " + x.name + " ชิป " + x.stack +
                       (x.connected ? "" : " (หลุด)") + (x.folded ? " หมอบ" : "") +
-                      (x.allIn ? " หมดตัก" : ""));
+                      (x.allIn ? " All in" : ""));
       });
     }
     L.push("");
@@ -1931,6 +1943,16 @@ button { font-family: inherit; }
     tablePanelOn = !tablePanelOn;
     paintTablePanel();
   });
+
+  /* แตะแถบข้อความเพื่อกาง/พับดูย้อนหลัง */
+  (function () {
+    var lg = $("t-log");
+    function toggle() { lg.classList.toggle("is-open"); if (view) render(); }
+    lg.addEventListener("click", toggle);
+    lg.addEventListener("keydown", function (e) {
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(); }
+    });
+  })();
 
   $("btn-leave").addEventListener("click", function () {
     if (view && view.phase !== "waiting" && view.phase !== "showdown") {
@@ -2310,15 +2332,21 @@ button { font-family: inherit; }
      ตามเท่าไหร่ก็ตาม = เสี่ยงโดนเรซก้อนใหญ่ในรอบถัดไป จึงหมดอายุเมื่อขึ้นรอบใหม่
      ⚠️ เดิมล้างทุกครั้งที่ขึ้นรอบเดิมพัน ทำให้ในโต๊ะสองคนแทบไม่มีวันได้ใช้เลย
      เพราะตาถัดไปของเรามักอยู่คนละรอบกับตอนที่กดสั่ง */
-  function preScope(kind) {
-    return kind === "call" ? view.handNo + "|" + view.phase : String(view.handNo);
+  /* ⚠️ คำสั่งล่วงหน้าต้องหมดอายุเมื่อข้ามรอบเดิมพัน ทุกแบบ ไม่ใช่เฉพาะ Pre-Call
+     ของเดิม Pre-Check/Fold กับ Pre-Fold ผูกกับ "มือ" อย่างเดียว
+     ตั้งไว้ตอนฟลอป มันเคาะผ่านให้ฟรี แล้วยัง "ติดอาวุธ" ค้างถึงเทิร์นกับริเวอร์
+     พอมีคนเดิมพันในรอบที่เราเลิกคิดถึงไปแล้ว มันพับให้ทันที
+     ซึ่งเป็นบั๊กทรงเดียวกับที่เคยทำให้เจ้าของพับมือจริงทิ้งไปแล้วครั้งหนึ่ง
+     ผูกกับรอบเดิมพันทั้งหมด = ตัดสินใจหนึ่งครั้งต่อรอบที่มองเห็นอยู่ตรงหน้า */
+  function preScope() {
+    return view.handNo + "|" + view.phase;
   }
 
   function runPreAction() {
     if (!view || !preAct) return;
     var me2 = view.seats[mySeat];
     if (!me2 || me2.folded || me2.allIn) { preAct = null; return; }
-    if (preAt !== preScope(preAct)) { preAct = null; return; }
+    if (preAt !== preScope()) { preAct = null; return; }
     if (view.current !== mySeat) return;
     var a = preAct;
     preAct = null;
@@ -2555,7 +2583,20 @@ button { font-family: inherit; }
     }
     lastPot = view.pot;
     $("t-hand").textContent = "ห้อง " + roomCode + (view.handNo ? " · มือที่ " + view.handNo : "");
-    $("t-log").textContent = (view.log && view.log.length) ? view.log[view.log.length - 1] : "";
+    /* ⚠️ เซิร์ฟเวอร์ส่งมา 8 บรรทัด แต่จอโชว์บรรทัดเดียวแล้วทับทิ้งทุกครั้งที่มีคนลงมือ
+       ข้อความสำคัญอย่าง "X หมดเวลา ระบบพับให้" · "X เติมชิป" · "— จบรอบเล่น —"
+       จึงกระพริบผ่านไปเฟรมเดียวแล้วหายถาวร แตะที่แถบเพื่อกางดูย้อนหลังได้ */
+    var lg = $("t-log");
+    var lines = (view.log || []);
+    lg.textContent = lines.length ? lines[lines.length - 1] : "";
+    if (lg.classList.contains("is-open")) {
+      lg.textContent = "";
+      lines.slice().reverse().forEach(function (t) {
+        var d = document.createElement("div");
+        d.textContent = t;
+        lg.appendChild(d);
+      });
+    }
 
     /* ไพ่กลาง 5 ช่อง — ใบที่เพิ่งเปิดใหม่เท่านั้นที่วิ่งลงมา
        ขึ้นมือใหม่ให้ถือว่าใหม่ทั้งแถว (ฟลอปลงพร้อมกัน 3 ใบ) */
@@ -3327,14 +3368,21 @@ button { font-family: inherit; }
     if (!me2) return;
     /* อยู่ในมืออยู่ เติมไม่ได้ (เซิร์ฟเวอร์ก็ปฏิเสธ) จึงไม่ต้องโชว์ให้กดเสียเที่ยว */
     if (me2.inHand) return;
-    if (me2.stack >= view.blinds.bb * 10) return;
+    /* ⚠️ ห้ามซ่อนตอนชิปยังเยอะ
+       เดิมโผล่เฉพาะตอนเหลือน้อยกว่า 10 บอด ทั้งที่เซิร์ฟเวอร์ให้เติมได้ตลอด
+       คนที่อยากเติมก่อนเริ่มวงใหญ่จึงหาปุ่มไม่เจอ ต้องเล่นจนเหลือน้อยก่อนปุ่มถึงโผล่
+       ตอนชิปยังเยอะให้เป็นปุ่มจางๆ ไม่แย่งสายตาปุ่มหลัก แต่ยังกดได้ */
+    var low = me2.stack < view.blinds.bb * 10;
 
     var b = mkBtn("act", "เติมชิป",
       me2.stack === 0 ? "ชิปหมด เติมก่อนถึงจะเล่นต่อได้" : "เหลือ " + me2.stack.toLocaleString("th-TH"),
       function () {
-        openAmount("เติมชิปเท่าไหร่", view.buyInRange.min, view.buyInRange.max,
+        /* ⚠️ เติมเสริมกับซื้อเข้าครั้งแรกคนละเรื่อง เซิร์ฟเวอร์รับเติมเท่าไหร่ก็ได้ที่มากกว่า 0
+           บังคับขั้นต่ำเท่าซื้อครั้งแรกทำให้คนที่อยากเติมนิดเดียวทำไม่ได้ */
+        openAmount("เติมชิปเท่าไหร่", 1, view.buyInRange.max,
           view.buyInRange.suggested, function (v) { send({ type: "rebuy", amount: v }); });
       });
+    if (!low) b.style.opacity = ".62";
     b.id = "btn-rebuy";
     $("t-actions").appendChild(b);
   }
@@ -3400,7 +3448,7 @@ button { font-family: inherit; }
       var wait = document.createElement("div");
       wait.className = "waitbar";
       wait.innerHTML = "<div class='msg'>" +
-        (me.folded ? "คุณหมอบแล้ว" : (me.allIn ? "คุณหมดหน้าตักแล้ว" : "รอ " + (who ? who.name : "—"))) +
+        (me.folded ? "คุณหมอบแล้ว" : (me.allIn ? "คุณ All in แล้ว" : "รอ " + (who ? who.name : "—"))) +
         "</div>";
       row.appendChild(wait);
 
@@ -3417,7 +3465,7 @@ button { font-family: inherit; }
           /* ใส่ Pre- นำหน้าให้ชัดว่าเป็น "คำสั่งล่วงหน้า" ไม่ใช่ปุ่มลงมือทันที
              ความสับสนตรงนี้เคยทำให้เจ้าของเสียมือแรกไปแล้ว */
           { k: "checkfold", t: "Pre-Check / Fold", sub: "ถ้าโดนเดิมพันเพิ่ม จะพับให้เลย" },
-          { k: "call", t: "Pre-Call Any", sub: "ตามทุกจำนวน แม้อีกฝ่ายลงหมดตัก" },
+          { k: "call", t: "Pre-Call Any", sub: "ตามทุกจำนวน แม้อีกฝ่าย All in" },
           { k: "fold", t: "Pre-Fold", sub: "พับทันทีที่ถึงตา" }
         ].forEach(function (o) {
           var pb = document.createElement("button");
@@ -3429,7 +3477,7 @@ button { font-family: inherit; }
           pb.appendChild(sm);
           pb.addEventListener("click", function () {
             preAct = (preAct === o.k) ? null : o.k;
-            preAt = preAct ? preScope(preAct) : "";
+            preAt = preAct ? preScope() : "";
             paintActions();
           });
           pre.appendChild(pb);
@@ -3618,7 +3666,9 @@ button { font-family: inherit; }
       { label: "ต่ำสุด", value: minTarget },
       { label: "½ กอง", value: view.currentBet + Math.round(potAfterCall / 2) },
       { label: "กอง",   value: view.currentBet + potAfterCall },
-      { label: "หมดตัก", value: maxTarget }
+      /* ⚠️ ต้องเรียกว่า All in เหมือนปุ่มกับแถบสถานะ ไม่ใช่ "หมดตัก"
+         คำเดียวกันสามชื่อ คนที่เพิ่งหัดจะไม่รู้ว่ามันคือท่าเดียวกัน */
+      { label: "All in", value: maxTarget }
     ].forEach(function (q) {
       /* ปุ่มลัดต้องกดแล้วใช้ได้จริง ถ้าคำนวณออกมาต่ำกว่าขั้นต่ำก็ดันขึ้นเป็นขั้นต่ำ
          ถ้าเกินหน้าตักก็หยุดที่หมดตัก ไม่งั้นกดแล้วเลขแดง ปุ่มตกลงกดไม่ได้ */

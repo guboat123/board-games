@@ -102,7 +102,7 @@ window.Cards = (function () {
     st.id = "pc-back-style";
     st.textContent = ".pc--back{background-image:url(\"img/dragon.png\"),url(\"data:image/svg+xml," +
       encodeURIComponent(FRAME_SVG).replace(/'/g, "%27") +
-      "\");background-size:66% auto,100% 100%;" +
+      "\");background-size:84% auto,100% 100%;" +
       "background-position:center center,center center;background-repeat:no-repeat,no-repeat;}";
     document.head.appendChild(st);
   }
