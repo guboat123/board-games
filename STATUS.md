@@ -23,7 +23,7 @@ games only. Start it with the `board-games-lan` entry in `C:\ClaudeCode\.claude\
 
 The owner asked for: send agents to actually play → fix what they find → send agents again → repeat.
 
-**Completion criterion (agreed with owner 2026-08-31):**
+**Completion criterion (agreed with owner 2026-08-31, then superseded — see "How this ended"):**
 > **Category A (bugs that actually break something) = 0 for two consecutive rounds.**
 > Categories B (confusion) and C (friction) are still collected and reported, but do NOT block.
 
@@ -42,9 +42,66 @@ dead-code grep), so B/C findings never run out. Severity, by contrast, did conve
 | 5 | 5 (A2) | 5 (A3) | 13 (A6) | first agent check of the poker fixes: 6 of 8 held, 2 failed |
 | 6 | 5 (A1) | 5 (**A0**) | 10 (A5) | first round judged by the new criterion; เดาสี is the first game to reach A=0 |
 | 7 | 2 (**A0 B0**) | 3 (A1) | 4 (A1) | วาดให้ทาย reached A=0 *and* B=0 |
-| 8 | running | running | running | final round — see "How this ended" |
+| 8 | 7 (A2) | 5 (A1) | 3 (**A0**) | final round — every category A fixed and verified; B/C left open on purpose |
+
+### Round 8 — the closing round
+
+All three category-A defects are fixed and verified in the browser.
+
+**วาดให้ทาย — A2.** The sticky button bar I added in round 7 turned out to be an opaque sheet
+floating over the form, and it swallowed taps meant for the controls underneath. Tapping "1 รอบ"
+**started the game** with the old value; tapping a leader chip jumped to the setup screen; the name
+field would not take focus. Fixed by removing `position: sticky` from the players and setup screens
+— both are scrollable forms, so the button belongs at the end of the form. (The button that must
+stay in view *during play* is on a different screen and was not touched.) Re-measured every tap
+point at both reported sizes: 375×667 → 182 points, 360×640 → 190 points, **0 hijacked**.
+
+**เดาสี — A1.** The round-7 rule "`กระดาน` at the tail of a word = positional" was too broad.
+`ไม้กระดาน` `แผ่นกระดาน` `พื้นกระดาน` `หมากกระดาน` — and worst, `เกมกระดาน` — were all rejected as
+"telling the position on the board", on a site called ก๊วนบอร์ดเกม. The decider is now the word
+immediately *before* `กระดาน`, not its index: a positional connector (`บน` `มุม` `ของ` `ริม` `ขอบ`
+`กลาง` …) blocks, anything else passes. Swept all 76 words the agent had verified — correct on every
+one — added cases to `tests/test-clue.mjs`, and confirmed by typing into the real clue field.
+
+**โป๊กเกอร์ — A0.** 45+ hands across 9-player, 3-player and heads-up tables, with a bot auditing
+every state frame. `Σstack + pot = Σbuy-ins` was never wrong, including all-in-then-leave, leaving
+while on turn, socket death mid-flop, and reload mid-hand. Hole cards stayed `??` on every frame
+until showdown — 0 leaks. 0 console errors.
+
+### Known remaining (deliberately not fixed)
+
+Left open by the owner's decision to close after round 8. None of these break a game.
+
+**วาดให้ทาย**
+- B1 · the disabled all-done button reads "ต้องมีคนคว้าคิวหรือยอมแพ้ก่อน", but a single give-up does
+  not actually unlock it — the text wants "หรือทุกคนยอมแพ้ก่อน".
+- C1 · the "ต้องเหลือชุดคำอย่างน้อย 1 ชุด" warning never clears once shown.
+- C2 · `#s-word .word` wins on ID specificity, so both short-screen media blocks are dead.
+- C3 · 360×500 (split screen): the button lands ~37px below the fold.
+
+**เดาสี**
+- B1 · positional words with a prefix slip through: `ด้านซ้าย` `ข้างบน` `แถวบน` are accepted while
+  `ซ้ายบน` is blocked. Fix is additive — extend `BANNED_POS_IN` with the `ด้าน/ข้าง/ฝั่ง/แถว/ขอบ`
+  + direction pairs.
+- B2 · colour names in tail position slip through: `ชาเขียว` `มะเขือม่วง`. Needs care — `มะม่วง`
+  must keep passing, which is why the rule compares whole tokens today.
+- C1 · in clue field 1 a spaced positional phrase reports the word-count error instead of the
+  positional one (field 2 gets it right). Still blocked, just with the less useful reason.
+- C2 · resuming mid-round re-rolls the card but does not release the clue that round already
+  consumed, so the clue-giver is told "คำใบ้นี้ใช้ไปแล้วในเกมนี้" for a round nobody ever answered.
+
+**โป๊กเกอร์**
+- B1 · a timed table shows "หมดเวลา · เล่นตานี้ให้จบ" before the first hand is dealt — `msLeft()`
+  returns `null` until `startedAt` is set, and the page does `null || 0`.
+- C1 · **regression of mine.** `@media (max-height: 700px)` caps `.hand-area` at 108px while the
+  content is ~129px, and the box is `justify-content: flex-end`, so the overflow rides *upward* out
+  of the box and onto the log — 1,747 px² of text over text at 360×640. One-line fix: raise or drop
+  that cap.
+- C2 · a third payout row is clipped with nothing to signal that it scrolls.
 
 ## How this ended
+
+**Closed 2026-08-31 after round 8. Category A is 0 across all three games.**
 
 The owner called it after round 8: **fix whatever round 8 reports as category A, then stop** — do
 not keep going for the "A=0 twice running" condition.
@@ -127,4 +184,6 @@ try/catch. Never touch `games/catch-sketch/words/` except the `-3` files (owner'
 
 ## Handoff / waiting on owner
 
-Nothing blocking. Round 5 results pending.
+Nothing blocking. The playtest loop is closed. If it is ever restarted, start from the
+"Known remaining" list above rather than sending a fresh agent — those items are already
+reproduced, located in the source, and none of them needs another round to find.
