@@ -356,29 +356,41 @@ times over; and the two think-time draws disagreed with each other.
 
 ### Where each level stands
 
-10,000,000 hands, all 30 bots, 400 rounds, chips per 100 hands. Run it with:
+10,000,002 hands, all 30 bots, 402 rounds, 63 minutes on six processes, chips per 100 hands.
+Re-measured 2026-09-03 on the build that passes `realism-check`. Run it with:
 
 ```
-for i in 0 1 2 3 4 5 6 7; do node lan/tools/watch-bots.mjs 1250000 25000 $i /tmp/wb/part$i.json & done
+for i in 0 1 2 3 4 5; do node lan/tools/watch-bots.mjs 1666667 25000 $i /tmp/wb/part$i.json & done
 node lan/tools/merge-watch.mjs /tmp/wb/part*.json
 ```
 
 | Level | chips/100 hands | VPIP | raise | showdown | busts/1000 | spread inside the level |
 |---|---|---|---|---|---|---|
-| 3 มืออาชีพ | **+6,230** | 27-32% | 21-23% | 8-10% | 6.7 | Vega +7,721 … Otto +4,471 |
-| 1 มือใหม่ | **-1,707** | 34-44% | 4-6% | 8-12% | 10.3 | Rudy -1,266 … Bruno -2,083 |
-| 2 นักพนัน | **-2,415** | 51-53% | 25% | 17-18% | 20.3 | Vince -1,491 … Tank -3,474 |
+| 3 มืออาชีพ | **+3,539** | 23-27% | 20-21% | 5-7% | **2.7** | Zed +4,041 … Ash +3,097 |
+| 2 นักพนัน | **-819** | 57% | 31-32% | 21% | 23.6 | Rocco -707 … Lenny -903 |
+| 1 มือใหม่ | **-1,561** | 39-48% | 5-7% | 7-12% | 10.9 | Bruno -1,447 … Wally -1,651 |
 
-Before this session's fixes the same run gave pro +11,286, beginner **+440** (break-even) and
-gambler -7,949 at 41.7 busts per 1000 hands.
+The run before the realism work gave pro +6,230, gambler -2,415, beginner -1,707, with the pro
+busting 6.7 times per 1000 hands instead of 2.7.
 
-The beginner losing less than the gambler is not an inversion: the gambler puts far more money in,
-so more of it is lost. The ordering that matters is the one a human meets, and that one is right —
-see below.
+**The spread inside each level is the number to watch, and it is now narrow everywhere** - the
+best and worst pro are 4,041 and 3,097 where they used to be 7,721 and 4,471. That is the whole
+point of the design: personality is meant to change how a bot plays, not how well. A wide spread
+means one bot's traits are carrying the level and the level itself is not calibrated.
 
-The spread inside a level stays narrow, which is the point: personality changes how a bot plays,
-not how well. A wide spread means one bot's traits are doing the work and the level itself is not
-calibrated.
+The beginner losing more than the gambler reads oddly until you notice it is also true in real
+games: the loose-passive player who calls down is the biggest loser at a small-stakes table, worse
+than the maniac, because the maniac at least wins pots nobody contests. The split confirms it -
+the beginner makes +3,091 per 100 hands at showdown and gives back -4,652 in hands that never got
+there, while the pro is +4,709 and -1,171.
+
+Where each level puts its whole stack in, since that is where the money actually goes:
+
+| Level | all-ins in the run | biggest two spots |
+|---|---|---|
+| มือใหม่ | 685,057 | turn raise 21% · preflop call 18% |
+| นักพนัน | 1,608,593 | turn call 23% · turn raise 20% |
+| มืออาชีพ | 226,561 | turn call 32% · river call 22% |
 
 ### What a human can do to them
 
