@@ -1184,6 +1184,38 @@ export function createBotManager(room, broadcast) {
     const cred = credibility(view, i, live, byWhom);
     return NEUTRAL + (claimed - NEUTRAL) * cred;
   }
+
+  /* ⚠️ ตัวอ่านอย่างเดียวสำหรับ lan/tools/read-check.mjs — ไม่มีใครในทางตัดสินใจเรียกใช้
+     มีไว้ให้เครื่องมือวัด "ถามค่าที่ decide ใช้จริง" แทนการลอกสูตรไปคำนวณเอง
+     การลอกสูตรไปวัดคือความผิดพลาดที่ทำให้โปรเจกต์นี้วัดผิดตัวมาหลายเดือน (ดู senseTable) */
+  /* ค่ามือจริงของที่นั่งหนึ่ง ตามสูตรเดียวกับที่บอทใช้ตีค่าไพ่ตัวเอง (madeStrength)
+     ⚠️ เครื่องมือวัดต้องใช้ตัวนี้เป็น "ความจริง" ไม่ใช่คำนวณเอง
+     ถ้าคำนวณเองจะไม่มีตัวหักไพ่บนบอร์ดล้วน แล้ว "ความจริง" จะสูงเกินจริง
+     ทำให้ความเอียงของการเดาดูน้อยกว่าที่เป็น = หลอกตัวเอง */
+  function _handValue(seatId) {
+    /* ⚠️ ต้องดึงผ่าน viewFor เหมือนที่ decide ทำ — ไพ่ใน _state เก็บเป็นตัวเลข
+       ส่วน madeStrength รับเป็นข้อความ (view เป็นตัวแปลงให้) */
+    const st = room.table._state;
+    const s = st.seats[seatId];
+    if (!s || !s.cards || !s.cards.length) return null;
+    const view = room.table.viewFor(seatId);
+    const mine = view.seats[seatId];
+    if (!mine || !mine.cards || !mine.cards.length) return null;
+    if (!view.board || view.board.length < 3) return null;
+    return madeStrength(mine.cards, view.board);
+  }
+
+  function _readGuess(seatId, oppSeatId) {
+    const st = room.table._state;
+    const me = st.seats[seatId], opp = st.seats[oppSeatId];
+    if (!me || !opp || !me.isBot || !opp.inHand || opp.folded) return 0;
+    const view = room.table.viewFor(seatId);
+    let live = 0;
+    view.seats.forEach(function (x, i) {
+      if (x && x.inHand && !x.folded && i !== seatId) live++;
+    });
+    return guessStrength(view, oppSeatId, live, me.name);
+  }
   const bench = {};         /* seatId -> กลับมาเล่นได้ตอนจบมือที่เท่าไหร่ */
   /* ⚠️ seatId -> มือล่าสุดที่ตัดสินใจเรื่อง "อยู่ต่อหรือลุก" ไปแล้ว
      poke() เรียก settleBusted() ทุกครั้งที่สถานะเป็น waiting/showdown ซึ่งเกิดหลายครั้งต่อมือ
@@ -1967,5 +1999,6 @@ export function createBotManager(room, broadcast) {
   }
 
   return { add, removeAll, poke, stop, _decideNow, _pendingStart, _addNamed, settleBusted, senseTable,
+           _readGuess, _handValue,
            count: () => botSeats().length, LEVEL };
 }
