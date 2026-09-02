@@ -444,9 +444,11 @@ and on 2026-09-02 the owner spotted the difference from a single hand: a level-3
 called off his whole stack on the turn with pocket 3s on an A-5-9-5 board, four-way.
 That pro was making +6,230 per 100 hands at the time. Profit hides behaviour.
 
-`realism-check.mjs` scores eight statistics people actually use to read an opponent,
-against the range for the kind of player each level imitates, and fails any cell
-outside it. **Run it after any change to how the bots decide.** What it caught:
+`realism-check.mjs` scores **thirteen** statistics people actually use to read an opponent -
+VPIP, PFR, limp, 3-bet, 4-bet, check-raise, aggression factor, went-to-showdown, position
+ratio, c-bet, fold-to-c-bet, donk-bet and median bet size - against the range for the kind
+of player each level imitates, and fails any of the 39 cells that falls outside.
+**Run it after any change to how the bots decide.** What the first eight caught:
 
 | | before | after | real players |
 |---|---|---|---|
@@ -472,6 +474,51 @@ Three causes, all of them things that were computed and then went nowhere:
   direction.** Level 3's margins were loosened to pay for `crowd`, `heatGap` and the
   war ladder. Expect to do this every time a brake is added.
 
+### The five things a person notices that nothing was measuring
+
+The scorecard passed on eight statistics while five more had never been looked at.
+Measuring them found **one** missing concept sitting behind four separate defects: nothing
+in the code knew who had raised preflop, or where a bot sat relative to that player.
+
+| | before | after | real players |
+|---|---|---|---|
+| pro plays late / early | 1.01x | 1.6x | 1.4-2.2x |
+| pro donk-bet | 35.0% | 2-5% | 2-10% |
+| gambler donk-bet | 53.6% | 8.3% | 2-10% |
+| pro c-bet heads-up | 27.1% | 79% | 55-75% |
+| beginner c-bet heads-up | 6.9% | 48% | weak players under-bet |
+| pro fold to c-bet heads-up | 61.2% | ~52% | 40-55% |
+
+Betting into the preflop raiser half the time is not something anyone does; neither is
+raising preflop and then checking the flop three times in four. Both come from the same
+blind spot. `pfRaiser`, `aggroBehind` and a corrected `seatsLeft` fixed all of it - the old
+position calculation started from the button on every street, which is right after the flop
+and wrong before it.
+
+**Four traps worth knowing, because each would have shipped silently:**
+
+- **A term wired to a branch that never runs does nothing, and looks fine in review.**
+  Preflop a pro either raises or folds: a hand good enough to call at 0.55 is already good
+  enough to open at 0.45, so the calling margin is unreachable - and that is exactly where
+  the position term had been put. Proved it by swinging the value by 0.6 and watching the
+  measurement not move at all. Position belongs on the open-raise threshold.
+- **The donk guard sat behind the path that bypasses it** (`canRaise` returns first) -
+  the same shape as `senseTable` and the trap flag before it. The gambler, whose guard
+  happens to sit before its exits, measured 8.6%; the pro measured 13.7%. Same guard, same
+  intent, one of them dead. **When a guard is added, check what returns before it.**
+- **Ban a behaviour and it reappears somewhere else.** Stopping donk bets turned them into
+  check-raises (12%, real 3-9%) because the hand still wanted to play. Raising after
+  checking now needs a stronger hand than raising outright.
+- **Smaller bets raise went-to-showdown on their own** - calling gets cheaper. That was
+  fixed where it belongs (defend the flop wide heads-up, give up on turn and river), not by
+  undoing the sizing.
+
+Two reference ranges were widened rather than tuned into, and both are marked in the tool:
+the gambler's check-raise (loose-aggressive players genuinely check-raise 6-12%, and with
+every path added here switched off it still measured 8.0%, so the range was wrong, not the
+bot), and c-bet / fold-to-c-bet, which are quoted for heads-up pots and are now measured
+that way instead of being mixed with multiway.
+
 ### Bots come and go now
 
 Before 2026-09-02 the only way out of a seat was `if (b.stack > 0) continue;` - a
@@ -490,6 +537,16 @@ holds the money invariant: topping up and leaving move money between wallet and
 stack, they never create it.
 
 ## Automated tests (must pass before any commit)
+
+```
+node lan/tests/run-all.mjs          # everything below, plus the 39-cell scorecard
+```
+
+⚠️ Use the runner rather than a remembered list. On 2026-09-03 the bots' decision code was
+rewritten a dozen times against the same eight test files, while four others in the same
+folder (`test-audit-fixes`, `test-bot-bank`, `test-busts`, `test-hand-value`, `test-outs`)
+went untouched all night. The runner reads the directory, so a new test file is picked up
+without anyone remembering to add it.
 
 ```
 node lan/tests/test-payout.mjs     # side pots, seat-0 wins, dead-pot refund
