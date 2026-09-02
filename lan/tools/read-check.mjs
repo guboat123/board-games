@@ -29,7 +29,7 @@ import path from "node:path";
 const HANDS = Number(process.argv[2] || 8000);
 const PER_ROUND = 2000;
 const LN = { 1: "มือใหม่", 2: "นักพนัน", 3: "มืออาชีพ" };
-const STREETS = ["flop", "turn", "river"];
+const STREETS = ["preflop", "flop", "turn", "river"];
 
 /* ⚠️ "ความจริง" ต้องมาจาก mgr._handValue ซึ่งเรียก madeStrength ตัวเดียวกับที่บอทใช้
    คำนวณเองจะขาดตัวหักไพ่บนบอร์ดล้วน แล้วความจริงจะสูงเกินไป ความเอียงจะดูน้อยกว่าที่เป็น */
@@ -48,7 +48,8 @@ for (const lv of [1, 2, 3]) {
   for (const st of STREETS) S[lv][st] = mk();
 }
 function mk() { return { n: 0, absErr: 0, bias: 0, gs: [], ts: [], strongN: 0, strongHit: 0,
-                         naiveErr: 0 }; }
+                         naiveErr: 0, truthSum: 0, guessSum: 0,
+                         gStrong: 0, nStrong: 0, gWeak: 0, nWeak: 0 }; }
 /* ค่ากลางที่ bots.mjs ใช้เป็นจุดตั้งต้นเวลา "ไม่รู้อะไรเลย" */
 const NEUTRAL = 0.45;
 function note(box, guess, truth) {
@@ -59,8 +60,14 @@ function note(box, guess, truth) {
   /* ⚠️ เส้นเปรียบเทียบต้องคำนวณจากข้อมูลชุดเดียวกัน ไม่ใช่เขียนตัวเลขที่จำมา
      ถ้าอ่านคนแล้วยังพลาดมากกว่า "เดาค่ากลางทุกครั้ง" แปลว่าการอ่านทำให้แย่ลง */
   box.naiveErr += Math.abs(NEUTRAL - truth);
-  /* "แรงจริง" = สองคู่ขึ้นไป · "จับได้" = เดาเกินค่ากลาง 0.45 ไปพอสมควร */
-  if (truth >= 0.62) { box.strongN++; if (guess >= 0.55) box.strongHit++; }
+  box.truthSum += truth; box.guessSum += guess;
+  /* ⚠️ "จับคนแรงได้" แบบใช้เกณฑ์ตายตัว (เดา >= 0.55) ใช้ไม่ได้เมื่อสเกลของค่าเดาขยับ
+     ขยับค่ากลางลงทั้งสเกลแล้วตัวเลขนี้ร่วงทันทีทั้งที่การอ่านดีขึ้น = วัดผิด
+     ใช้ "แยกแยะได้" แทน: ค่าเดาเฉลี่ยตอนเขาแรงจริง ลบ ค่าเดาเฉลี่ยตอนเขาไม่มีอะไร
+     ไม่ขึ้นกับว่าสเกลอยู่ตรงไหน วัดสิ่งที่อยากรู้จริง ๆ คือ "แยกออกไหม" */
+  if (truth >= 0.62) { box.strongN++; if (guess >= 0.55) box.strongHit++;
+                       box.gStrong += guess; box.nStrong++; }
+  else if (truth < 0.45) { box.gWeak += guess; box.nWeak++; }
 }
 function corr(x, y) {
   const n = x.length; if (n < 50) return null;
@@ -142,15 +149,21 @@ function show(label, box) {
     " พลาดเฉลี่ย " + (box.absErr / box.n).toFixed(3) +
     " · ทิศทาง " + (c === null ? " -   " : (c >= 0 ? " " : "") + c.toFixed(3)) +
     " · เอียง " + (box.bias / box.n >= 0 ? "+" : "") + (box.bias / box.n).toFixed(3) +
-    " · จับคนแรงได้ " + (box.strongN ? (box.strongHit / box.strongN * 100).toFixed(0) : "-").padStart(3) + "%" +
-    "   [ไม่อ่านเลยพลาด " + (box.naiveErr / box.n).toFixed(3) + "]" +
+    " · แยกแยะได้ " + ((box.nStrong && box.nWeak)
+        ? ((box.gStrong / box.nStrong - box.gWeak / box.nWeak) >= 0 ? "+" : "") +
+          (box.gStrong / box.nStrong - box.gWeak / box.nWeak).toFixed(3)
+        : "  -   ") +
+    "   [ความจริงเฉลี่ย " + (box.truthSum / box.n).toFixed(3) +
+    " · เดาเฉลี่ย " + (box.guessSum / box.n).toFixed(3) +
+    " · ไม่อ่านเลยพลาด " + (box.naiveErr / box.n).toFixed(3) + "]" +
     "   (" + box.n.toLocaleString("en-US") + " ครั้ง)");
 }
 
 console.log("");
 console.log("บอทเดาไพ่คู่ต่อสู้แม่นแค่ไหน · " + done.toLocaleString("en-US") + " มือ");
 console.log("=".repeat(96));
-console.log("พลาดเฉลี่ย ยิ่งน้อยยิ่งดี · ทิศทาง 0 = มั่ว · เอียง + = กลัวเกินจริง · จับคนแรงได้ ยิ่งมากยิ่งดี");
+console.log("พลาดเฉลี่ย ยิ่งน้อยยิ่งดี · ทิศทาง 0 = มั่ว · เอียง + = กลัวเกินจริง");
+console.log("แยกแยะได้ = เดาเฉลี่ยตอนเขาแรงจริง ลบ เดาเฉลี่ยตอนเขาไม่มีอะไร (ยิ่งมากยิ่งดี · 0 = แยกไม่ออกเลย)");
 for (const lv of [1, 2, 3]) {
   console.log("");
   console.log(LN[lv]);

@@ -1112,7 +1112,20 @@ export function createBotManager(room, broadcast) {
     }
   }
 
-  const NEUTRAL = 0.45;   /* ค่ากลางของมือที่ "ยอมลงเงินเล่นต่อ" ไม่ใช่ของไพ่สุ่มทั้งสำรับ */
+  /* ⚠️ ค่ากลาง = "ถ้าไม่รู้อะไรเลย ควรคิดว่าเขาแรงเท่าไหร่"
+     ของเดิมเป็น 0.45 ตัวเดียวใช้ทั้งเกม ซึ่งผิดหนักบนฟลอป — จุดที่ตัดสินใจบ่อยที่สุด
+     วัดจริงจาก 6,000 มือ (ค่ามือเฉลี่ยของคนที่ยังอยู่ในมือ ผ่าน madeStrength ตัวเดียวกับที่บอทใช้):
+       ก่อนฟลอป 0.38 · ฟลอป 0.32 · เทิร์น 0.41 · ริเวอร์ 0.48
+     ยิ่งไพ่เปิดเยอะ ทุกคนยิ่งมีมือดีขึ้นตามธรรมชาติ ค่ากลางจึงเป็นค่าเดียวทั้งเกมไม่ได้
+     ผลของการใช้ 0.45 ตลอด: บอทเดาสูงเกินจริง +0.17 ถึง +0.21 ทุกระดับทุกสตรีท
+     จนการอ่านคนพลาดมากกว่า "ไม่อ่านเลย" 25-40% (ดู lan/tools/read-check.mjs) */
+  function neutralFor(phase) {
+    return phase === "river" ? 0.48
+         : phase === "turn"  ? 0.41
+         : phase === "flop"  ? 0.32
+         : 0.38;
+  }
+  const NEUTRAL = 0.45;   /* เก็บไว้เพื่อความเข้ากันได้ ที่ใช้จริงคือ neutralFor */
 
   /* ---------- (ก) เขากำลังอ้างว่ามือแรงแค่ไหน ---------- */
   function claimedStrength(view, i) {
@@ -1120,7 +1133,7 @@ export function createBotManager(room, broadcast) {
     if (!x || !x.inHand || x.folded) return 0;
     const a = acts[i] || { raises: 0, calls: 0, checks: 0 };
 
-    let g = NEUTRAL;
+    let g = neutralFor(view.phase);
     g += Math.min(a.raises, 3) * 0.13;   /* ดันหนึ่งครั้ง = อ้างว่าแรงขึ้นชัดเจน */
     g += Math.min(a.calls, 3) * 0.02;    /* ตามเฉยๆ บอกอะไรน้อยมาก */
     g -= Math.min(a.checks, 3) * 0.045;  /* เคาะผ่านบ่อย มักไม่มีอะไร */
@@ -1182,7 +1195,8 @@ export function createBotManager(room, broadcast) {
     const claimed = claimedStrength(view, i);
     if (claimed === 0) return 0;
     const cred = credibility(view, i, live, byWhom);
-    return NEUTRAL + (claimed - NEUTRAL) * cred;
+    const mid = neutralFor(view.phase);
+    return mid + (claimed - mid) * cred;
   }
 
   /* ⚠️ ตัวอ่านอย่างเดียวสำหรับ lan/tools/read-check.mjs — ไม่มีใครในทางตัดสินใจเรียกใช้
@@ -1201,7 +1215,8 @@ export function createBotManager(room, broadcast) {
     const view = room.table.viewFor(seatId);
     const mine = view.seats[seatId];
     if (!mine || !mine.cards || !mine.cards.length) return null;
-    if (!view.board || view.board.length < 3) return null;
+    /* ก่อนฟลอปใช้ค่ามือเริ่มต้น ซึ่งเป็นสเกลเดียวกับที่ decide ใช้ */
+    if (!view.board || view.board.length < 3) return preflopStrength(mine.cards);
     return madeStrength(mine.cards, view.board);
   }
 

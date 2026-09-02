@@ -547,7 +547,32 @@ bots think everyone is stronger than they are, everywhere, and act on it.
 
 That is very likely why the pro needed a `catchBluff` term to stop over-folding, and why
 `readGap` had to be damped: those were compensating for a bias nobody knew was there.
-Fixing the bias means re-tuning both. `docs/PLAN-hand-reading.md` has the staged plan.
+
+**Fixed, 2026-09-03.** The anchor - what to assume about an opponent when nothing is known -
+was one constant, `NEUTRAL = 0.45`, used on every street. The measured average strength of a
+live opponent is not one number: **preflop 0.38, flop 0.32, turn 0.41, river 0.48**. Of
+course it rises as cards land; everyone's hand improves. 0.45 was far too high exactly where
+most decisions are made. `neutralFor(phase)` now supplies the right one.
+
+| | before | after | never reading |
+|---|---|---|---|
+| beginner error | 0.188 | **0.155** | 0.157 |
+| gambler error | 0.183 | **0.154** | 0.158 |
+| pro error | 0.178 | **0.147** | 0.156 |
+| bias | +0.125 to +0.138 | **+0.053 to +0.063** | |
+| direction | 0.19-0.23 | **0.25-0.30** | |
+| separation | +0.050 to +0.078 | **+0.065 to +0.105** | |
+
+**The read is worth having for the first time** - every level now beats the do-nothing
+baseline. All 39 behaviour cells stayed green on the first try, four runs in a row.
+
+One measurement lesson from this: the first version scored "of the times he really was
+strong, how often did the guess exceed 0.55". Lowering the whole scale made that number
+collapse from 52% to 19% while the read was getting better - the threshold was absolute and
+the scale had moved. It now reports **separation** (mean guess when the opponent is strong,
+minus mean guess when he has nothing), which does not care where the scale sits.
+
+`docs/PLAN-hand-reading.md` has stages 1-4, still to do.
 
 Two lessons from building the tool itself:
 
