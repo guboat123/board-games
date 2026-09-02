@@ -1133,7 +1133,6 @@ export function createBotManager(room, broadcast) {
          : phase === "flop"  ? 0.32
          : 0.38;
   }
-  const NEUTRAL = 0.45;   /* เก็บไว้เพื่อความเข้ากันได้ ที่ใช้จริงคือ neutralFor */
 
   /* ---------- (ก) เขากำลังอ้างว่ามือแรงแค่ไหน ---------- */
   function claimedStrength(view, i) {
