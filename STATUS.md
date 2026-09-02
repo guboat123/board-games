@@ -399,14 +399,23 @@ fold to price, occasional semi-bluff heads-up) and reports big blinds per 100 ha
 per lineup — **2,000 hands is far too few to read a win rate here**: two 2,000-hand runs against
 pros gave -134 and +164, which is all noise.
 
-| Table | BB/100 for the human |
-|---|---|
-| pros only | **-35** — they beat it |
-| gamblers only | +71 |
-| beginners only | +165 |
-| mixed 3/3/2 | +88 |
+| Table | BB/100 for the human | before the realism work |
+|---|---|---|
+| pros only | **-41** — they beat it | -35 |
+| mixed 3/3/2 | +92 | +88 |
+| beginners only | +130 | +165 |
+| gamblers only | +195 | +71 |
 
-Before this session's fixes the mixed table paid +723 and pros were not measurable at all.
+The pro table is the one that matters for practice, and it is the one a plain solid player loses at.
+
+The gamblers-only jump from +71 to +195 is the fix working, not a regression. That level now opens
+for a raise preflop at 22% of hands instead of 10.6%, which is what a loose-aggressive player does;
+it wins against a table of callers and donates to anyone tight enough to wait. Real maniacs have
+exactly that shape. Nothing about the mixed table - the one a person actually sits at - moved.
+
+None of these are realistic win rates in absolute terms; a good player in a soft live game makes
+10-30. Levels 1 and 2 are *designed* to be bad players, and eight of them at one table is not a
+situation that exists outside this tool. Read these numbers as an ordering, not as a forecast.
 
 ### The two behaviour bugs the measurements found
 
