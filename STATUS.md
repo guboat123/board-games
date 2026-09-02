@@ -530,12 +530,32 @@ try/catch. Never touch `games/catch-sketch/words/` except the `-3` files (owner'
 - Before launching a round: clear `localStorage` on localhost:8080, restart the dev server, close
   spare browser tabs (agents hit "tab cap reached" every round when tabs pile up).
 
+## Practising alone against the bots — what to expect
+
+The scorecard says the three levels now play inside human ranges, and the 10M run says the
+ordering is right, but the thing that decides whether practice is worth anything is what happens
+when you sit down:
+
+- **Pros only is the table that will beat you.** A plain solid player loses 41 BB/100 there. That
+  is the one to use when you want to be tested.
+- **The mixed table pays a solid player about 92 BB/100.** Levels 1 and 2 are meant to be bad, so
+  that is expected, but do not read your win rate there as a measure of your own game.
+- **Fold too much and the table will start attacking you.** The bots track each opponent's fold
+  ratio and bluff at anyone who is over-folding. A sound tight game (folding ~38% of actions)
+  is left alone; folding ~55% of actions - about what you do if you only play 12% of hands -
+  scores 0.78 and gets you bluffed at. This is the only mechanism in the game that punishes
+  passivity, so it is worth keeping calibrated to real numbers, not to numbers that sound right.
+- **They remember you between sessions.** Grudges, moods, who bluffs, who calls everything, and
+  what cards they have seen you show are all in `lan/data/bot-mind.json`, which survives restarts.
+  Every level reads its own slice of that now, not just the pros.
+- **People come and go.** Roughly one bot stands up every 24 hands, tops up when short, and is
+  replaced by someone else at the same level.
+
 ## Handoff / waiting on owner
 
-**The LAN server the owner had open on port 8080 is still running the pre-2026-09-01 code.**
-It has to be restarted to pick up the bot work; asked, not yet answered. A second server was
-started on port 8099 for verification and can be stopped once that is settled.
+Nothing is waiting on the owner. The LAN server on port 8080 was restarted 2026-09-03 00:43 on the
+current build with nobody connected; bot wallets and memory (35 KB of it) survived the restart.
 
-Nothing else blocking. The playtest loop is closed. If it is ever restarted, start from the
-"Known remaining" list above rather than sending a fresh agent — those items are already
-reproduced, located in the source, and none of them needs another round to find.
+If you start a second server on the same machine for testing, set `BOT_DATA_DIR` — otherwise it
+writes the same bot wallet and memory files as the live table, which `bots.mjs` already warns is
+destructive.
