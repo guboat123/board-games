@@ -572,7 +572,21 @@ collapse from 52% to 19% while the read was getting better - the threshold was a
 the scale had moved. It now reports **separation** (mean guess when the opponent is strong,
 minus mean guess when he has nothing), which does not care where the scale sits.
 
-`docs/PLAN-hand-reading.md` has stages 1-4, still to do.
+**Then it stopped, on purpose.** Two further improvements were built and measured and both
+gave nothing outside noise: damping the claim by board texture (separation +0.066 → +0.055),
+and remembering an opponent's aggression per street (+0.067 → +0.069). Judging showdowns by
+the made hand rather than the hole cards also did not help, and on reflection should not -
+that number feeds "does he turn up with junk", which hole cards answer more directly.
+
+The question that should have come first: **how much is there to read at all?** The raw
+visible signal - money an opponent has put in this street - correlates with their real hand
+at **+0.197 to +0.228**. The read scores **0.243 to 0.293**. It is already extracting more
+than any single observable carries, which is why two rounds of work moved nothing.
+
+That is the right outcome for what these bots are for. Bet size correlates with hand strength
+at 0.098 / -0.001 / 0.212, and think time at 0.045 - a person cannot pattern-match them after
+fifty hands. `docs/PLAN-hand-reading.md` records the negative results and marks its remaining
+stages superseded; the effort belongs in the backlog there, none of which has been measured.
 
 Two lessons from building the tool itself:
 

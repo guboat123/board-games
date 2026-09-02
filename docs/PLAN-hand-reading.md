@@ -58,7 +58,38 @@ Metrics, per level and per street:
 Ground truth uses hole cards the bot cannot see. That is fine for scoring the read; it must
 never feed the decision. The tool takes it from the harness, not from `decide`.
 
-### Stage 1 — put the board into the claim
+### RESULT, 2026-09-03 — stop after stage 0's fix; the information is not there
+
+Stage 0 found a fixable bias and fixing it worked (see STATUS). Stages 1 and 2 were then
+built, measured, and **removed again** — both gave nothing outside noise:
+
+| tried | result | kept |
+|---|---|---|
+| board texture damping the claim | separation +0.066 → +0.055, direction 0.249 → 0.230 | no |
+| judging reveals by the made hand instead of hole cards | error 0.146 → 0.149, separation flat | no |
+| per-street memory of an opponent's aggression | separation +0.067 → +0.069 | no |
+
+Then the obvious question, which should have been asked first: **how much is there to read?**
+Correlating the raw visible signal — money an opponent has put in this street — against their
+real hand gives **+0.197 to +0.228**. The read as it stands scores **0.243 to 0.293**.
+
+**The read already extracts more than any single visible signal carries**, by combining
+several plus credibility and memory. That is why two rounds of improvement produced nothing:
+the ceiling was already behind us.
+
+This is a good outcome for what the bots are for. A bot whose hand strength can be inferred
+from its betting is a bot a person beats by pattern-matching after fifty hands; ours cannot
+be. Bet size correlates with hand strength at 0.098 / -0.001 / 0.212 and think time at 0.045,
+both effectively unreadable.
+
+**Stages 1-4 below are superseded.** Re-open only with a specific reason to believe more
+signal exists — for example after adding a behaviour that genuinely leaks, or if the bots are
+ever given a wider range of bet sizes tied to hand strength. The effort belongs in the
+backlog instead, where nothing has been measured at all.
+
+---
+
+### Stage 1 — put the board into the claim  *(superseded — see result above)*
 
 Scale the claim by what the board allows. A big bet on a dry, uncoordinated board is a
 narrower claim than the same bet on a board where half the deck makes something.

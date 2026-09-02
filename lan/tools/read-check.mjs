@@ -49,9 +49,17 @@ for (const lv of [1, 2, 3]) {
 }
 function mk() { return { n: 0, absErr: 0, bias: 0, gs: [], ts: [], strongN: 0, strongHit: 0,
                          naiveErr: 0, truthSum: 0, guessSum: 0,
-                         gStrong: 0, nStrong: 0, gWeak: 0, nWeak: 0 }; }
+                         gStrong: 0, nStrong: 0, gWeak: 0, nWeak: 0,
+                         actAg: [], actTruth: [] }; }
 /* ค่ากลางที่ bots.mjs ใช้เป็นจุดตั้งต้นเวลา "ไม่รู้อะไรเลย" */
 const NEUTRAL = 0.45;
+/* ⚠️ เพดานของการอ่าน: ท่าที่คู่ต่อสู้ทำ "บอกอะไรได้จริงแค่ไหน"
+   ถ้าตัวท่าเองแทบไม่สัมพันธ์กับความแรงของไพ่เขา ก็ไม่มีสูตรไหนอ่านได้ดีกว่านั้น
+   วัดตรง ๆ จากสิ่งที่มองเห็นได้ล้วน ๆ (ดันกี่ครั้ง + ลงเงินเทียบกอง) เทียบกับความจริง
+   ตัวเลขนี้คือขีดจำกัดบน ไม่ใช่เป้า */
+function noteCeiling(box, aggression, truth) {
+  box.actAg.push(aggression); box.actTruth.push(truth);
+}
 function note(box, guess, truth) {
   box.n++;
   box.absErr += Math.abs(guess - truth);
@@ -122,6 +130,11 @@ while (done < HANDS) {
           if (truth === null) continue;
           note(S[me.botLevel].all, guess, truth);
           note(S[me.botLevel][st.phase], guess, truth);
+          /* สัญญาณดิบที่ใครก็มองเห็น: เขาลงเงินไปเท่าไหร่ในสตรีทนี้ เทียบกับกอง */
+          const potNow = st.seats.reduce(function (a, y) { return a + (y ? y.committed || 0 : 0); }, 0);
+          const raw = potNow > 0 ? Math.min((x.bet || 0) / potNow, 1.5) : 0;
+          noteCeiling(S[me.botLevel].all, raw, truth);
+          noteCeiling(S[me.botLevel][st.phase], raw, truth);
         }
       }
       if (!mgr._decideNow(cur)) {
@@ -174,6 +187,14 @@ for (const lv of [1, 2, 3]) {
   show("รวม", S[lv].all);
   for (const stt of STREETS) show(stt, S[lv][stt]);
 }
+console.log("");
+console.log("");
+console.log("เพดาน — ท่าที่มองเห็นบอกความแรงได้แค่ไหน (ทิศทางระหว่างเงินที่เขาลง กับไพ่จริงของเขา)");
+for (const lv of [1, 2, 3]) {
+  const c = corr(S[lv].all.actAg, S[lv].all.actTruth);
+  console.log("   " + LN[lv].padEnd(10) + (c === null ? " -" : (c >= 0 ? " +" : " ") + c.toFixed(3)));
+}
+console.log("   ถ้าเลขนี้ต่ำ แปลว่าบอทอ่านยากโดยธรรมชาติ ไม่ใช่สูตรอ่านไม่ดี — และเป็นเรื่องดีสำหรับคนซ้อม");
 console.log("");
 console.log("[ไม่อ่านเลย] = เดาเป็นค่ากลาง " + NEUTRAL + " ทุกครั้ง คำนวณจากข้อมูลชุดเดียวกัน");
 console.log("ถ้า 'พลาดเฉลี่ย' ไม่ต่ำกว่า 'ไม่อ่านเลย' ชัดเจน แปลว่าระบบอ่านคนยังไม่ได้ช่วยอะไร");
