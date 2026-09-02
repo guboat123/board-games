@@ -127,13 +127,16 @@ Carry a per-opponent, per-hand read forward instead of recomputing from counters
 
 Ordered by how much a person would notice, most first:
 
-1. **Blind defence and stealing.** Never measured. Real: button steal 25-45%, big blind folds
-   to a steal 55-70%. If the bots defend blinds nothing like a person, that is very visible
-   in a heads-up-ish spot.
-2. **Turn and river barrelling.** Real: about half of flop c-bets get a second barrel. We do
-   not know our number.
-3. **Short-stack play.** Under about 25 big blinds people switch to push-or-fold; the bots
-   almost certainly do not.
+1. ~~**Blind defence and stealing.**~~ **Done** - four scorecard cells. The pro was already
+   inside every range; the beginner never attacked the blinds (2.1%) and now does (8.6%).
+2. ~~**Turn and river barrelling.**~~ **Done** - now a scorecard cell. Pro 51.3%, gambler
+   68%, beginner 26%, against a real 40-60% for a solid player.
+3. ~~**Short-stack play.**~~ **Measured 2026-09-03, no work needed.** Pros are under 25 big
+   blinds for 0.9% of their actions and gamblers 3.5%, because both top up. Beginners are
+   short for **21.4%** of theirs - they only top up 35% of the time - and when short they
+   fold 56%, call 23% and shove 2%. Calling off a short stack instead of shoving is the
+   classic weak-player mistake, so that is the right behaviour for level 1, and the levels
+   that would need push-or-fold discipline are almost never in the situation.
 4. **Multiway discipline.** Bet sizing and continuation with four players in are different
    from heads-up; the scorecard currently checks heads-up only.
 5. **Table talk / show-off frequency.** `maybeShowOff` exists and has never been measured
