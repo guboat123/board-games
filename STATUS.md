@@ -453,10 +453,11 @@ and on 2026-09-02 the owner spotted the difference from a single hand: a level-3
 called off his whole stack on the turn with pocket 3s on an A-5-9-5 board, four-way.
 That pro was making +6,230 per 100 hands at the time. Profit hides behaviour.
 
-`realism-check.mjs` scores **thirteen** statistics people actually use to read an opponent -
+`realism-check.mjs` scores **seventeen** statistics people actually use to read an opponent -
 VPIP, PFR, limp, 3-bet, 4-bet, check-raise, aggression factor, went-to-showdown, position
-ratio, c-bet, fold-to-c-bet, donk-bet and median bet size - against the range for the kind
-of player each level imitates, and fails any of the 39 cells that falls outside.
+ratio, c-bet, fold-to-c-bet, donk-bet, median bet size, blind steal, big-blind and
+small-blind defence, and turn barrel - against the range for the kind of player each level
+imitates, and fails any of the 51 cells that falls outside.
 **Run it after any change to how the bots decide.** What the first eight caught:
 
 | | before | after | real players |
@@ -596,6 +597,28 @@ Two lessons from building the tool itself:
   beat.
 - **Take ground truth from the bots' own function.** Recomputing hand value the obvious way
   skipped the board-play correction and made the bias look 0.04 smaller than it is.
+
+### Blind play, measured last and mostly already right
+
+The four blind and barrelling statistics went in after the read work. The pro was inside
+every real-player range on the first measurement - steals 36.5%, big blind folds to a steal
+64.7%, small blind 82.3%, turn barrel 51.3% - which is the first area checked here that
+needed no work at all. The gambler defends blinds far wider than a typical player (big blind
+folds 24%), which is what a loose-aggressive player does, and its band says so.
+
+One real gap: **the beginner attacked the blinds 2.1% of the time.** Even a weak player raises
+when everyone folds to them on the button - it is the one situation that feels obvious without
+knowing any theory. Now 8.6%, inside the 8-18% weak-player range, and the level's overall
+passivity is untouched.
+
+Two counting traps, both of which produced numbers that looked fine:
+
+- The small blind acts before the big blind preflop, so stopping at the first blind seen
+  counts the small blind almost every time. The big blind sample was 3 to 15 hands out of
+  12,000 before that was noticed - small enough to read as anything.
+- Steal and defence stats have to come from the seat's position relative to the button, not
+  from the order players acted in. The action order shrinks as people fold, so the same seat
+  scores differently hand to hand.
 
 ### Bots come and go now
 

@@ -34,17 +34,22 @@ const WANT = {
   1: { vpip: [35, 60], pfr: [2, 10],  limp: [18, 45], b3: [0.5, 5], b4: [0, 3],
        cr: [1, 6], af: [0.3, 1.1], wtsd: [24, 42],
        /* คนเพิ่งหัดแทบไม่ใช้ตำแหน่ง · ยิงต่อน้อยกว่าคนเล่นเป็นชัดเจน */
-       pos: [0.85, 1.35], cbet: [25, 62], fcb: [40, 63], donk: [1.5, 12], size: [30, 72] },
+       pos: [0.85, 1.35], cbet: [25, 62], fcb: [40, 63], donk: [1.5, 12], size: [30, 72],
+       /* คนเพิ่งหัดขโมยบอดน้อยแต่ไม่ใช่ไม่ทำ · ป้องกันบอดกว้างเกินไปเพราะ "จ่ายไปแล้ว เสียดาย" */
+       steal: [4, 20], bbf: [40, 70], sbf: [45, 78], barrel: [15, 55] },
   /* ⚠️ ช่อง cr ของระดับนี้กว้างกว่าคนทั่วไป (3-8%) เพราะ 6-12% คือช่วงของคนเล่นหลวมดุจริง ๆ
      พิสูจน์แล้วว่าไม่ใช่การขยับเป้าให้ผ่าน: ปิดทาง check-raise ที่เขียนเพิ่มทั้งหมด
      ค่ายังอยู่ที่ 8.0% คือมาจากความดุประจำระดับเอง ไม่ได้มาจากโค้ดที่ใส่ทีหลัง
      เช่นเดียวกับ cbet/size ที่กว้างกว่าคนทั่วไป — ยิงใหญ่และยิงบ่อยคือตัวตนของระดับนี้ */
   2: { vpip: [45, 70], pfr: [18, 40], limp: [8, 35],  b3: [4, 12],  b4: [0, 4],
        cr: [2, 12], af: [1.4, 4.0], wtsd: [28, 46],
-       pos: [1.15, 2.20], cbet: [55, 92], fcb: [35, 58], donk: [1.5, 12], size: [45, 95] },
+       pos: [1.15, 2.20], cbet: [55, 92], fcb: [35, 58], donk: [1.5, 12], size: [45, 95],
+       /* คนหลวมดุป้องกันบอดแทบทุกครั้ง กรอบจึงต่ำกว่าคนทั่วไปมาก และยิงต่อบ่อยกว่า */
+       steal: [22, 50], bbf: [12, 55], sbf: [28, 70], barrel: [40, 78] },
   3: { vpip: [20, 35], pfr: [14, 26], limp: [0, 12],  b3: [4, 11],  b4: [0.3, 3],
        cr: [3, 9], af: [1.4, 3.6], wtsd: [22, 32],
-       pos: [1.35, 2.30], cbet: [55, 82], fcb: [40, 58], donk: [1.5, 12], size: [45, 80] }
+       pos: [1.35, 2.30], cbet: [55, 82], fcb: [40, 58], donk: [1.5, 12], size: [45, 80],
+       steal: [25, 48], bbf: [50, 72], sbf: [65, 88], barrel: [40, 62] }
 };
 const LABEL = {
   vpip: "VPIP ลงเล่นกี่ % ของมือ",
@@ -59,10 +64,15 @@ const LABEL = {
   cbet: "c-bet ตัวต่อตัว",
   fcb:  "หมอบใส่ c-bet ตัวต่อตัว",
   donk: "donk เดิมพันตัดหน้า",
-  size: "ขนาดเดิมพันกลาง ๆ"
+  size: "ขนาดเดิมพันกลาง ๆ",
+  steal: "ขโมยบอดจากท้ายโต๊ะ",
+  bbf:  "บอดใหญ่หมอบใส่คนขโมย",
+  sbf:  "บอดเล็กหมอบใส่คนขโมย",
+  barrel: "ยิงต่อที่เทิร์น"
 };
 const ORDER = ["vpip", "pfr", "limp", "b3", "b4", "cr", "af", "wtsd",
-               "pos", "cbet", "fcb", "donk", "size"];
+               "pos", "cbet", "fcb", "donk", "size",
+               "steal", "bbf", "sbf", "barrel"];
 
 const ROSTER = {
   1: ["Milo", "Pip", "Toby", "Bruno", "Ozzy", "Rudy", "Gus", "Wally", "Bobby", "Sammy"],
@@ -78,7 +88,8 @@ for (const lv of [1, 2, 3]) {
             chk: 0, cr: 0, post: 0, call: 0, flop: 0, sd: 0,
             early: 0, earlyVp: 0, late: 0, lateVp: 0,
             cbetHu: 0, cbetHuN: 0, fcbHu: 0, fcbHuN: 0,
-            donk: 0, donkN: 0, sizes: [] };
+            donk: 0, donkN: 0, sizes: [],
+            steal: 0, stealN: 0, bbf: 0, bbfN: 0, sbf: 0, sbfN: 0, barrel: 0, barrelN: 0 };
 }
 
 let done = 0;
@@ -173,6 +184,30 @@ while (done < HANDS) {
         else { S[lv].early++; if (vp) S[lv].earlyVp++; }
       });
 
+      /* ---- ขโมยบอด · ป้องกันบอด ----
+         ⚠️ ต้องนับ "ท่าแรกของบอดแต่ละคน" แยกกัน บอดเล็กเดินก่อนบอดใหญ่เสมอ
+         ถ้าหยุดที่คนแรกที่เจอ บอดใหญ่จะแทบไม่ถูกนับเลย (เคยได้ตัวอย่างแค่ 3-15 ครั้ง) */
+      const sbSeat = ring[0], bbSeat = ring[1];
+      const lateTwo = ring.slice(-2);
+      let raisedYet = false, stealer = -1;
+      for (const a of pre) {
+        const lv = lvOf[a.seat];
+        if (!raisedYet && lv && lateTwo.indexOf(a.seat) >= 0) {
+          S[lv].stealN++;
+          if (a.act === "raise" || a.act === "bet") S[lv].steal++;
+        }
+        if ((a.act === "raise" || a.act === "bet") && !raisedYet) { raisedYet = true; stealer = a.seat; }
+      }
+      if (stealer >= 0 && lateTwo.indexOf(stealer) >= 0) {
+        let sbDone = false, bbDone = false;
+        for (const a of pre) {
+          const lv = lvOf[a.seat]; if (!lv) continue;
+          if (a.seat === sbSeat && !sbDone) { sbDone = true; S[lv].sbfN++; if (a.act === "fold") S[lv].sbf++; }
+          else if (a.seat === bbSeat && !bbDone) { bbDone = true; S[lv].bbfN++; if (a.act === "fold") S[lv].bbf++; }
+          if (sbDone && bbDone) break;
+        }
+      }
+
       /* ---- หลังฟลอป ---- */
       const post = acts.filter(function (a) { return a.phase !== "preflop"; });
       const flop = acts.filter(function (a) { return a.phase === "flop"; });
@@ -234,6 +269,20 @@ while (done < HANDS) {
         }
       }
 
+      /* ---- ยิงต่อที่เทิร์น: ยิงฟลอปแล้วยังยิงต่อไหม ---- */
+      const turnActs = acts.filter(function (a) { return a.phase === "turn"; });
+      if (pfRaiser >= 0 && flop.length && turnActs.length) {
+        const firstFlopBet = flop.find(function (a) { return a.act === "bet" || a.act === "raise"; });
+        if (firstFlopBet && firstFlopBet.seat === pfRaiser) {
+          const mine = turnActs.find(function (a) { return a.seat === pfRaiser; });
+          const lv2 = lvOf[pfRaiser];
+          if (lv2 && mine) {
+            S[lv2].barrelN++;
+            if (mine.act === "bet" || mine.act === "raise") S[lv2].barrel++;
+          }
+        }
+      }
+
       /* ---- ขนาดเดิมพันเทียบกอง (หลังฟลอปเท่านั้น) ---- */
       let running = (hand.sb || 0) + (hand.bb || 0);
       for (const a of acts) {
@@ -278,7 +327,11 @@ function valuesOf(s) {
     cbet: s.cbetHuN ? s.cbetHu / s.cbetHuN * 100 : 0,
     fcb:  s.fcbHuN  ? s.fcbHu  / s.fcbHuN  * 100 : 0,
     donk: s.donkN   ? s.donk   / s.donkN   * 100 : 0,
-    size: med * 100
+    size: med * 100,
+    steal:  s.stealN  ? s.steal  / s.stealN  * 100 : 0,
+    bbf:    s.bbfN    ? s.bbf    / s.bbfN    * 100 : 0,
+    sbf:    s.sbfN    ? s.sbf    / s.sbfN    * 100 : 0,
+    barrel: s.barrelN ? s.barrel / s.barrelN * 100 : 0
   };
 }
 
