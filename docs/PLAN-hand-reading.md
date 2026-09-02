@@ -39,7 +39,7 @@ measured for accuracy.
 ## Order of work
 
 Each stage is measured before and after with the same tool. **Nothing ships without the
-accuracy number moving in the right direction and the 39-cell scorecard staying green** — a
+accuracy number moving in the right direction and the 51-cell scorecard staying green** — a
 better read is worthless if it makes the bots stop looking like people.
 
 ### Stage 0 — measure what we have (no behaviour change)

@@ -640,7 +640,7 @@ stack, they never create it.
 ## Automated tests (must pass before any commit)
 
 ```
-node lan/tests/run-all.mjs          # everything below, plus the 39-cell scorecard
+node lan/tests/run-all.mjs          # everything below, plus the 51-cell scorecard
 ```
 
 ⚠️ Use the runner rather than a remembered list. On 2026-09-03 the bots' decision code was

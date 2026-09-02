@@ -50,7 +50,7 @@ if (fs.existsSync(path.join(root, "tests", "test-clue.mjs"))) {
 }
 
 console.log("");
-console.log("บอทเล่นเหมือนคนรึยัง · 39 ช่อง · " + Number(HANDS).toLocaleString("en-US") + " มือ");
+console.log("บอทเล่นเหมือนคนรึยัง · 51 ช่อง · " + Number(HANDS).toLocaleString("en-US") + " มือ");
 console.log("-".repeat(56));
 if (!run("realism-check.mjs", path.join("lan", "tools", "realism-check.mjs"), [HANDS])) bad++;
 
