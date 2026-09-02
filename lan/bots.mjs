@@ -534,7 +534,18 @@ function decideGambler(f) {
     if (eq >= 0.42 || Math.random() < 0.18) return bet(0.5 + Math.random() * 0.8);
     return { type: "act", action: "check" };
   }
-  if (eq >= 0.80) return bet(0.9 + Math.random());
+  /* ⚠️ วัดได้ว่านักพนันไล่ก่อนฟลอปแค่ 10.6% ของมือ แต่ลงเล่นถึง 53.6%
+     ส่วนต่างนั้นคือ "ตามบอดเฉย ๆ" 33% ซึ่งไม่ใช่คนเล่นหลวมดุ แต่เป็นคนตามทุกอย่าง
+     คนหลวมดุตัวจริงเปิดไล่ด้วยไพ่กว้างมาก นั่นคือสิ่งที่ทำให้เขาน่ากลัวและอ่านไม่ออก
+     ทำเฉพาะตอนยังไม่มีใครเปิด (heat 0) — ไล่ทับเป็นคนละเรื่อง มีเกณฑ์ของมันอยู่แล้ว */
+  if (f.pre && f.heat === 0 && eq >= 0.36 && f.toCall <= f.me.stack * 0.1 &&
+      Math.random() < 0.55) {
+    return bet(0.5 + Math.random() * 0.6);
+  }
+  /* ⚠️ แม้แต่นักพนันก็ไม่ไล่ทับรอบที่สามด้วยมือธรรมดา วัดได้ 6.7% ของคนจริงคือ 1-2%
+     เกณฑ์ต่ำกว่ามืออาชีพชัดเจน (0.72 vs 0.90) เพราะเขายังเป็นคนหลวมอยู่ */
+  const warOk = f.heat < 3 || eq >= 0.72;
+  if (eq >= 0.80 && warOk) return bet(0.9 + Math.random());
   /* ⚠️ วัดได้ว่านักพนันไล่ 18-24% ของท่า ซึ่งพอ ๆ กับมืออาชีพ
      แปลว่าเขาไม่ใช่นักพนัน เขาเป็นคนตามทุกอย่าง ซึ่งเป็นคนละแบบกันคนละขั้ว
      นักพนันจริงไล่ด้วยคู่สอง ด้วยไพ่ลุ้น ด้วยความรู้สึก — และนั่นคือเหตุผลที่อ่านเขาไม่ออก
@@ -565,7 +576,7 @@ function decideGambler(f) {
      ไล่ด้วยคู่เดียวที่เทิร์นใส่คนสามคน ไม่ใช่ความกล้า เป็นการยกกองให้คนอื่น
      ให้ไล่กว้างเฉพาะตอนไพ่ยังเปิดไม่หมด หรือเหลือสู้กันสองคน ซึ่งความหลวมยังคุ้ม */
   const early = f.view.phase === "preflop" || f.view.phase === "flop";
-  if (eq >= 0.60 && f.toCall < f.me.stack * 0.35 && (early || f.live <= 2) &&
+  if (eq >= 0.60 && warOk && f.toCall < f.me.stack * 0.35 && (early || f.live <= 2) &&
       Math.random() < 0.32) {
     return bet(0.6 + Math.random() * 0.7);
   }
@@ -641,8 +652,11 @@ function decidePro(f) {
      นี่คือบั๊กตัวเดียวกับที่แก้ให้นักพนันไปแล้ว แต่ตอนนั้นแก้ระดับเดียว */
   const crowd = Math.max(0, f.live - 1) * (f.pre ? 0.02 : 0.05);
 
+  /* ยิ่งไล่ทับกันหลายรอบ ยิ่งแปลว่ามีคนมีของจริง ต้องใช้ไพ่ดีกว่าเดิมถึงจะตามต่อ */
+  const heatGap = Math.max(0, f.heat - 1) * 0.06;
+
   const rawMargin = (f.pre ? lv.preMargin : lv.margin) + f.caution + latePos + readGap
-                    - catchBluff + risk + crowd;
+                    - catchBluff + risk + crowd + heatGap;
 
   /* ⚠️ ราคาถูกมากๆ ต้องแทบไม่คิด — จ่าย 2% ของกองเพื่อดูไพ่ต่อ ไม่มีคนไหนทิ้ง
      เกณฑ์ทุกตัวข้างบน (ระวังตัว · อ่านคน · กลัวเสียตัก) ออกแบบมาสำหรับราคาปกติ
@@ -657,7 +671,23 @@ function decidePro(f) {
 
   /* ไม่เรซทับเดิมพันก้อนใหญ่ด้วยมือกลางๆ ไม่งั้นบอทจะสาดกันไปมาไม่จบ */
   const facingBig = f.toCall > f.me.stack * 0.3;
-  const canRaise = f.me.stack > f.toCall && eq >= raiseAt && (!facingBig || eq >= 0.82);
+  /* ⚠️ เกณฑ์ข้างบนดูแต่ "ก้อนใหญ่แค่ไหน" ซึ่งก่อนฟลอปไม่มีทางใหญ่
+     การไล่ทับรอบสามจึงไม่มีอะไรห้ามเลย ทั้งที่มันคือจังหวะที่ต้องมีไพ่จริงที่สุดในเกม
+     คนเล่นเป็นไล่ทับรอบสามด้วยมือระดับ AA-KK-AK เท่านั้น ไม่ใช่ด้วย "มือดีพอใช้" */
+  /* บันได: เปิดไล่เองใช้เกณฑ์ปกติ · ไล่ทับรอบสองต้องแคบลง · รอบสามต้องมีของจริง
+     วัดก่อนแก้: 3-bet 14.2% (คนจริง 4-11) · 4-bet 23.1% (คนจริง 1-2) */
+  const warNeed = f.heat >= 3 ? 0.90 : (f.heat === 2 ? 0.80 : (f.heat === 1 ? 0.66 : 0));
+  const warOk = eq >= warNeed;
+
+  /* ⚠️ check-raise ของจริงไม่ได้ใช้เฉพาะกับไพ่ระดับกับดัก (base 0.86 ขึ้นไป) ซึ่งนาน ๆ เจอที
+     คนเล่นเป็นไล่ทับหลังเคาะผ่านด้วยไพ่แรงพอใช้ และด้วยไพ่ลุ้นที่ยังมีทางชนะ
+     ถ้าไม่มีทางนี้เลย จะกลายเป็น "เขาเคาะผ่าน = เขาไม่มีอะไรแล้ว" ซึ่งอ่านออกทันที
+     วัดก่อนแก้: 0.2% ของคนจริงคือ 3-9% */
+  const crSpot = f.iChecked && f.toCall > 0 && !f.pre && !facingBig;
+  const crWorth = crSpot && (eq >= 0.66 ||
+                             (f.draw >= 0.13 && Math.random() < 0.30 + f.trait.bluffy * 0.15));
+  const canRaise = f.me.stack > f.toCall && (eq >= raiseAt || crWorth) &&
+                   (!facingBig || eq >= 0.82) && warOk;
 
   const sized = (mult) => raiseTo(f, eq, mult);
 
@@ -683,7 +713,11 @@ function decidePro(f) {
                        f.me.bet >= f.me.stack * 0.9 && f.price < 0.45;
   f.potCommittedHard = f.me.bet >= f.me.stack * 1.5;
 
-  if (canRaise && !f.plan.trap) {
+  /* ⚠️ ธง trap เคยปิดการไล่ทับ "ทั้งสตรีท" ไม่ใช่แค่ตอนยังไม่มีใครเดิมพัน
+     ผลคือแผน "แกล้งอ่อนแล้วค่อยเก็บ" กลายเป็นเคาะผ่านแล้วตามเฉย ๆ ทุกครั้ง
+     กับดักไม่เคยสปริงเลยสักหน — วัดได้ check-raise 0.4% ของคนจริงคือ 3-9%
+     และทำให้อ่านออกง่ายมาก: มืออาชีพเคาะผ่าน = มืออาชีพไม่มีอะไรแล้ว */
+  if (canRaise && !(f.plan.trap && f.toCall === 0)) {
     return sized(eq >= 0.72 ? valueMult() : lv.sizing * (0.6 + Math.random() * 0.7));
   }
   if (f.toCall === 0) {
@@ -1486,6 +1520,23 @@ export function createBotManager(room, broadcast) {
        ในเครื่องมือวัดผลไม่มีการหน่วงเวลา จึงต้องคิดเองตรงนี้ */
     if (plannedThink[seatId] === undefined) plannedThink[seatId] = thinkMs(lv, view, me, base);
 
+    /* ⚠️ "สตรีทนี้ไล่กันมาแล้วกี่ครั้ง" ไม่เคยมีในสมการเลยสักระดับ
+       มือที่เปิดไล่ได้สบาย ๆ กลายเป็นมือที่ต้องทิ้งทันทีเมื่อโดนไล่ทับสองรอบ
+       ซึ่งเป็นเรื่องที่คนเล่นทุกคนรู้ ไม่ใช่เฉพาะคนเก่ง
+       วัดได้ก่อนแก้: มืออาชีพไล่ทับรอบที่สาม 23.1% ของโอกาส ของคนจริงคือ 1-2%
+       (บอดไม่ถูกนับเป็น act จึงนับได้ตรง ๆ: 1 = มีคนเปิด · 2 = โดนไล่ทับ · 3+ = สงครามแล้ว) */
+    const curHand = room.table._state.hand;
+    let heat = 0;
+    /* เคาะผ่านไปแล้วในสตรีทนี้ แล้วได้กลับมาเดินอีก = จังหวะ check-raise พอดี */
+    let iChecked = false;
+    if (curHand && curHand.acts) {
+      for (const a of curHand.acts) {
+        if (a.phase !== view.phase) continue;
+        if (a.act === "raise" || a.act === "bet") heat++;
+        if (a.seat === seatId && a.act === "check") iChecked = true;
+      }
+    }
+
     /* คนที่ยังสู้อยู่กี่คน — บลัฟได้ผลกับคนน้อย ยิ่งหลายคนยิ่งมีคนตามแน่ */
     let live = 0;
     view.seats.forEach(function (x, i) { if (x && x.inHand && !x.folded && i !== seatId) live++; });
@@ -1661,7 +1712,7 @@ export function createBotManager(room, broadcast) {
     });
     if (!anyFoe) foldy = 0;
 
-    const facts = { pre, base, draw, live, me, view, seatId, lv, walletPressure, trait, wet, plan,
+    const facts = { pre, base, draw, live, heat, iChecked, me, view, seatId, lv, walletPressure, trait, wet, plan,
                     potNow, toCall, price, caution: caution + grudge, crowdFactor,
                     /* ⚠️ ความจำถูกยำรวมเป็นก้อนเดียวชื่อ caution ที่ปรุงมาให้มืออาชีพใช้
                        (busts + respect + debtFear - boldness + patienceGap - moodSwing + grudge)
