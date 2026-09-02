@@ -324,7 +324,9 @@ were joining. Gate the audit on all seats being occupied before believing it.
 | `lan/tools/play-as-human.mjs <hands> <perTable> [level]` | can a competent human beat them, and how |
 | `lan/tools/leak-scan.mjs <hands>` | which street a level loses on, calling or raising |
 | `lan/tools/smoke-live.mjs <hands>` | does the live `poke()` path still run at all |
-| `lan/tools/realism-check.mjs <hands>` | **do they play like people** - scored, exits 1 on any red cell |
+| `lan/tools/realism-check.mjs <hands>` | **do they play like people** - 39 scored cells, exits 1 on any red |
+| `lan/tools/read-check.mjs <hands>` | **is the opponent read any good** - vs the truth, and vs not reading |
+| `lan/tests/run-all.mjs` | every test plus the scorecard, in one command |
 
 **Every calibration number recorded here before 2026-09-01 was measured on a bot that could not
 read opponents, had no memory and no mood.** `trackActions`, `updateMoods`, `rememberFoes` and
@@ -356,41 +358,50 @@ times over; and the two think-time draws disagreed with each other.
 
 ### Where each level stands
 
-10,000,002 hands, all 30 bots, 402 rounds, 63 minutes on six processes, chips per 100 hands.
-Re-measured 2026-09-03 on the build that passes `realism-check`. Run it with:
+10,000,000 hands, all 30 bots, 400 rounds, 55 minutes on five processes, chips per 100 hands.
+Re-measured 2026-09-03 on the build that passes all 39 scorecard cells. Run it with:
 
 ```
-for i in 0 1 2 3 4 5; do node lan/tools/watch-bots.mjs 1666667 25000 $i /tmp/wb/part$i.json & done
+for i in 0 1 2 3 4; do node lan/tools/watch-bots.mjs 2000000 25000 $i /tmp/wb/part$i.json & done
 node lan/tools/merge-watch.mjs /tmp/wb/part*.json
 ```
 
 | Level | chips/100 hands | VPIP | raise | showdown | busts/1000 | spread inside the level |
 |---|---|---|---|---|---|---|
-| 3 มืออาชีพ | **+3,539** | 23-27% | 20-21% | 5-7% | **2.7** | Zed +4,041 … Ash +3,097 |
-| 2 นักพนัน | **-819** | 57% | 31-32% | 21% | 23.6 | Rocco -707 … Lenny -903 |
-| 1 มือใหม่ | **-1,561** | 39-48% | 5-7% | 7-12% | 10.9 | Bruno -1,447 … Wally -1,651 |
+| 3 มืออาชีพ | **+2,091** | 21-24% | 20-21% | 6-7% | **2.1** | Zed +2,335 … Ash +1,789 |
+| 2 นักพนัน | **+208** | 57% | 26% | 21% | 16.6 | Tank +316 … Buddy +115 |
+| 1 มือใหม่ | **-1,595** | 42-50% | 5-7% | 8-13% | 10.5 | Bruno -1,557 … Milo -1,638 |
 
-The run before the realism work gave pro +6,230, gambler -2,415, beginner -1,707, with the pro
-busting 6.7 times per 1000 hands instead of 2.7.
+Two earlier runs for comparison: before the realism work, pro +6,230 / gambler -2,415 /
+beginner -1,707 at 6.7 pro busts per 1000; after the first realism pass, +3,539 / -819 /
+-1,561 at 2.7.
 
-**The spread inside each level is the number to watch, and it is now narrow everywhere** - the
-best and worst pro are 4,041 and 3,097 where they used to be 7,721 and 4,471. That is the whole
-point of the design: personality is meant to change how a bot plays, not how well. A wide spread
-means one bot's traits are carrying the level and the level itself is not calibrated.
+⚠️ These numbers are from the build measured at 02:14-03:10. Three cells were sitting on
+their band boundaries afterwards and were nudged into the middle (pro donk pass-through,
+late-street give-up, c-bet frequency). The effect on profit should be small but is not
+measured - **re-run before quoting these as final.**
 
-The beginner losing more than the gambler reads oddly until you notice it is also true in real
-games: the loose-passive player who calls down is the biggest loser at a small-stakes table, worse
-than the maniac, because the maniac at least wins pots nobody contests. The split confirms it -
-the beginner makes +3,091 per 100 hands at showdown and gives back -4,652 in hands that never got
-there, while the pro is +4,709 and -1,171.
+**The spread inside each level is now very narrow** - the best and worst pro are 2,335 and
+1,789, where before any of this work they were 7,721 and 4,471. That is the design goal:
+personality changes how a bot plays, not how well. A wide spread means one bot's traits are
+carrying the level and the level is not calibrated.
 
-Where each level puts its whole stack in, since that is where the money actually goes:
+The gambler crossing into profit (+208 from -819) is not a mistake. A loose-aggressive
+player at a table containing three calling stations does make money, and the ordering that
+results - pro, then gambler, then beginner - is the skill ordering. The beginner is the
+biggest loser at every measurement, which is also what happens in real small-stakes games:
+the loose-passive player who calls down loses more than the maniac, because the maniac at
+least wins the pots nobody contests. The split confirms it - the beginner makes +2,760 per
+100 hands at showdown and gives back -4,355 in hands that never got there, against the pro's
++3,331 and -1,240.
+
+Where each level puts its whole stack in, since that is where the money goes:
 
 | Level | all-ins in the run | biggest two spots |
 |---|---|---|
-| มือใหม่ | 685,057 | turn raise 21% · preflop call 18% |
-| นักพนัน | 1,608,593 | turn call 23% · turn raise 20% |
-| มืออาชีพ | 226,561 | turn call 32% · river call 22% |
+| มือใหม่ | 657,257 | preflop call 21% · turn raise 19% |
+| นักพนัน | 1,275,613 | turn raise 20% · river raise 19% |
+| มืออาชีพ | 182,820 | turn call 25% · river call 21% |
 
 ### What a human can do to them
 
@@ -399,23 +410,21 @@ fold to price, occasional semi-bluff heads-up) and reports big blinds per 100 ha
 per lineup — **2,000 hands is far too few to read a win rate here**: two 2,000-hand runs against
 pros gave -134 and +164, which is all noise.
 
-| Table | BB/100 for the human | before the realism work |
-|---|---|---|
-| pros only | **-41** — they beat it | -35 |
-| mixed 3/3/2 | +92 | +88 |
-| beginners only | +130 | +165 |
-| gamblers only | +195 | +71 |
+| Table | BB/100 for the human | after the first realism pass | before any of it |
+|---|---|---|---|
+| pros only | **-19** — they beat it | -41 | -35 |
+| mixed 3/3/2 | **+69** | +92 | +88 |
+| gamblers only | **+86** | +195 | +71 |
+| beginners only | **+97** | +130 | +165 |
 
-The pro table is the one that matters for practice, and it is the one a plain solid player loses at.
+The pro table is the one that matters for practice, and it is the one a plain solid player
+loses at. Every table got harder as the bots got more human, which is the expected cost:
+playing like a person means having a person's leaks, and also a person's defences.
 
-The gamblers-only jump from +71 to +195 is the fix working, not a regression. That level now opens
-for a raise preflop at 22% of hands instead of 10.6%, which is what a loose-aggressive player does;
-it wins against a table of callers and donates to anyone tight enough to wait. Real maniacs have
-exactly that shape. Nothing about the mixed table - the one a person actually sits at - moved.
-
-None of these are realistic win rates in absolute terms; a good player in a soft live game makes
-10-30. Levels 1 and 2 are *designed* to be bad players, and eight of them at one table is not a
-situation that exists outside this tool. Read these numbers as an ordering, not as a forecast.
+None of these are realistic win rates in absolute terms; a good player in a soft live game
+makes 10-30. Levels 1 and 2 are *designed* to be bad players, and eight of them at one table
+is not a situation that exists outside this tool. Read these numbers as an ordering, not as
+a forecast.
 
 ### The two behaviour bugs the measurements found
 
@@ -518,6 +527,36 @@ the gambler's check-raise (loose-aggressive players genuinely check-raise 6-12%,
 every path added here switched off it still measured 8.0%, so the range was wrong, not the
 bot), and c-bet / fold-to-c-bet, which are quoted for heads-up pots and are now measured
 that way instead of being mixed with multiway.
+
+### The opponent read has never worked, and nobody had checked
+
+`lan/tools/read-check.mjs` asks a bot what it currently thinks of each live opponent -
+through the same path `decide` uses, never a copy - and compares that against the
+opponent's real hand, scored with the bots' own `madeStrength`.
+
+| level | read error | error if it never read at all | bias | direction |
+|---|---|---|---|---|
+| beginner | 0.245 | **0.175** | +0.208 | 0.241 |
+| gambler | 0.226 | **0.171** | +0.179 | 0.288 |
+| pro | 0.216 | **0.175** | +0.168 | 0.253 |
+
+**Reading opponents makes the guess 25-40% worse than not reading.** The machinery is not
+broken - direction correlates 0.25-0.32 and improves street by street as cards land, which
+is exactly what a working read looks like - but every guess is inflated by about 0.18. The
+bots think everyone is stronger than they are, everywhere, and act on it.
+
+That is very likely why the pro needed a `catchBluff` term to stop over-folding, and why
+`readGap` had to be damped: those were compensating for a bias nobody knew was there.
+Fixing the bias means re-tuning both. `docs/PLAN-hand-reading.md` has the staged plan.
+
+Two lessons from building the tool itself:
+
+- **Compute the baseline from the same data, not from memory.** The first version printed
+  "a constant guess would score about 0.19" from recollection. Measured on the same samples
+  it is 0.171-0.175 - and that number is the whole point, since it is what the read has to
+  beat.
+- **Take ground truth from the bots' own function.** Recomputing hand value the obvious way
+  skipped the board-play correction and made the bias look 0.04 smaller than it is.
 
 ### Bots come and go now
 
