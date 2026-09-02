@@ -82,12 +82,16 @@ function corr(x, y) {
   return (sxx && syy) ? sxy / Math.sqrt(sxx * syy) : 0;
 }
 
+/* ⚠️ ความจำต้องสะสมข้ามรอบ ไม่งั้นฟีเจอร์ที่พึ่งความจำจะถูกวัดต่ำกว่าความจริง
+   ของเดิมสร้างโฟลเดอร์สมองใหม่ทุก 2,000 มือ = บอทลืมทุกอย่างตลอดเวลา
+   เซิร์ฟเวอร์จริงเก็บความจำข้ามมือ ข้ามวง และข้ามการรีสตาร์ต */
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "read-"));
+bank._setDir(dir); mind._setDir(dir); mind.setAutoSave(false);
+
 let done = 0;
 let missing = false;
 while (done < HANDS) {
   const n = Math.min(PER_ROUND, HANDS - done);
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "read-"));
-  bank._setDir(dir); mind._setDir(dir); mind.setAutoSave(false);
   const table = createTable("READ");
   const mgr = createBotManager({ table: table }, function () {});
   if (typeof mgr._readGuess !== "function" || typeof mgr._handValue !== "function") { missing = true; break; }
@@ -132,8 +136,8 @@ while (done < HANDS) {
   }
   mgr.stop();
   for (const s of st.seats) if (s && s.isBot) bank.release(s.name);
-  try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* ไม่เป็นไร */ }
 }
+try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* ไม่เป็นไร */ }
 
 if (missing) {
   console.log("");
