@@ -487,8 +487,11 @@ function decideBeginner(f) {
   /* ⚠️ วัดได้ว่ามือใหม่ไปถึงเปิดไพ่แค่ 23.8% ซึ่งต่ำกว่ากรอบคนจริง (24-42)
      คนเพิ่งหัด "อยากเห็นว่าเขามีอะไร" แล้วตามจนสุด นั่นคือจุดที่เขาเสียเงินจริง ๆ
      ยิ่งไพ่เปิดครบแล้วยิ่งอยากรู้ ไม่ใช่ยิ่งกลัว */
-  const nosy = f.view.phase === "river" ? 0.08 : 0;
-  if (!scary && seen >= 0.31 && Math.random() < 0.18 + nosy + nerve * 0.45) {
+  /* ⚠️ ค่าแรกที่ลองทำให้ตัวเลขไปเกาะขอบล่างพอดี (23.9-25% แกว่งข้ามเส้น 24 ไปมา)
+     ซึ่งแปลว่าตั้งไว้ต่ำเกินจริง คนเพิ่งหัดไปถึงเปิดไพ่ราว 30% ไม่ใช่ 24%
+     ยิ่งเหลือไพ่ให้เปิดน้อย ยิ่งอยากรู้ว่าเขามีอะไร — เทิร์นเริ่มอยาก ริเวอร์อยากที่สุด */
+  const nosy = f.view.phase === "river" ? 0.14 : (f.view.phase === "turn" ? 0.06 : 0);
+  if (!scary && seen >= 0.29 && Math.random() < 0.18 + nosy + nerve * 0.45) {
     return { type: "act", action: "call" };
   }
   return { type: "act", action: "fold" };
@@ -1175,7 +1178,10 @@ export function createBotManager(room, broadcast) {
     return room.table._state.seats.filter(s => s && s.isBot);
   }
 
-  function add(count, level) {
+  /* avoid = ชื่อที่ห้ามเรียกกลับมารอบนี้ (คนที่เพิ่งลุกออกไปเมื่อกี้)
+     ⚠️ ไม่มีใครเก็บกำไรแล้วเดินออกจากโต๊ะ แล้วเดินกลับมานั่งใหม่ในวินาทีเดียวกัน
+     เจอเพราะเทสต์ตกประมาณ 1 ใน 10 ครั้งพอดีกับโอกาสสุ่มได้ชื่อเดิมจากรายชื่อ 10 ตัว */
+  function add(count, level, avoid) {
     const lv = LEVEL[level] ? level : 2;
     const added = [];
     let busyAll = false;
@@ -1184,7 +1190,8 @@ export function createBotManager(room, broadcast) {
          กระเป๋าเงินผูกกับชื่อ ถ้าชื่อเดียวกันนั่งสองโต๊ะ ทั้งสองโต๊ะจะหยิบจากกระเป๋าใบเดียวกัน
          แล้วเขียนทับกันไปมา ยอดของโต๊ะที่บันทึกก่อนจะหายทั้งก้อน */
       const used = room.table._state.seats.filter(Boolean).map(s => s.name);
-      const free = (ROSTER[lv] || []).filter(n => used.indexOf(n) === -1 && !bank.isBusy(n));
+      const free = (ROSTER[lv] || []).filter(n => used.indexOf(n) === -1 && !bank.isBusy(n) &&
+                                                  n !== avoid);
       if (!free.length) { busyAll = true; break; }
       /* สุ่มว่าใครในระดับนั้นจะได้มาเล่น ไม่ใช่เรียกตัวแรกในรายชื่อทุกครั้ง
          ไม่งั้นจะเจอ Rex ทุกวงจนบอทตัวอื่นไม่มีประวัติของตัวเองเลย */
@@ -1317,7 +1324,7 @@ export function createBotManager(room, broadcast) {
     clearTimeout(pending[b.seatId]);
     delete pending[b.seatId];
     room.table.leave(b.seatId);
-    add(1, lv);
+    add(1, lv, gone);
   }
 
   /* ---------- บอทหมดตัว: เติมชิปหรือลุกให้ตัวอื่นมาแทน ----------
@@ -1376,8 +1383,9 @@ export function createBotManager(room, broadcast) {
         delete pending[b.seatId];
         room.table.leave(b.seatId);
         /* เรียกตัวใหม่ระดับเดียวกันมานั่งแทน โต๊ะจะได้ไม่ค่อยๆ ว่างลง
-           ถ้าระดับนั้นไม่ว่างเลย ก็ปล่อยที่นั่งว่างไว้ ดีกว่าลากตัวที่นั่งโต๊ะอื่นอยู่มา */
-        add(1, lv);
+           ถ้าระดับนั้นไม่ว่างเลย ก็ปล่อยที่นั่งว่างไว้ ดีกว่าลากตัวที่นั่งโต๊ะอื่นอยู่มา
+           ⚠️ ห้ามเรียกคนที่เพิ่งหมดตัวแล้วบอกว่าเลิกกลับมาทันที — เขาเพิ่งลุกไปเมื่อกี้นี้เอง */
+        add(1, lv, gone);
         continue;
       }
 
