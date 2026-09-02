@@ -48,8 +48,10 @@ console.log("--- เติมชิปเสริมเมื่อชิปส
   b.wallet = 50000;
   const beforeTotal = b.stack + b.wallet;
   const beforeBusts = b.busts || 0;
+  /* ⚠️ ต้องเดินเลขมือด้วย ไม่งั้นตัวกันไม่ให้ตัดสินใจซ้ำในมือเดียวจะบล็อกทุกรอบ
+     (poke ในเกมจริงเรียก settleBusted หลายครั้งต่อมือ จึงต้องมีตัวกันตัวนี้) */
   let tries = 0;
-  while (b.stack < BUY_IN && tries++ < 200) w.mgr.settleBusted();
+  while (b.stack < BUY_IN && tries++ < 200) { w.st.handNo++; w.mgr.settleBusted(); }
   ok("บอทที่เหลือ 120 ชิป ต้องเติมกลับขึ้นมา", b.stack === BUY_IN, "ได้ " + b.stack);
   ok("เงินรวม (กระเป๋า+ชิป) ต้องไม่เปลี่ยน",
      b.stack + b.wallet === beforeTotal, b.stack + b.wallet + " vs " + beforeTotal);
@@ -68,7 +70,7 @@ console.log("--- ชิปยังพอเล่น ต้องไม่ไ�
   const b = w.st.seats.filter(function (s) { return s && s.isBot; })[0];
   b.stack = 1800; b.wallet = 50000;
   const bought = b.boughtIn;
-  for (let i = 0; i < 50; i++) w.mgr.settleBusted();
+  for (let i = 0; i < 50; i++) { w.st.handNo++; w.mgr.settleBusted(); }
   ok("ชิป 1,800 (90% ของบายอิน) ต้องไม่ถูกเติม", b.boughtIn === bought, "boughtIn=" + b.boughtIn);
   w.mgr.stop();
 }
@@ -87,6 +89,7 @@ console.log("--- ลุกเองทั้งที่ยังมีชิป
   const moneyBefore = b.stack + b.wallet;
   let left = false;
   for (let i = 0; i < 400 && !left; i++) {
+    w.st.handNo++;
     w.mgr.settleBusted();
     const now = w.st.seats[seatId];
     if (!now || now.name !== nameGone) left = true;
@@ -113,6 +116,7 @@ console.log("--- นิสัยประจำระดับต้องยั
     b.stack = BUY_IN * 2; b.wallet = 4000;
     let n = 0;
     for (let i = 0; i < rounds; i++) {
+      w.st.handNo++;
       w.mgr.settleBusted();
       const now = w.st.seats[seatId];
       if (!now || now.name !== was) { n++; break; }
@@ -127,6 +131,40 @@ console.log("--- นิสัยประจำระดับต้องยั
   }
   ok("มือใหม่ต้องเก็บกำไรแล้วเลิกบ่อยกว่านักพนัน",
      beginnerQuit > gamblerQuit, "มือใหม่ " + beginnerQuit + " · นักพนัน " + gamblerQuit + " จาก 60 รอบ");
+}
+
+/* ---------- 5. ตัดสินใจได้มือละครั้ง ไม่ใช่ทุกครั้งที่ถูกเรียก ---------- */
+console.log("");
+console.log("--- เรียกซ้ำในมือเดียว ต้องไม่ทำให้โอกาสลุกพองขึ้น ---");
+{
+  /* ⚠️ กับดักประจำโปรเจกต์นี้: poke() เรียก settleBusted() ทุกครั้งที่สถานะเป็น
+     waiting/showdown ซึ่งเกิดสิบกว่าครั้งต่อหนึ่งมือ ส่วนเครื่องมือวัดเรียกมือละครั้ง
+     อะไรก็ตามที่ "ทอยลูกเต๋า" ในนั้นจึงพองขึ้นเป็นสิบเท่าเฉพาะในเกมจริง โดยที่วัดไม่เห็น
+     (เคยโดนมาแล้วกับ rememberFoes ที่ทำให้ความแค้นพองหลายเท่า) */
+  function leftOnce(sameHand, calls) {
+    const w = fresh();
+    w.mgr._addNamed("Bobby", 1);
+    const b = w.st.seats.filter(function (s) { return s && s.isBot; })[0];
+    const seatId = b.seatId, was = b.name;
+    b.stack = BUY_IN * 2; b.wallet = 4000;     /* กำไรเท่าตัว = อยากเก็บแล้วเลิก */
+    for (let i = 0; i < calls; i++) {
+      if (!sameHand) w.st.handNo++;
+      w.mgr.settleBusted();
+      const now = w.st.seats[seatId];
+      if (!now || now.name !== was) { w.mgr.stop(); return 1; }
+    }
+    w.mgr.stop();
+    return 0;
+  }
+  let same = 0, spread = 0;
+  for (let t = 0; t < 200; t++) {
+    same   += leftOnce(true, 20);
+    spread += leftOnce(false, 20);
+  }
+  ok("เรียก 20 ครั้งในมือเดียว ต้องเท่ากับทอยครั้งเดียว",
+     same * 3 < spread || same <= 12,
+     "มือเดียว " + same + " · ยี่สิบมือ " + spread + " จาก 200 ครั้ง");
+  ok("และต้องยังลุกได้จริงเมื่อมือเดินไปเรื่อย ๆ", spread > same);
 }
 
 console.log("");

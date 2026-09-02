@@ -324,6 +324,7 @@ were joining. Gate the audit on all seats being occupied before believing it.
 | `lan/tools/play-as-human.mjs <hands> <perTable> [level]` | can a competent human beat them, and how |
 | `lan/tools/leak-scan.mjs <hands>` | which street a level loses on, calling or raising |
 | `lan/tools/smoke-live.mjs <hands>` | does the live `poke()` path still run at all |
+| `lan/tools/realism-check.mjs <hands>` | **do they play like people** - scored, exits 1 on any red cell |
 
 **Every calibration number recorded here before 2026-09-01 was measured on a bot that could not
 read opponents, had no memory and no mood.** `trackActions`, `updateMoods`, `rememberFoes` and
@@ -415,6 +416,58 @@ which is his character and is meant to stay.
 - Pros run VPIP 31-36% against a table with six weak players, looser than a live TAG (22-28%),
   because that table justifies it.
 
+### Realism is a separate question from profit, and needs its own tool
+
+`watch-bots` answers "who wins". It cannot answer "does this look like a person",
+and on 2026-09-02 the owner spotted the difference from a single hand: a level-3 pro
+called off his whole stack on the turn with pocket 3s on an A-5-9-5 board, four-way.
+That pro was making +6,230 per 100 hands at the time. Profit hides behaviour.
+
+`realism-check.mjs` scores eight statistics people actually use to read an opponent,
+against the range for the kind of player each level imitates, and fails any cell
+outside it. **Run it after any change to how the bots decide.** What it caught:
+
+| | before | after | real players |
+|---|---|---|---|
+| pro 4-bet+ | 23.1% | 0.4% | 1-2% |
+| pro check-raise | 0.4% | 4.8% | 3-9% |
+| pro aggression factor | 1.16 | 1.89 | 1.4-3.6 |
+| gambler PFR (vs 54% VPIP) | 10.6% | 21.8% | 18-40% |
+| gambler check-raise | 0.9% | 3.1% | 1-8% |
+
+Three causes, all of them things that were computed and then went nowhere:
+
+- **Nothing counted how many raises had already gone in on the street**, at any
+  level. A hand that is a fine open looked identical to that hand facing a raise
+  war. Note the count means different things before and after the flop - one raise
+  preflop means someone opened, one bet postflop is just Tuesday - so `war` offsets
+  them; using the raw count blocks ordinary postflop aggression (tried it, the pro
+  fell to VPIP 20.8 / AF 1.16).
+- **The trap flag disabled raising for the whole street**, not just while the bot
+  was acting weak, so every planned trap became a check-call and never once sprang.
+  Traps also only fire on monsters; real check-raises include strong-but-not-nutted
+  hands and semi-bluffs, so the pro now has a check-raise path of its own.
+- **Adding brakes without relaxing the base makes a bot inhuman in the other
+  direction.** Level 3's margins were loosened to pay for `crowd`, `heatGap` and the
+  war ladder. Expect to do this every time a brake is added.
+
+### Bots come and go now
+
+Before 2026-09-02 the only way out of a seat was `if (b.stack > 0) continue;` - a
+stack of exactly zero. Arithmetic on the measured rates: a pro busts 5 times per
+1000 hands and leaves on 12% of those, so about 0.6 departures per 1000 hands, while
+a person plays 30-60 hands a sitting. The owner said he had never seen a bot leave,
+and he could not have. Nobody topped up either, so a bot ground down to 97 chips at
+a 2,000 buy-in table just sat there.
+
+Now, between hands: short stacks top up (the engine already supported it - a rebuy
+with chips left is not counted as a bust), and each level leaves for its own reason -
+the beginner books a win or gives up, the gambler almost never quits, the pro leaves
+a table that is not paying. Measured: one voluntary departure roughly every 24 hands
+across the table, which a person will actually see. `lan/tests/test-bot-table-life.mjs`
+holds the money invariant: topping up and leaving move money between wallet and
+stack, they never create it.
+
 ## Automated tests (must pass before any commit)
 
 ```
@@ -424,6 +477,9 @@ node lan/tests/test-room.mjs       # pot excludes uncalled money · seat takeove
 node tests/test-clue.mjs           # clue rules, extracted live from color-clues/index.html
 node lan/tests/test-history.mjs    # per-player history: no double counting, money totals, reload
 node lan/tests/test-split.mjs      # ties, side pots, odd-chip remainders, 500-case money fuzz
+node lan/tests/test-bot-memory.mjs      # all three memory paths, asserted by result not by call
+node lan/tests/test-bot-table-life.mjs  # top-up + voluntary leaving, money conserved
+node lan/tools/realism-check.mjs        # 24 behaviour cells vs real-player ranges
 ```
 
 `lan/tools/table-bot.mjs` fills a table with bots that play like people — they evaluate hands

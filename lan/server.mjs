@@ -23,11 +23,21 @@ import { createTable } from "./poker-room.mjs";
 import * as store from "./history-store.mjs";
 import { createBotManager } from "./bots.mjs";
 import * as botBank from "./bot-bank.mjs";
+import * as botMind from "./bot-mind.mjs";
 import { createHash } from "node:crypto";
 
 /* รอยนิ้วมือของเครื่อง: แปลง token ทางเดียว ใช้แยกคนได้ แต่เอาไปยึดที่นั่งไม่ได้ */
 function fingerprint(tok) {
   return createHash("sha256").update(String(tok)).digest("hex").slice(0, 16);
+}
+/* ⚠️ เปิดเซิร์ฟเวอร์ตัวที่สองบนเครื่องเดียวกันเพื่อทดสอบ จะเขียนทับกระเป๋าเงินบอท
+   กับความจำของโต๊ะจริงทันที (ไฟล์เดียวกัน สองคนเขียน — ดูคำเตือนใน bots.mjs add())
+   ตั้ง BOT_DATA_DIR ให้ตัวทดสอบ แล้วมันจะไม่แตะข้อมูลของโต๊ะจริงเลย
+   ต้องตั้งก่อน store.load() ไม่งั้นมันอ่านของเดิมไปแล้ว */
+if (process.env.BOT_DATA_DIR) {
+  const d = process.env.BOT_DATA_DIR;
+  store._setDir(d); botBank._setDir(d); botMind._setDir(d);
+  console.log("  ใช้โฟลเดอร์ข้อมูลแยก: " + d);
 }
 store.load();
 /* เขียนลงดิสก์เป็นช่วงๆ ไม่ใช่ทุกมือ ดิสก์จะได้ไม่ถูกกวนตลอดเวลา
