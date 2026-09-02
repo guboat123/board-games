@@ -358,28 +358,27 @@ times over; and the two think-time draws disagreed with each other.
 
 ### Where each level stands
 
-10,000,000 hands, all 30 bots, 400 rounds, 55 minutes on five processes, chips per 100 hands.
-Re-measured 2026-09-03 on the build that passes all 39 scorecard cells. Run it with:
+10,000,000 hands, all 30 bots, 400 rounds, 49 minutes on five processes, chips per 100 hands.
+Measured on the shipped build (`73a389d`), which passes all 51 scorecard cells. Run it with:
 
 ```
 for i in 0 1 2 3 4; do node lan/tools/watch-bots.mjs 2000000 25000 $i /tmp/wb/part$i.json & done
 node lan/tools/merge-watch.mjs /tmp/wb/part*.json
 ```
 
-| Level | chips/100 hands | VPIP | raise | showdown | busts/1000 | spread inside the level |
-|---|---|---|---|---|---|---|
-| 3 มืออาชีพ | **+2,091** | 21-24% | 20-21% | 6-7% | **2.1** | Zed +2,335 … Ash +1,789 |
-| 2 นักพนัน | **+208** | 57% | 26% | 21% | 16.6 | Tank +316 … Buddy +115 |
-| 1 มือใหม่ | **-1,595** | 42-50% | 5-7% | 8-13% | 10.5 | Bruno -1,557 … Milo -1,638 |
+| Level | chips/100 hands | busts/1000 | spread inside the level |
+|---|---|---|---|
+| 3 มืออาชีพ | **+2,034** | **2.0** | Zed +2,280 … Ash +1,746 |
+| 2 นักพนัน | **+246** | 17.2 | Tank +387 … Gio +80 |
+| 1 มือใหม่ | **-1,594** | 10.7 | Sammy -1,573 … Ozzy -1,627 |
 
 Two earlier runs for comparison: before the realism work, pro +6,230 / gambler -2,415 /
 beginner -1,707 at 6.7 pro busts per 1000; after the first realism pass, +3,539 / -819 /
 -1,561 at 2.7.
 
-⚠️ These numbers are from the build measured at 02:14-03:10. Three cells were sitting on
-their band boundaries afterwards and were nudged into the middle (pro donk pass-through,
-late-street give-up, c-bet frequency). The effect on profit should be small but is not
-measured - **re-run before quoting these as final.**
+An earlier run on the build from two hours before gave +2,091 / +208 / -1,595 - so the
+several calibration changes made after it (donk, give-up, c-bet frequency, the read
+re-anchoring) moved profit by under 3%. Behaviour changed a good deal; the money barely did.
 
 **The spread inside each level is now very narrow** - the best and worst pro are 2,335 and
 1,789, where before any of this work they were 7,721 and 4,471. That is the design goal:
@@ -410,12 +409,16 @@ fold to price, occasional semi-bluff heads-up) and reports big blinds per 100 ha
 per lineup — **2,000 hands is far too few to read a win rate here**: two 2,000-hand runs against
 pros gave -134 and +164, which is all noise.
 
-| Table | BB/100 for the human | after the first realism pass | before any of it |
+| Table | BB/100 for the human | first realism pass | before any of it |
 |---|---|---|---|
-| pros only | **-19** — they beat it | -41 | -35 |
-| mixed 3/3/2 | **+69** | +92 | +88 |
-| gamblers only | **+86** | +195 | +71 |
-| beginners only | **+97** | +130 | +165 |
+| pros only | **-30** — they beat it | -41 | -35 |
+| gamblers only | **+79** | +195 | +71 |
+| mixed 3/3/2 | **+84** | +92 | +88 |
+| beginners only | **+122** | +130 | +165 |
+
+40,000 hands is enough to rank these tables and not enough to trust the last few points:
+the run before this one gave -19 / +86 / +69 / +97 on a build whose measured behaviour was
+almost identical. Treat differences under about 20 BB/100 as noise.
 
 The pro table is the one that matters for practice, and it is the one a plain solid player
 loses at. Every table got harder as the bots got more human, which is the expected cost:
@@ -711,7 +714,14 @@ when you sit down:
 
 ## Handoff / waiting on owner
 
-Nothing is waiting on the owner. The LAN server on port 8080 was restarted 2026-09-03 00:43 on the
+Nothing is waiting on the owner. One open question, not a blocker: bots show their cards
+after **25-63%** of uncontested wins (pros most, junk hands most often). That is far above a
+casino, but this is a game played with friends over WiFi, where showing is normal - left as
+it is rather than changed unasked. It also feeds what the bots learn from each other, so
+changing it moves more than one thing.
+
+Still unmeasured, from `docs/PLAN-hand-reading.md`: multiway discipline (the scorecard checks
+heads-up c-bet and fold-to-c-bet only). The LAN server on port 8080 was restarted 2026-09-03 00:43 on the
 current build with nobody connected; bot wallets and memory (35 KB of it) survived the restart.
 
 If you start a second server on the same machine for testing, set `BOT_DATA_DIR` — otherwise it
