@@ -811,11 +811,14 @@ when you sit down:
 
 ## Handoff / waiting on owner
 
-Nothing is waiting on the owner. One open question, not a blocker: bots show their cards
-after **25-63%** of uncontested wins (pros most, junk hands most often). That is far above a
-casino, but this is a game played with friends over WiFi, where showing is normal - left as
-it is rather than changed unasked. It also feeds what the bots learn from each other, so
-changing it moves more than one thing.
+Nothing is waiting on the owner.
+
+**Decided 2026-09-03: showing cards stays as it is.** Bots show after **25-63%** of uncontested
+wins (pros most, junk hands most often), which is far above a casino but normal in a game played
+with friends over WiFi. The owner chose to leave it. Do not "fix" this number toward a casino
+rate - besides being wrong for the setting, showing is how bots feed each other's `reads`, so
+lowering it quietly degrades the memory system. If it is ever revisited, measure what the read
+loses before changing the rate.
 
 Still unmeasured, from `docs/PLAN-hand-reading.md`: multiway discipline (the scorecard checks
 heads-up c-bet and fold-to-c-bet only).
