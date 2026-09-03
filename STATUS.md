@@ -402,6 +402,103 @@ Where each level puts its whole stack in, since that is where the money goes:
 | นักพนัน | 1,275,613 | turn raise 20% · river raise 19% |
 | มืออาชีพ | 182,820 | turn call 25% · river call 21% |
 
+### Is one bot in a level actually better than another? (asked 2026-09-03)
+
+The spread line above is a **range, not a ranking**. Each bot's rate can be computed separately
+in each of the five 2,000,000-hand parts, which gives a real error bar (95%, from the spread
+across parts). Gamblers, chips per 100 hands:
+
+| | rate | 95% | the five parts |
+|---|---|---|---|
+| Tank | +399 | ±78 | 319, 296, 492, 415, 475 |
+| Sonny | +324 | ±108 | 275, 272, 527, 338, 206 |
+| Vince | +296 | ±196 | 226, 689, 251, 157, 157 |
+| Frankie | +277 | ±94 | 309, 264, 318, 102, 389 |
+| Rico | +247 | ±86 | 393, 251, 231, 117, 241 |
+| Lenny | +244 | ±91 | 322, 80, 259, 339, 221 |
+| Marco | +242 | ±157 | 411, 347, 228, 276, -53 |
+| Rocco | +126 | ±130 | 331, 90, 213, -50, 47 |
+| Buddy | +109 | ±145 | 159, -132, 71, 123, 326 |
+| Gio | +103 | ±83 | -44, 206, 112, 82, 157 |
+
+- Tank vs Gio: **297 ±114 — a real difference.**
+- Rico vs Buddy: **137 ±168 — cannot be told apart.**
+
+So the ends of a level are separated and the middle is not. Do not read the per-bot order as a
+skill ranking without the error bar. (These are unweighted means of the five parts; the merge
+tool weights by hands, which is why its Tank reads +387 and this reads +399. Same data.)
+
+### live-check.mjs — the same bands, measured on the real table
+
+New tool, 2026-09-03. Reads `lan/data/hands.jsonl` — the log the server writes as people
+actually play — and scores any named player, bot or human, against the same `WANT` bands
+`realism-check.mjs` uses. It answers a question the harness cannot: *is this bot behaving on
+the real table the way the simulation says it does?*
+
+```
+node lan/tools/live-check.mjs Rico Buddy --day=2026-09-03
+node lan/tools/live-check.mjs                 # everyone in the log, by profit
+```
+
+**Not in `run-all.mjs`** on purpose: it needs live data that only exists on a machine that has
+hosted games, and `lan/data/` is gitignored, so anywhere else there is nothing to measure. It
+exits 0 with a message when the log is missing.
+
+First run, on the owner's own 104-hand session of 2026-09-03 with Rico and Buddy: **every
+measurable cell in band.** Two cells read outside it — Rico's VPIP 70% against 45-70 and 3-bet
+15% against 4-12 — and both are inside sampling error at 104 hands and 27 opportunities.
+
+That exposed a flaw in the tool's first version, which called a cell failed on a flat "25+
+samples" rule and so reported noise as a failure. It now widens each rate by its 95% interval
+and only fails a cell when the whole interval sits outside the band; a cell that is out but
+still overlapping prints `?`. The same trap as the read metric in the section above: **a
+threshold that ignores sample size manufactures findings.**
+
+#### It also found a real bug in the scorecard itself
+
+Run with no arguments over the whole log, the tool printed **"went to showdown 127%"** — which
+is impossible, and therefore a bug in the measurement, not the bots.
+
+`wtsd` divided showdowns by *players who acted on the flop*. Someone who is **all-in before the
+flop has no flop action but always reaches showdown**, so they were counted in the numerator and
+missing from the denominator. On the real log that is 1,280 of 3,819 showdowns, and the rate came
+out **32% too high** (94.6% instead of 71.7%).
+
+**`realism-check.mjs` had the identical bug in a scorecard cell** — the gate that blocks commits.
+It hid there because bots go all-in preflop far less often than people do, so it only inflated
+the number quietly instead of breaking it. Both files now use *"did not fold preflop, and a flop
+was dealt"*, taken from the hand's dealt-in list rather than from who acted.
+
+Two things came out of the fix:
+
+- **51 cells still green** (pro showdown rate now 30.7% against a 22-32 band). Unit tests 12/12.
+- The heads-up test for c-bet is now *"exactly two players reached the flop"* rather than *"two
+  acted"*, which is what heads-up means; both files also require that the preflop raiser actually
+  got to act, so an all-in opponent no longer counts as a c-bet opportunity that was declined.
+
+Lesson worth keeping: **the harness and the real table have different shapes, and a definition
+can be wrong in a way only the real table reveals.** Nothing in 10,000,000 simulated hands
+surfaced this; 1,704 real ones printed an impossible number on the first run.
+
+### What the bots have worked out about the owner
+
+Rico and Buddy have each sat with the owner for hundreds of actions, and have independently
+reached the same profile: **shown down weak 7 times in 11**, and **folds to only 10%** of what
+it faces. Those are the two correct conclusions about a loose-passive player — do not believe
+its bets, and do not try to bluff it — and `foldiness` clamps to 0 for the owner, so neither
+bot wastes money attacking. Each has also caught the owner bluffing 11-12 times, which is how
+they learned it. Nothing about this is hand-coded; it is the memory doing its job.
+
+The `foldiness` calibration was re-checked against the population it now actually has: **498
+opponent pairs with 15+ observed actions, median fold rate 34%, 90th percentile 57%, highest
+79%.** The threshold `(rate - 0.42) / 0.16` therefore leaves 63% of pairs at zero, fires
+partially for 28% and saturates for 8% — it reads the tight third of a table, which is what it
+is for. It is not a dead feature and it is not firing on everyone.
+
+Bots read each other the same way: Buddy's record of Rico is 1 strong to 4 weak in 12
+showdowns, and on the real table Rico is the more aggressive of the pair (3-bet 15%,
+committed 12,226 with two pair on a paired ace board). Buddy's read of Rico is correct.
+
 ### What a human can do to them
 
 `play-as-human.mjs` seats a deliberately plain tight-aggressive human (tight preflop, value bet,

@@ -211,7 +211,24 @@ while (done < HANDS) {
       /* ---- หลังฟลอป ---- */
       const post = acts.filter(function (a) { return a.phase !== "preflop"; });
       const flop = acts.filter(function (a) { return a.phase === "flop"; });
-      const sawFlop = new Set(flop.map(function (a) { return a.seat; }));
+      /* ⚠️ "เห็นฟลอป" = ไม่ได้หมอบก่อนฟลอป — ไม่ใช่ "มีท่าในฟลอป"
+         ของเดิมนับจากคนที่เดินในฟลอป ซึ่งตกคนที่ลงหมดตัวไปก่อนฟลอปแล้ว
+         (คนกลุ่มนี้ไม่มีท่าให้เดินอีก แต่ไปถึงเปิดไพ่แน่นอน)
+         ตัวหารจึงเล็กกว่าตัวตั้ง แล้ว wtsd ทะลุ 100% ได้ — เจอตอนเอานิยามชุดนี้
+         ไปวัดโต๊ะจริงเมื่อ 2026-09-03 (คนจริงลงหมดตัวก่อนฟลอปบ่อยกว่าบอทมาก
+         1,280 ครั้งจาก 3,819 เปิดไพ่) ในการจำลองมันแค่ทำให้ค่าสูงเกินจริงเงียบ ๆ */
+      const foldedPre = new Set();
+      for (const a of acts) if (a.phase === "preflop" && a.act === "fold") foldedPre.add(a.seat);
+      const sawFlop = new Set();
+      if ((hand.board || []).length >= 3) {
+        /* คนที่ถูกแจกไพ่ในมือนี้เท่านั้น — st.seats มีบอทที่เพิ่งนั่งหรือรออยู่ด้วย */
+        const seatOfName = {};
+        for (const s of st.seats) if (s) seatOfName[s.name] = s.seatId;
+        for (const pl of (hand.players || [])) {
+          const sid = seatOfName[pl.name];
+          if (sid !== undefined && !foldedPre.has(sid)) sawFlop.add(sid);
+        }
+      }
       for (const sid of sawFlop) if (lvOf[sid]) S[lvOf[sid]].flop++;
       for (const a of post) {
         const lv = lvOf[a.seat]; if (!lv) continue;
