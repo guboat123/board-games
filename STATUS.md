@@ -818,8 +818,18 @@ it is rather than changed unasked. It also feeds what the bots learn from each o
 changing it moves more than one thing.
 
 Still unmeasured, from `docs/PLAN-hand-reading.md`: multiway discipline (the scorecard checks
-heads-up c-bet and fold-to-c-bet only). The LAN server on port 8080 was restarted 2026-09-03 00:43 on the
-current build with nobody connected; bot wallets and memory (35 KB of it) survived the restart.
+heads-up c-bet and fold-to-c-bet only).
+
+**Server state as of 2026-09-03 23:15 — port 8080 is NOT listening.** The owner played a
+107-hand session that evening (last hand 23:02:59) and the process was gone by 23:15; no crash
+log exists because its output was never captured to a file. **Nothing was lost**: bot minds,
+bank, wallet summary and the hand log were all written cleanly at 23:04:04-23:04:13, and the
+log holds 1,704 hands. Reason unknown — nothing in this session touched the server (all work
+was read-only analysis plus a simulation in a temp directory). Start it again with
+`node lan/server.mjs`; **ask the owner first**, since a restart drops anyone connected.
+
+That 107-hand session is the data behind the `live-check.mjs` section above, and is worth
+keeping: it is the only sample of the shipped build with a real person at the table.
 
 If you start a second server on the same machine for testing, set `BOT_DATA_DIR` — otherwise it
 writes the same bot wallet and memory files as the live table, which `bots.mjs` already warns is
