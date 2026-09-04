@@ -758,6 +758,7 @@ node lan/tests/test-history.mjs    # per-player history: no double counting, mon
 node lan/tests/test-split.mjs      # ties, side pots, odd-chip remainders, 500-case money fuzz
 node lan/tests/test-bot-memory.mjs      # all three memory paths, asserted by result not by call
 node lan/tests/test-bot-table-life.mjs  # top-up + voluntary leaving, money conserved
+node lan/tests/test-bot-buyin.mjs       # host-set bot buy-in; chips seated == wallet debited
 node lan/tools/realism-check.mjs        # 24 behaviour cells vs real-player ranges
 ```
 
@@ -809,9 +810,87 @@ when you sit down:
 - **People come and go.** Roughly one bot stands up every 24 hands, tops up when short, and is
   replaced by someone else at the same level.
 
+## Session 2026-09-04: host-set bot buy-in, and player history on the landing page
+
+Two things the owner asked for, both shipped and verified against a running server.
+
+### The host can now set how much the bots buy in for
+
+`BUY_IN = 2000` was a module constant in `lan/bots.mjs`. It is now `DEFAULT_BUY_IN` plus a
+per-table setting on the bot manager (`setBuyIn` / `buyIn()`), exposed in the bot box under
+**บอทซ้อม** as `− 2,000 +`, stepping by 10 big blinds. The number alone means nothing, so the
+row also says what it costs: `100 บอด · นักพนันซื้อได้ 10 ครั้ง`, computed from the level
+starting wallets (5,000 / 20,000 / 100,000). Set it high enough that a level can afford fewer
+than two buy-ins and the line turns amber — at 5,000 a beginner gets one shot and then leaves,
+which is a real change to the table, not a cosmetic one.
+
+Deliberate choices worth keeping:
+
+- **The setting is per table, not per server.** Two tables with different blinds need different
+  numbers, and the value rides along in the state broadcast so a second phone opening the panel
+  sees the truth rather than its own guess.
+- **Changing it does not touch bots already seated.** Their chips stay put; the new number
+  applies to the next bot called and the next top-up. Each bot also remembers its own stake
+  (`seat.buyIn`), because "am I up or down" must be measured against what *it* bought in with —
+  compare against the current setting and a bot that is exactly even reads itself as down 78%
+  and starts playing scared.
+- **A pure set sends no `count`.** The `addbot` handler reads a missing `count` as 0, which
+  means *remove every bot*. Nudging a number must never empty the table mid-game, so the set-only
+  path returns before it gets there.
+- **The row only renders when the server sent `botBuyIn`.** The page reloads the moment a browser
+  refreshes; the server only changes on restart. Without that check, an updated page talking to a
+  not-yet-restarted server would send the exact message that clears the table.
+
+**Two money bugs came out of this, both real and both now tested.**
+
+1. `sit()` clamps the requested buy-in to the table's own min/max, but the wallet was debited by
+   the *requested* amount. Ask for 8,000 on a table capped at 2,500 and 5,500 chips per bot
+   vanish — `bankroll = wallet + stack` silently breaks. Both sit paths now debit `bs.stack`,
+   the chips actually seated. `setBuyIn` also clamps at set time, but that is not enough on its
+   own: the host can lower the table cap afterwards, which is what the test reproduces.
+2. The rebuy after a bust debited the wallet without checking whether the rebuy succeeded. The
+   room refuses one that exceeds the table cap or lands mid-hand — money left the wallet with no
+   chips in return, and since the stack stayed 0 the same path ran again on the next poke,
+   draining it repeatedly and inflating the bust count. It now checks the result first, and the
+   bust decision is capped at one per hand like the branch above it.
+
+`node lan/tests/test-bot-buyin.mjs` — 29 assertions. Reverting either fix fails it.
+
+### Player history moved to the landing page
+
+`ประวัติผู้เล่น` now sits on the join screen next to the bot money table, as a `<details>` block
+that loads over the lobby socket. It was previously reachable only from the **สะสม** tab inside
+the table panel, which meant that to answer "how did last night go" you had to join a table and
+buy chips first, to look at numbers.
+
+- The server's `profiles` request moved above the "must be seated" gate, next to `botbank` — it
+  is machine-wide data, not table data. A client that has not joined has no `playerKey` yet, so
+  it sends its own token and the server fingerprints it the same way `join` does. The raw token
+  is never echoed back; that warning in `join` applies here too.
+- **People and bots are shown as separate groups.** Sorted together by hands played, the bots
+  win: they play thousands of hands a night and a person plays a few dozen, so every human ends
+  up below the fold on the screen built to show them.
+- Each row answers the landing-page question (net, hands, wins, VPIP, when they last played),
+  not the in-game one. The **สะสม** tab still shows the fuller per-opponent breakdown, which is
+  what you want while deciding how to play against someone.
+- On GitHub Pages, and against a server too old to answer, both sections say so instead of
+  spinning forever.
+
 ## Handoff / waiting on owner
 
-Nothing is waiting on the owner.
+**Restart the server to get the two features above.** The page is served from disk, so a browser
+refresh already has the new UI, but `lan/server.mjs` and `lan/bots.mjs` only change on restart.
+Until then the UI degrades on purpose: the buy-in row does not render, and the history section
+says it cannot reach the server. Ask before restarting — it drops anyone connected.
+
+**Port 8080 stopped again, and again without explanation.** The owner started it at 22:26 on
+2026-09-04; it was still listening at ~22:49 and the process was gone by 22:57. Its data files
+were last written at 22:35:50, so nothing was lost and nobody was mid-hand. This session's
+testing cannot be the cause: it ran on port 8090 with `BOT_DATA_DIR` pointing at a temp folder,
+started at ~22:53 — after the last live write, on a different port, against different files.
+This is the second night in a row (see 2026-09-03 below), so **when it is next started, capture
+its output**: `node lan/server.mjs > lan/data/server.log 2>&1`. Without a log there is nothing
+to diagnose.
 
 **Decided 2026-09-03: showing cards stays as it is.** Bots show after **25-63%** of uncontested
 wins (pros most, junk hands most often), which is far above a casino but normal in a game played

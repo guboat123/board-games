@@ -258,6 +258,24 @@ button { font-family: inherit; }
 .botadd { color: #bff0d2; border-color: var(--live); }
 .botadd--rm { color: #ff8f84; border-color: #6b2f28; }
 .botlv:focus-visible, .botadd:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+/* ปุ่มลบ/บวกต้องกดโดนบนมือถือ 30px คือขนาดเล็กสุดที่ยังกดไม่พลาดในกล่องเตี้ยแบบนี้ */
+.botbuy__step {
+  flex: 0 0 auto; width: 30px; height: 30px; padding: 0;
+  font-family: inherit; font-size: 1rem; font-weight: 700; line-height: 1;
+  color: #bff0d2; background: #102b1e;
+  border: 1px solid #2f5540; border-radius: 8px; cursor: pointer;
+}
+.botbuy__step:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+.botbuy__val {
+  flex: 0 0 auto; min-width: 52px; text-align: center;
+  font-family: var(--mono); font-size: .84rem; color: var(--gold);
+}
+/* คำอธิบายยาวกว่าที่เหลือได้ ให้มันหดเองแทนที่จะดันปุ่มออกนอกกล่อง */
+.botbuy__hint {
+  flex: 1 1 0; min-width: 0; font-size: .66rem; line-height: 1.25;
+  color: var(--muted);
+}
+.botbuy__hint.is-warn { color: #ffc98a; }
 .ptabs { display: flex; gap: 6px; margin: 2px 0 8px; }
 .ptab {
   flex: 1 1 0; padding: 7px 6px; font-family: inherit;
@@ -1092,7 +1110,27 @@ button { font-family: inherit; }
 .bank-bar i { display: block; height: 100%; border-radius: 2px; }
 /* ⚠️ ต้องเห็นได้หมด ไม่ใช่ตัดที่ 46vh แล้วเดาเอาว่ายังมีต่อ
    เลื่อนในกล่องตัวเองได้ และการ์ดหน้าเข้าร่วมก็เลื่อนได้ทั้งใบอยู่แล้ว */
-#bank-list { max-height: 62vh; overflow-y: auto; padding-right: 2px; }
+#bank-list, #prof-list { max-height: 62vh; overflow-y: auto; padding-right: 2px; }
+/* ---------- ประวัติผู้เล่นบนหน้าก่อนเข้าเกม ----------
+   ใช้โครงเดียวกับตารางเงินบอท (แถวสองบรรทัด) เพราะมันคือคำถามแบบเดียวกัน
+   "ใครเป็นใคร ตอนนี้ได้เสียเท่าไหร่" ต่างกันแค่ว่าเป็นคนหรือบอท */
+.plrow {
+  padding: 7px 9px; margin-bottom: 5px;
+  background: rgba(255,255,255,.04); border-radius: 9px;
+}
+/* เครื่องตัวเองต้องหาเจอทันทีโดยไม่ต้องไล่อ่านชื่อ */
+.plrow.is-me { box-shadow: inset 0 0 0 1px rgba(47,168,92,.55); }
+.plrow__top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.plrow .nm {
+  font-size: .84rem; font-weight: 600; color: #e6f2ea;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.plrow .net { font-family: var(--mono); font-size: .95rem; font-weight: 700; flex: 0 0 auto; }
+.plrow .net.up { color: var(--good); }
+.plrow .net.dn { color: #ff6b5e; }
+.plrow .net.flat { color: var(--muted); }
+.plrow__bot { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; font-size: .68rem; color: var(--muted); }
+.plrow__bot b { font-family: var(--mono); font-weight: 700; color: #cfe6d8; }
 /* บรรทัดเดียวบอกผลของทุกคนในมือนี้ รวมคนที่หมอบไปแล้วด้วย
    ⚠️ ต้องเตี้ยและหดได้ ไม่งั้นจะไปเบียดแถวผู้ชนะเหมือนที่โซนเงินเคยทำ */
 .res-handnet {
@@ -1245,6 +1283,15 @@ button { font-family: inherit; }
         <span class="share__hint" id="share-hint">ต้องอยู่วง WiFi เดียวกัน</span>
       </div>
     </div>
+
+    <!-- ประวัติผู้เล่น ดูได้ก่อนเข้าเกม เหมือนตารางเงินบอท
+         ⚠️ เดิมดูได้เฉพาะตอนนั่งอยู่บนโต๊ะ (แท็บ "สะสม" ในแผงโต๊ะ)
+         แต่คำถาม "เมื่อวานใครเก็บไปเท่าไหร่" เกิดตอนยังไม่ได้นั่ง ไม่ใช่ตอนถือไพ่อยู่
+         คนที่แค่อยากดูผลจึงต้องเข้าโต๊ะ ซื้อชิป แล้วลุกออกมา เพื่อดูตัวเลขอย่างเดียว -->
+    <details class="bank-box" id="prof-box">
+      <summary>📊 ประวัติผู้เล่น</summary>
+      <div id="prof-list"><p class="hint-sm">กำลังโหลด...</p></div>
+    </details>
 
     <!-- เงินติดตัวบอท ดูได้ก่อนเข้าเกม ไม่ต้องนั่งโต๊ะก่อน -->
     <details class="bank-box" id="bank-box">
@@ -1433,6 +1480,7 @@ button { font-family: inherit; }
 
   var lobbyWs = null;
   var lobbyWanted = false, lobbyRetry = 0, lobbyTimer = null;
+  var profTimer = null;        /* ตัวจับเวลา "ขอประวัติแล้วไม่มีใครตอบ" */
 
   /* ---------- ตัวเก็บอาการ ----------
      เก็บไว้เป็นวงแหวนขนาดจำกัด เล่นทั้งคืนแล้วหน่วยความจำต้องไม่บวม
@@ -1723,6 +1771,107 @@ button { font-family: inherit; }
    ["มืออาชีพ", ["Rex","Duke","Vega","Otto","Zed","Kai","Nico","Sable","Cole","Ash"]]
   ].forEach(function (g) { g[1].forEach(function (n) { BOT_LEVEL_OF[n] = g[0]; }); });
 
+  /* เงินตั้งต้นของบอทแต่ละระดับ (ตรงกับ WALLET_START ใน lan/bots.mjs)
+     ⚠️ ต้องมีฝั่งนี้ด้วย เพราะมันคือตัวแปลง "ตัวเลขบายอิน" ให้เป็นคำตอบที่คนอ่านออก:
+     ตั้ง 10,000 แปลว่ามือใหม่ซื้อเข้าได้ไม่ถึงครั้ง = เจอกันมือเดียวก็หมดตัวแล้วลุก
+     ถ้าไม่บอก คนตั้งจะเห็นแค่ตัวเลข แล้วไม่รู้เลยว่าเพิ่งทำอะไรกับโต๊ะไป */
+  var BOT_LEVEL_NAME = { 1: "มือใหม่", 2: "นักพนัน", 3: "มืออาชีพ" };
+  var BOT_START = { 1: 5000, 2: 20000, 3: 100000 };
+
+  /* ---------- ประวัติผู้เล่นบนหน้าก่อนเข้าเกม ----------
+     ข้อมูลชุดเดียวกับแท็บ "สะสม" ในแผงโต๊ะ แต่คนละสถานการณ์จึงจัดคนละแบบ:
+     ในโต๊ะคนถามว่า "คนที่นั่งตรงข้ามเล่นยังไง" — ต้องการ VPIP กับท่าที่เขาชอบใช้
+     หน้านี้คนถามว่า "ผลเป็นยังไงบ้าง" — ต้องการได้เสียกับจำนวนมือ แค่นั้น
+
+     ⚠️ คนกับบอทต้องแยกกลุ่ม ไม่ใช่เรียงปนกัน
+     บอทเล่นวันละเป็นพันมือ คนเล่นครั้งละไม่กี่สิบ เรียงตามจำนวนมือรวมกันเมื่อไหร่
+     บอทจะยึดหัวตารางทั้งแถบ แล้วคนที่เข้ามาดูผลของตัวเองต้องเลื่อนหาจนสุด */
+  function paintLandingProfiles(list, me) {
+    var host = $("prof-list");
+    host.innerHTML = "";
+    if (!list || !list.length) {
+      var none = document.createElement("p");
+      none.className = "hint-sm";
+      none.textContent = "ยังไม่มีประวัติ เล่นจบสักมือแล้วจะเริ่มเก็บให้เอง";
+      host.appendChild(none);
+      return;
+    }
+
+    function isBot(p) {
+      return p.names.some(function (n) { return !!BOT_LEVEL_OF[n]; });
+    }
+    /* เวลาที่อ่านแล้วรู้เรื่องทันที ไม่ใช่ตัวเลข epoch หรือวันที่เต็มรูปแบบ
+       คนดูอยากรู้แค่ว่า "เพิ่งเล่นเมื่อกี้" หรือ "นานแล้ว" */
+    function whenText(ts) {
+      if (!ts) return "";
+      var d = new Date(ts), now = new Date();
+      var sameDay = d.toDateString() === now.toDateString();
+      if (sameDay) return "วันนี้ " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+      var y = new Date(now.getTime() - 86400000);
+      if (d.toDateString() === y.toDateString()) return "เมื่อวาน";
+      return d.getDate() + "/" + (d.getMonth() + 1);
+    }
+
+    [["ผู้เล่น", false], ["บอท", true]].forEach(function (g) {
+      var inGroup = list.filter(function (p) { return isBot(p) === g[1]; });
+      if (!inGroup.length) return;
+
+      var h = document.createElement("div");
+      h.className = "bank-grp";
+      var gn = document.createElement("b");
+      gn.textContent = g[0];
+      var gs = document.createElement("span");
+      gs.textContent = inGroup.length + " คน";
+      h.appendChild(gn); h.appendChild(gs);
+      host.appendChild(h);
+
+      inGroup.forEach(function (p) {
+        var row = document.createElement("div");
+        row.className = "plrow" + (p.key === me ? " is-me" : "");
+
+        var top = document.createElement("div");
+        top.className = "plrow__top";
+        var nm = document.createElement("span");
+        nm.className = "nm";
+        nm.textContent = (p.names.length ? p.names.join(" / ") : p.key) +
+                         (p.key === me ? " (เครื่องนี้)" : "");
+        var net = document.createElement("b");
+        net.className = "net " + (p.net > 0 ? "up" : (p.net < 0 ? "dn" : "flat"));
+        net.textContent = (p.net > 0 ? "+" : (p.net < 0 ? "−" : "")) +
+                          Math.abs(p.net).toLocaleString("th-TH");
+        top.appendChild(nm); top.appendChild(net);
+        row.appendChild(top);
+
+        var bot = document.createElement("div");
+        bot.className = "plrow__bot";
+        [[p.hands, "มือ"], [p.won, "ชนะ"], [p.vpip + "%", "ลงเงิน"]].forEach(function (it) {
+          var s = document.createElement("span");
+          var b = document.createElement("b");
+          b.textContent = it[0];
+          s.appendChild(b);
+          s.appendChild(document.createTextNode(" " + it[1]));
+          bot.appendChild(s);
+        });
+        var w = whenText(p.lastSeen);
+        if (w) {
+          var ws = document.createElement("span");
+          ws.style.marginLeft = "auto";
+          ws.textContent = w;
+          bot.appendChild(ws);
+        }
+        row.appendChild(bot);
+        host.appendChild(row);
+      });
+    });
+
+    /* ข้อจำกัดเดียวกับที่เขียนไว้ในแท็บ "สะสม" ต้องบอกด้วย ไม่งั้นคนจะเชื่อตัวเลขเกินจริง */
+    var note = document.createElement("p");
+    note.className = "hint-sm";
+    note.style.margin = "6px 0 0";
+    note.textContent = "นับคนจากรหัสที่เก็บไว้ในเครื่อง ถ้าล้างข้อมูลเบราว์เซอร์หรือเปลี่ยนเครื่อง จะกลายเป็นคนใหม่";
+    host.appendChild(note);
+  }
+
   function paintBank(list) {
     var host = $("bank-list");
     host.innerHTML = "";
@@ -1736,7 +1885,9 @@ button { font-family: inherit; }
 
     /* แบ่งตามระดับ แล้วเรียงจากรวยไปจนในแต่ละระดับ
        ข้ามระดับเทียบกันไม่ได้ เพราะเงินตั้งต้นคนละก้อน */
-    [["มือใหม่", 5000], ["นักพนัน", 20000], ["มืออาชีพ", 100000]].forEach(function (g) {
+    [[BOT_LEVEL_NAME[1], BOT_START[1]],
+     [BOT_LEVEL_NAME[2], BOT_START[2]],
+     [BOT_LEVEL_NAME[3], BOT_START[3]]].forEach(function (g) {
       var inGroup = list.filter(function (b) { return BOT_LEVEL_OF[b.name] === g[0]; })
                         .sort(function (a, b) { return b.bankroll - a.bankroll; });
       if (!inGroup.length) return;
@@ -1839,6 +1990,19 @@ button { font-family: inherit; }
       lobbyRetry = 0;
       lobbyWs.send(JSON.stringify({ type: "lobby" }));
       lobbyWs.send(JSON.stringify({ type: "botbank" }));
+      /* ส่ง token ไปด้วย เซิร์ฟเวอร์จะได้บอกได้ว่าแถวไหนคือเครื่องนี้
+         (ยังไม่ได้นั่งโต๊ะ มันจึงยังไม่รู้จักเรา — ดู profiles ใน server.mjs) */
+      lobbyWs.send(JSON.stringify({ type: "profiles", token: myToken() }));
+      /* ⚠️ เซิร์ฟเวอร์รุ่นเก่าเงียบไปเลยกับคำขอนี้ (มันบังคับให้นั่งโต๊ะก่อน)
+         ถ้าไม่ดักไว้ ช่องนี้จะค้างที่ "กำลังโหลด..." ตลอดกาลโดยไม่มีอะไรบอกว่าทำไม */
+      clearTimeout(profTimer);
+      profTimer = setTimeout(function () {
+        var el = $("prof-list");
+        if (el && el.textContent.indexOf("กำลังโหลด") >= 0) {
+          el.innerHTML = '<p class="hint-sm">ดึงประวัติไม่ได้ ' +
+                         '(เครื่องที่เปิดโต๊ะอาจยังเป็นรุ่นเก่า ลองรีสตาร์ตเซิร์ฟเวอร์)</p>';
+        }
+      }, 4000);
     };
     lobbyWs.onmessage = function (ev) {
       var msg;
@@ -1852,6 +2016,10 @@ button { font-family: inherit; }
         paintShare(msg.lan);
       }
       if (msg.type === "botbank") paintBank(msg.bots || []);
+      if (msg.type === "profiles") {
+        clearTimeout(profTimer);
+        paintLandingProfiles(msg.players || [], msg.me || "");
+      }
     };
     lobbyWs.onerror = function () {
       $("tables-list").innerHTML = "";
@@ -1861,6 +2029,9 @@ button { font-family: inherit; }
       $("bank-list").innerHTML =
         '<p class="hint-sm">ดูได้เฉพาะตอนต่อกับเครื่องที่เปิดโต๊ะอยู่ ' +
         '(เงินบอทเก็บไว้ในเครื่องนั้น ไม่ได้อยู่บนเว็บ)</p>';
+      $("prof-list").innerHTML =
+        '<p class="hint-sm">ดูได้เฉพาะตอนต่อกับเครื่องที่เปิดโต๊ะอยู่ ' +
+        '(ประวัติเก็บไว้ในเครื่องนั้น ไม่ได้อยู่บนเว็บ)</p>';
     };
     lobbyWs.onclose = function () {
       lobbyWs = null;
@@ -1877,6 +2048,7 @@ button { font-family: inherit; }
 
   function closeLobby() {
     lobbyWanted = false;
+    if (profTimer) { clearTimeout(profTimer); profTimer = null; }
     if (lobbyTimer) { clearTimeout(lobbyTimer); lobbyTimer = null; }
     if (lobbyWs) { try { lobbyWs.close(); } catch (e) {} lobbyWs = null; }
   }
@@ -3198,6 +3370,65 @@ button { font-family: inherit; }
   }
   var PHASE_TH = { preflop: "Preflop", flop: "Flop", turn: "Turn", river: "River" };
 
+  /* ---------- บอทซื้อเข้าโต๊ะครั้งละเท่าไหร่ ----------
+     ⚠️ เป็นค่าของโต๊ะ ไม่ใช่ของคนกด — อ่านจาก view ที่เซิร์ฟเวอร์ส่งมา ไม่ใช่ตัวแปรในหน้านี้
+     ไม่งั้นสองเครื่องที่เปิดแผงพร้อมกันจะเห็นคนละเลข ทั้งที่โต๊ะมีค่าเดียว
+
+     ทำเป็นปุ่มลบ/บวก ไม่ใช่ช่องพิมพ์ เพราะบนมือถือช่องตัวเลขเด้งคีย์บอร์ดขึ้นมาทับโต๊ะ
+     และค่าที่พิมพ์ผิดหนึ่งหลัก (20000 แทน 2000) เปลี่ยนเกมทั้งวงโดยไม่มีอะไรทัดทาน */
+  function buildBotBuyRow() {
+    var bb = (view.blinds && view.blinds.bb) || 20;
+    var range = view.buyInRange || { min: 200, max: 100000 };
+    var cur = view.botBuyIn || 2000;
+    /* ขยับทีละ 10 บอด = หน่วยที่คนเล่นโป๊กเกอร์คิดจริง และได้เลขกลม ๆ เสมอ */
+    var step = Math.max(100, Math.round(bb * 10 / 100) * 100);
+
+    var row = document.createElement("div");
+    row.className = "botbox__row";
+    var lbl = document.createElement("span");
+    lbl.className = "botbox__t";
+    lbl.textContent = "ซื้อเข้าคนละ";
+    row.appendChild(lbl);
+
+    function bump(dir) {
+      var next = Math.round((cur + dir * step) / step) * step;
+      next = Math.max(range.min, Math.min(range.max, next));
+      if (next === cur) return;
+      view.botBuyIn = next;          /* ให้ตัวเลขบนจอขยับทันที เซิร์ฟเวอร์จะยืนยันตามมา */
+      send({ type: "addbot", buyIn: next });
+      paintTablePanel();
+    }
+
+    [["−", -1], ["+", 1]].forEach(function (o, i) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "botbuy__step";
+      b.textContent = o[0];
+      b.setAttribute("aria-label", (o[1] < 0 ? "ลด" : "เพิ่ม") + "ชิปที่บอทซื้อเข้า");
+      b.addEventListener("click", function () { bump(o[1]); });
+      if (i === 0) row.appendChild(b);
+      else {
+        var val = document.createElement("b");
+        val.className = "botbuy__val";
+        val.textContent = cur.toLocaleString("th-TH");
+        row.appendChild(val);
+        row.appendChild(b);
+      }
+    });
+
+    /* ตัวเลขเปล่าไม่บอกอะไร ต้องแปลเป็นสองอย่างที่ใช้ตัดสินใจได้จริง:
+       กี่บอด (ตักลึกแค่ไหนเทียบโต๊ะนี้) และระดับที่เลือกไว้ซื้อเข้าได้กี่ครั้งก่อนหมดตัวจริง */
+    var times = Math.floor((BOT_START[botLevel] || 20000) / cur);
+    var hint = document.createElement("span");
+    hint.className = "botbuy__hint" + (times < 2 ? " is-warn" : "");
+    hint.textContent = Math.round(cur / bb) + " บอด · " +
+      (times < 1
+        ? BOT_LEVEL_NAME[botLevel] + "ซื้อเข้าไม่ไหว จะเป็นหนี้ตั้งแต่ตัวแรก"
+        : BOT_LEVEL_NAME[botLevel] + "ซื้อได้ " + times + " ครั้ง");
+    row.appendChild(hint);
+    return row;
+  }
+
   /* แถวเดียวจบ: เลือกระดับ แล้วกดจำนวน — ต้องเตี้ยพอที่จะไม่เบียดของอื่นออกนอกจอ */
   function buildBotBox() {
     var wrap = document.createElement("div");
@@ -3223,6 +3454,11 @@ button { font-family: inherit; }
       lvRow.appendChild(b);
     });
     wrap.appendChild(lvRow);
+    /* ⚠️ โผล่เฉพาะตอนเซิร์ฟเวอร์รุ่นที่รองรับ (ดูจาก botBuyIn ที่มันส่งมากับสถานะ)
+       หน้าเว็บอัปเดตทันทีที่รีเฟรช แต่เซิร์ฟเวอร์อัปเดตต่อเมื่อรีสตาร์ต
+       ระหว่างนั้นถ้าปุ่มยังอยู่ คำสั่งตั้งค่าจะถูกอ่านเป็น "เอาบอทออกให้หมด"
+       = เจ้าของกดเลื่อนตัวเลข แล้วบอททั้งโต๊ะหายกลางวง */
+    if (typeof view.botBuyIn === "number") wrap.appendChild(buildBotBuyRow());
 
     var addRow = document.createElement("div");
     addRow.className = "botbox__row";

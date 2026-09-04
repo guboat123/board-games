@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 import { createTable } from "./poker-room.mjs";
 import * as store from "./history-store.mjs";
-import { createBotManager } from "./bots.mjs";
+import { createBotManager, DEFAULT_BUY_IN } from "./bots.mjs";
 import * as botBank from "./bot-bank.mjs";
 import * as botMind from "./bot-mind.mjs";
 import { createHash } from "node:crypto";
@@ -310,7 +310,11 @@ function broadcastState(room) {
     catch (e) { log("bot error", room.code, e && e.message); }
   }
   for (const c of room.clients) {
-    send(c, { type: "state", state: room.table.viewFor(c.seatId) });
+    const state = room.table.viewFor(c.seatId);
+    /* บอทซื้อเข้าครั้งละเท่าไหร่ เป็นค่าของโต๊ะ ไม่ใช่ของคนกด
+       ต้องส่งไปกับสถานะ ไม่งั้นเปิดหน้าใหม่หรือคนที่สองเข้ามา จะเห็นค่าที่ไม่ตรงกับของจริง */
+    state.botBuyIn = room.bots ? room.bots.buyIn() : DEFAULT_BUY_IN;
+    send(c, { type: "state", state: state });
   }
 }
 
@@ -391,6 +395,24 @@ server.on("upgrade", (req, socket) => {
       return;
     }
 
+    /* ประวัติสะสมรายคน ขอได้ตั้งแต่หน้าก่อนเข้าเกม เหมือนตารางเงินบอท
+       ⚠️ อยู่เหนือ "ต้องนั่งโต๊ะก่อน" ตั้งใจ — มันเป็นข้อมูลของทั้งเครื่อง ไม่ใช่ของโต๊ะไหน
+       และคำถามที่คนถามบ่อยที่สุด ("คืนนี้ใครนำ / เมื่อวานใครเก็บไปเท่าไหร่")
+       เป็นคำถามที่เกิดตอนยังไม่ได้นั่ง ไม่ใช่ตอนกำลังถือไพ่อยู่ */
+    if (msg.type === "profiles") {
+      /* นั่งอยู่แล้ว = เขียนมือที่เพิ่งเล่นลงไฟล์ก่อน ตัวเลขจะได้เป็นของล่าสุดจริง */
+      if (client.room) persistNewHands(client.room);
+      /* ยังไม่ได้นั่ง จึงยังไม่มี playerKey — คิดจาก token ด้วยวิธีเดียวกับตอน join
+         (ทำไมต้องแปลงก่อน ไม่ส่ง token ดิบไปไหน: ดูเหตุผลยาว ๆ ที่ join) */
+      let me = client.playerKey;
+      if (!me) {
+        const tok = String(msg.token || "").slice(0, 64);
+        me = tok ? ("tok:" + fingerprint(tok)) : (client.ip ? "ip:" + client.ip : "");
+      }
+      send(client, { type: "profiles", players: store.profiles(), me: me });
+      return;
+    }
+
     if (msg.type === "join") {
       const code = String(msg.room || "").toUpperCase().slice(0, 8) || "HOME";
       const room = getRoom(code);
@@ -454,6 +476,17 @@ server.on("upgrade", (req, socket) => {
       const n = Math.max(0, Math.min(8, Math.floor(Number(msg.count)) || 0));
       const lv = Math.max(1, Math.min(3, Math.floor(Number(msg.level)) || 2));
       const bots = botsOf(client.room);
+      /* ตั้งว่าบอทจะซื้อเข้าครั้งละเท่าไหร่ ส่งมาพร้อมปุ่มเรียกบอท
+         มีผลกับตัวที่เรียกตอนนี้และการเติมชิปครั้งต่อไป ไม่ไปแก้ชิปของตัวที่นั่งอยู่แล้ว
+         (เสกชิปเข้ากองของคนที่กำลังเล่นอยู่ = เปลี่ยนผลของมือที่ค้างอยู่) */
+      if (msg.buyIn !== undefined) {
+        const eff = bots.setBuyIn(msg.buyIn);
+        log("ห้อง", client.room.code, "ตั้งบายอินบอทเป็น", eff);
+        /* ⚠️ ตั้งค่าอย่างเดียวต้องจบตรงนี้ ห้ามตกไปข้างล่าง
+           ข้างล่างอ่าน count ที่ไม่ได้ส่งมาเป็น 0 ซึ่งแปลว่า "เอาบอทออกให้หมด"
+           = เลื่อนตัวเลขเล่น ๆ แล้วบอททั้งโต๊ะหายไปกลางวง */
+        if (msg.count === undefined) { broadcastState(client.room); return; }
+      }
       if (n === 0) {
         bots.removeAll();
         log("ห้อง", client.room.code, "เอาบอทออกหมด");
@@ -497,13 +530,6 @@ server.on("upgrade", (req, socket) => {
     /* ประวัติมือ ส่งเฉพาะตอนมีคนขอ ไม่แนบไปกับ state ทุกครั้ง */
     if (msg.type === "history") {
       send(client, { type: "history", hands: client.room.table.history() });
-      return;
-    }
-
-    /* ประวัติสะสมรายคน ข้ามรอบเล่นและข้ามการปิดเปิดเซิร์ฟเวอร์ */
-    if (msg.type === "profiles") {
-      persistNewHands(client.room);
-      send(client, { type: "profiles", players: store.profiles(), me: client.playerKey });
       return;
     }
 

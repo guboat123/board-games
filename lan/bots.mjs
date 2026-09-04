@@ -83,14 +83,16 @@ const ROSTER = {
 
 /* ---------- กระเป๋าเงินของบอท ----------
    ชิปบนโต๊ะไม่ใช่เงินของบอท มันคือเงินที่ "หยิบมาเล่น" จากกระเป๋า
-   ซื้อเข้าโต๊ะครั้งละ BUY_IN หักจากกระเป๋าจริง หมดตัวแล้วซื้อใหม่ก็หักอีก
+   ซื้อเข้าโต๊ะครั้งละหนึ่งตัก หักจากกระเป๋าจริง หมดตัวแล้วซื้อใหม่ก็หักอีก
    กระเป๋าติดลบได้ = เป็นหนี้ ซึ่งบอทรู้ตัวและเล่นระวังขึ้นจริง (ดู decide)
    ทำแบบนี้เพราะถ้าซื้อชิปใหม่ได้ฟรีไม่จำกัด การหมดตัวก็ไม่มีความหมายอะไรเลย
    บอทจะไล่ all-in ทุกมือแล้วก็ยังอยู่ครบ ซึ่งไม่เหมือนคนเล่นจริงสักนิด */
 /* ⚠️ เงินไม่ได้เริ่มใหม่ทุกวง มันผูกกับ "ชื่อบอท" และอยู่ข้ามการรีสตาร์ต (ดู bot-bank.mjs)
    Rex ที่เจอเมื่อวานกับ Rex วันนี้คือตัวเดียวกัน ถ้าเมื่อวานมันเจ๊ง วันนี้มันก็ยังเป็นหนี้อยู่
    สมการที่ต้องเป็นจริงเสมอ: bankroll = wallet (นอกโต๊ะ) + stack (บนโต๊ะ) */
-const BUY_IN = 2000;
+/* ค่าเริ่มต้น เจ้าของโต๊ะตั้งใหม่ได้จากกล่อง "บอทซ้อม" (ดู setBuyIn ข้างล่าง)
+   ตั้งเป็นของแต่ละโต๊ะ ไม่ใช่ของทั้งเซิร์ฟเวอร์ — สองโต๊ะที่บอดไม่เท่ากันต้องตั้งคนละค่าได้ */
+export const DEFAULT_BUY_IN = 2000;
 
 /* ---------- เงินตั้งต้นของบอทแต่ละระดับ ----------
    ⚠️ ตัวเลขนี้ไม่ใช่แค่ "ให้เงินเยอะน้อย" มันคือ "มีอะไรให้กลัวแค่ไหน"
@@ -869,6 +871,33 @@ export function createBotManager(room, broadcast) {
   const pending = {};     /* seatId -> timer ที่ตั้งไว้ */
   let seq = 0;
 
+  /* ---------- บอทซื้อเข้าโต๊ะครั้งละเท่าไหร่ ----------
+     ⚠️ ตัวเลขนี้ไม่ใช่แค่ "ให้ชิปเยอะน้อย" มันเปลี่ยนเกมทั้งโต๊ะ
+     คนซื้อเข้า 1,000 นั่งกับบอทที่ถือ 10,000 คือคนละเกมกับนั่งกับบอทที่ถือ 1,000:
+     กองที่ใหญ่กว่ากดคนกองเล็กได้ทุกมือ เพราะทุกครั้งที่สู้คือเสี่ยงหมดตัว ส่วนอีกฝั่งไม่เสี่ยง
+     เจ้าของโต๊ะจึงต้องตั้งเองได้ ไม่ใช่ถูกล็อกไว้ที่ 2,000 ตลอดกาล */
+  let buyIn = DEFAULT_BUY_IN;
+
+  /* ตั้งค่าใหม่ คืนค่าที่ใช้จริง (ไม่ใช่ค่าที่ขอมา) เพราะโต๊ะมีเพดานของมันเอง
+     ⚠️ ต้องบีบให้อยู่ในกรอบโต๊ะตรงนี้ ไม่ใช่ปล่อยให้ sit() ไปบีบเงียบ ๆ ทีหลัง
+        ถ้าปล่อย บอทจะได้ชิปตามเพดานโต๊ะ แต่กระเป๋าถูกหักตามค่าที่ขอ = เงินหายจริง */
+  function setBuyIn(v) {
+    const cfg = room.table._cfg;
+    let n = Math.floor(Number(v));
+    if (!isFinite(n) || n <= 0) return buyIn;
+    n = Math.max(cfg.minBuyIn, Math.min(cfg.maxBuyIn, n));
+    buyIn = n;
+    return buyIn;
+  }
+
+  /* "ตักของบอทตัวนี้" ≠ "ค่าที่ตั้งไว้ตอนนี้"
+     บอทที่นั่งอยู่ก่อนเจ้าของจะเปลี่ยนค่า ยังถือตักเก่าอยู่
+     ถ้าเทียบกับค่าใหม่ มันจะอ่านตัวเองผิดว่า "ตอนนี้ติดลบหนัก" ทั้งที่ยังเท่าทุน
+     (ค่าที่ตั้งไว้ตอนนี้ใช้กับ "ครั้งต่อไปที่จะควักเงิน" ซึ่งเป็นคนละคำถาม) */
+  function stakeOf(b) {
+    return (typeof b.buyIn === "number" && b.buyIn > 0) ? b.buyIn : buyIn;
+  }
+
   /* ---------- ความจำเรื่องคนอื่นที่โต๊ะ ----------
      ทุกครั้งที่มีใครเปิดไพ่ (เปิดตอน showdown หรือกดโชว์เอง) บอททุกตัวจำไว้
      ว่าคนนั้นสู้ด้วยไพ่แบบไหน แล้วเอามาใช้ตอนตัดสินใจครั้งต่อไป
@@ -1358,15 +1387,19 @@ export function createBotManager(room, broadcast) {
          ไม่งั้นจะเจอ Rex ทุกวงจนบอทตัวอื่นไม่มีประวัติของตัวเองเลย */
       const name = free[Math.floor(Math.random() * free.length)];
       bank.claim(name);
-      const r = room.table.sit(name, null, BUY_IN, "bot:" + (++seq), { bot: true, level: lv });
+      const r = room.table.sit(name, null, buyIn, "bot:" + (++seq), { bot: true, level: lv });
       if (!r.ok) { bank.release(name); break; }
       /* หยิบเงินเก่าของบอทชื่อนี้ขึ้นมา แล้วหักค่าซื้อเข้าโต๊ะครั้งแรก
          เงินบนโต๊ะมาจากกระเป๋าเสมอ ไม่ได้เสกขึ้นมาใหม่ */
       const bs = room.table._state.seats[r.seatId];
       if (bs) {
-        bs.wallet = bank.startSession(r.name, WALLET_START[lv] || 20000, Date.now()) - BUY_IN;
+        /* ⚠️ ต้องหักตาม "ชิปที่ได้จริง" ไม่ใช่ "ชิปที่ขอ"
+           โต๊ะบีบค่าที่ขอให้อยู่ในกรอบของมันเสมอ (clampBuyIn) ถ้าหักตามค่าที่ขอ
+           สมการ bankroll = wallet + stack จะพัง = เงินหายหรืองอกขึ้นมาเฉย ๆ */
+        bs.wallet = bank.startSession(r.name, WALLET_START[lv] || 20000, Date.now()) - bs.stack;
         /* จำเงินตั้งต้นไว้ด้วย ใช้เทียบว่า "ตอนนี้ขึ้นหรือลงจากที่เริ่มมา" (ดู decide) */
         bs.walletStart = WALLET_START[lv] || 20000;
+        bs.buyIn = bs.stack;   /* ตักของตัวนี้ ใช้เทียบว่าตอนนี้ขึ้นหรือลง (ดู stakeOf) */
       }
       added.push(r.name);
     }
@@ -1431,7 +1464,7 @@ export function createBotManager(room, broadcast) {
        ตัววัดที่ตรงที่สุดคือ "ซื้อเข้าได้อีกกี่ครั้ง" ไม่ใช่ยอดดิบ
        เพราะมืออาชีพเหลือ 5,000 (2 ครั้ง) กับมือใหม่เหลือ 5,000 (2 ครั้ง)
        อยู่ในสถานการณ์เดียวกันเป๊ะ ต่างกันแค่เคยมีเท่าไหร่ ซึ่งไม่เกี่ยวตอนนี้แล้ว */
-    const runway = purse / BUY_IN;
+    const runway = purse / buyIn;
     let factor;
     if (runway < 0) factor = 0.15;        /* ต้องกู้มาเล่น มีบ้างแต่ไม่บ่อย */
     else if (runway < 1) factor = 0.25;   /* เหลือไม่พอซื้อเข้าอีกครั้งด้วยซ้ำ */
@@ -1450,7 +1483,7 @@ export function createBotManager(room, broadcast) {
      คอมเมนต์ในโค้ดเขียนมาตลอดว่า "มืออาชีพลุกเมื่อโต๊ะไม่คุ้ม" แต่ไม่เคยมีโค้ดรองรับ
      คืนค่าเป็นโอกาสต่อ "หนึ่งมือ" เพื่อจูนตรง ๆ ได้ว่าคนเล่นจะเห็นบ่อยแค่ไหน */
   function leaveChance(b) {
-    const up = b.stack / BUY_IN;          /* ตอนนี้เหลือกี่เท่าของที่ซื้อเข้ามา */
+    const up = b.stack / stakeOf(b);     /* ตอนนี้เหลือกี่เท่าของที่ซื้อเข้ามา */
     const m = moodOf(b.name);
     if (b.botLevel === 1) {
       /* มือใหม่: ได้กำไรแล้วรีบเก็บ เป็นภาพที่พบบ่อยที่สุดของคนเพิ่งหัด
@@ -1511,20 +1544,21 @@ export function createBotManager(room, broadcast) {
            เอนจินรองรับอยู่แล้ว (rebuy ตอนยังมีชิป ไม่ถูกนับเป็นการล้ม — poker-room บรรทัด s.stack === 0)
            บอทที่เหลือ 97 ชิปบนโต๊ะบายอิน 2,000 แล้วนั่งแช่ต่อ คือภาพที่ไม่มีคนจริงคนไหนทำ */
         let topped = false;
-        if (b.stack < BUY_IN * 0.25) {
+        if (b.stack < buyIn * 0.25) {
           const purse = typeof b.wallet === "number" ? b.wallet : bank.bankrollOf(b.name);
           const want = b.botLevel === 3 ? 0.90 : (b.botLevel === 2 ? 0.70 : 0.35);
-          if (purse >= BUY_IN && Math.random() < want) {
-            const addChips = BUY_IN - b.stack;
+          if (purse >= buyIn && Math.random() < want) {
+            const addChips = buyIn - b.stack;
             if (!room.table.action(b.seatId, { type: "rebuy", amount: addChips }).error) {
               b.wallet = purse - addChips;
+              b.buyIn = b.stack;   /* เติมเต็มตักแล้ว ตักใหม่คือค่าที่ตั้งไว้ตอนนี้ */
               bank.sync(b.name, b.wallet, b.stack, Date.now());
               topped = true;
             }
           }
         }
         /* สั้นแล้วยังไม่ยอมเติม = เหตุผลที่จะลุกแรงขึ้นอีก ไม่ใช่นั่งต่อเฉย ๆ */
-        const extra = (!topped && b.stack < BUY_IN * 0.25) ? 0.02 : 0;
+        const extra = (!topped && b.stack < buyIn * 0.25) ? 0.02 : 0;
         if (Math.random() < leaveChance(b) + extra) botLeaves(b);
         continue;
       }
@@ -1534,6 +1568,11 @@ export function createBotManager(room, broadcast) {
          คนจริงที่หมดตัวก็เลือกสองทางนี้ และเลือกไม่เหมือนกันตามนิสัยกับเงินที่เหลือ
          นักพนันแทบไม่เคยเลิก · มือใหม่โดนสองครั้งก็กลัวแล้วลุก
          มืออาชีพลุกเมื่อโต๊ะนี้ไม่คุ้ม ซึ่งเป็นการตัดสินใจที่ถูกต้อง ไม่ใช่ขี้ขลาด */
+      /* ⚠️ ตัดสินใจได้มือละครั้งเดียว เหมือนทางข้างบน
+         poke() เรียกฟังก์ชันนี้หลายครั้งต่อมือ และถ้าเติมชิปไม่สำเร็จ ชิปยังเป็นศูนย์อยู่
+         = เข้าทางนี้ซ้ำทุกครั้ง แล้ว "จำนวนครั้งที่ล้ม" จะบวกรัวโดยที่บอทล้มแค่หนเดียว */
+      if (lifeHand[b.seatId] === st.handNo) continue;
+      lifeHand[b.seatId] = st.handNo;
       bank.noteBust(b.name);
       if (!wantsRebuy(b)) {
         const gone = b.name, lv = b.botLevel;
@@ -1550,9 +1589,12 @@ export function createBotManager(room, broadcast) {
         continue;
       }
 
-      room.table.action(b.seatId, { type: "rebuy", amount: BUY_IN });
+      /* ⚠️ เติมไม่สำเร็จก็ต้องไม่หักเงิน — ห้องปฏิเสธได้จริง (เกินเพดานโต๊ะ / กำลังอยู่ในมือ)
+         ของเดิมหักกระเป๋าทุกครั้งโดยไม่ดูผล = เงินหายไปเฉย ๆ โดยไม่ได้ชิปมาแลก */
+      if (room.table.action(b.seatId, { type: "rebuy", amount: buyIn }).error) continue;
       /* ซื้อชิปใหม่ = หยิบเงินออกจากกระเป๋าอีกก้อน ติดลบได้ นั่นคือเป็นหนี้ */
-      b.wallet = (typeof b.wallet === "number" ? b.wallet : bank.bankrollOf(b.name)) - BUY_IN;
+      b.wallet = (typeof b.wallet === "number" ? b.wallet : bank.bankrollOf(b.name)) - buyIn;
+      b.buyIn = b.stack;
       const penalty = Math.min(Math.max(b.busts || 1, 1), 5);
       room.table.action(b.seatId, { type: "sitout", value: true });
       bench[b.seatId] = st.handNo + penalty;
@@ -1893,7 +1935,7 @@ export function createBotManager(room, broadcast) {
        ไม่ใช่แค่ระวังขึ้นทีละนิดตามสัดส่วน แต่เป็นเส้นที่ข้ามแล้วเปลี่ยนพฤติกรรมทันที
        และคนที่ติดลบอยู่แล้ว รู้ตัวว่ากำลังเล่นด้วยเงินที่ไม่มี */
     const walletNow = typeof me.wallet === "number" ? me.wallet : 0;
-    const nextBuyIn = walletNow < BUY_IN;        /* ซื้อเข้าอีกครั้งแล้วติดลบ */
+    const nextBuyIn = walletNow < buyIn;        /* ซื้อเข้าอีกครั้งแล้วติดลบ */
     const walletPressure = Math.min(1,
       Math.max(0, 1 - ratio) +
       (nextBuyIn ? 0.35 : 0) +
@@ -2033,17 +2075,19 @@ export function createBotManager(room, broadcast) {
   function _addNamed(name, level) {
     const lv = LEVEL[level] ? level : 2;
     if (!bank.claim(name)) return null;
-    const r = room.table.sit(name, null, BUY_IN, "bot:" + (++seq), { bot: true, level: lv });
+    const r = room.table.sit(name, null, buyIn, "bot:" + (++seq), { bot: true, level: lv });
     if (!r.ok) { bank.release(name); return null; }
     const bs = room.table._state.seats[r.seatId];
     if (bs) {
-      bs.wallet = bank.startSession(r.name, WALLET_START[lv] || 20000, Date.now()) - BUY_IN;
+      bs.wallet = bank.startSession(r.name, WALLET_START[lv] || 20000, Date.now()) - bs.stack;
       bs.walletStart = WALLET_START[lv] || 20000;
+      bs.buyIn = bs.stack;
     }
     return r;
   }
 
-  return { add, removeAll, poke, stop, _decideNow, _pendingStart, _addNamed, settleBusted, senseTable,
+  return { add, removeAll, poke, stop, setBuyIn, buyIn: () => buyIn,
+           _decideNow, _pendingStart, _addNamed, settleBusted, senseTable,
            _readGuess, _handValue,
            count: () => botSeats().length, LEVEL };
 }
