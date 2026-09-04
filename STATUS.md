@@ -1036,6 +1036,52 @@ cell sitting at 2% of band width from its edge is a failure that has not happene
 now are pro 4-bet (0.3-0.5 on a 0.3-3 band, inherently noisy at that frequency) and gambler
 late/early position (1.17-1.25 on 1.15-2.2).
 
+## Research: 3,000,000 hands of bot-vs-bot, and what it found
+
+The owner asked for a long bot-vs-bot run, research on everything the bots had played, and then
+to act on it without waiting. The first run of 5,100,000 hands found something better than a
+statistic - it found that a whole behaviour was dead (see the departures fix above). These numbers
+are from the corrected 3,000,000-hand run.
+
+### The three levels separate cleanly, and for the right reasons
+
+| Level | Per 100 hands | Busts / 1000 | Where the money comes from |
+|---|---|---|---|
+| มืออาชีพ | **+1,788** | 2.4 | showdown +3,429, non-showdown -1,641 |
+| นักพนัน | +415 | 25.0 | non-showdown +1,719, showdown -1,304 |
+| มือใหม่ | **-1,640** | 23.3 | loses on both |
+
+That is exactly the intended shape: **pros win by holding the better hand, gamblers win by pushing
+people off pots**, and both feed on beginners. Within each level the spread is tight enough that
+they are still recognisably the same level (pros 1,468-2,074, gamblers 85-767, beginners -1,551 to
+-1,735), which is the property that matters - a level should be a style, not a ranking.
+
+Note that gamblers are now slightly *profitable* where the broken run showed them losing. That is
+not a regression: with beginners in the game losing 1,640 per 100 hands, a loose-aggressive player
+does beat them. They still lose heavily to pros.
+
+### ⚠️ Bots leave the table four times more often than intended - measured on the real table
+
+`STATUS` has always said "roughly one bot stands up every 24 hands". Measured against the owner's
+own hand log (688 hands across 10 evenings, session boundaries excluded so a new night is not
+counted as everyone leaving): **one every 6.1 hands.** The bot-only simulation says 13.3.
+
+The gap matters because of everything else shipped this session. The bots remember who hurt them,
+hold grudges, brag, sulk and go quiet - and all of it needs the same face to come back. Voluntary
+leaving now requires twelve hands at the seat first, which moved the simulation only from 12.8 to
+13.3, because **the driver is busting, not choosing to leave** (a bust every 7.1 hands at the
+table). Going further means either making bots bust less or making busted bots rebuy more, and the
+second one directly weakens the thing that makes the money feel real.
+
+**This is left as an owner decision rather than tuned further, because "how often should someone
+get up from the table" is a question about the feel of his game, not a correctness bug.** The three
+options, in increasing cost to the money mattering:
+1. Leave it - the memory is stored per name and survives sessions anyway, so Rico still remembers
+   you next week even if he leaves tonight.
+2. Raise the beginner starting wallet above 5,000 (currently 2-3 buy-ins), so they bust less often.
+3. Make a busted bot with a healthy wallet almost always rebuy, which removes "beginner busts twice
+   and gets scared" - a characterful behaviour that is there on purpose.
+
 ## Handoff / waiting on owner
 
 **Restart the server to get the two features above.** The page is served from disk, so a browser
