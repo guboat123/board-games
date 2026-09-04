@@ -1073,14 +1073,41 @@ leaving now requires twelve hands at the seat first, which moved the simulation 
 table). Going further means either making bots bust less or making busted bots rebuy more, and the
 second one directly weakens the thing that makes the money feel real.
 
-**This is left as an owner decision rather than tuned further, because "how often should someone
-get up from the table" is a question about the feel of his game, not a correctness bug.** The three
-options, in increasing cost to the money mattering:
-1. Leave it - the memory is stored per name and survives sessions anyway, so Rico still remembers
-   you next week even if he leaves tonight.
-2. Raise the beginner starting wallet above 5,000 (currently 2-3 buy-ins), so they bust less often.
-3. Make a busted bot with a healthy wallet almost always rebuy, which removes "beginner busts twice
-   and gets scared" - a characterful behaviour that is there on purpose.
+**Fixed on the owner's instruction ("don't leave so often, make it realistic").**
+
+The root was that busting out almost always ended in leaving, which is not what people do - someone
+who loses their stack at a friend's house usually buys back in. They leave when they are *actually*
+out of money, not when they are out of chips. The culprit was the runway multiplier: bankrolls
+persist across evenings, so beginners and gamblers thin out naturally, and once thin the old
+multiplier sat at 0.15-0.45, meaning nearly every bust ended the session **forever after**.
+It could be opened up now precisely because the debt floor exists to catch the far end: rebuy
+freely until genuinely broke, then disappear for good. Voluntary leaving with chips still in front
+of you was also halved - a beginner who doubled up had a 3% chance per hand of walking, which is
+gone within 33 hands.
+
+| Runway | was | now |
+|---|---|---|
+| in debt | 0.15 | 0.30 |
+| under one buy-in | 0.25 | 0.55 |
+| one buy-in left | 0.45 | 0.80 |
+| two to five | 0.75 | 0.93 |
+
+**The number that actually matters is how long one bot stays, not how often anyone leaves** - a
+table rate of "someone every 6 hands" sounds alarming but with six bots seated it is a whole
+evening per bot. Measured per level:
+
+| Level | before | after |
+|---|---|---|
+| มือใหม่ | 61 hands | **85** |
+| นักพนัน | 115 | **168** |
+| มืออาชีพ | 324 | **526** |
+
+That is the right shape for a home game: the beginner busts out and goes home first, the gambler
+lasts the evening, the pro is still there when the lights go off. Table-level churn went 12.8 to
+18.3 hands in simulation. On the owner's own table the effect should be larger than the simulation
+shows, because his bots' wallets are genuinely thin (6 of 30 in debt, 10 more under two buy-ins)
+and that is exactly the case the multiplier change targets - his bots' average willingness to buy
+back in rises 21%.
 
 ## Handoff / waiting on owner
 
