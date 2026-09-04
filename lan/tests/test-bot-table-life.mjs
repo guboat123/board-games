@@ -38,16 +38,16 @@ function fresh() {
 const BUY_IN = 2000;
 
 /* ---------- บอทลุกเป็นสองจังหวะ ----------
-   จังหวะแรก settleBusted ติดป้ายว่าจะลุก (b.leaving = เวลาที่ครบกำหนด) แล้วยืนโบกมืออยู่ 2.2 วิ
+   จังหวะแรก settleBusted ติดป้ายว่าจะลุก (b.botBye = เวลาที่ครบกำหนด) แล้วยืนโบกมืออยู่ 2.2 วิ
    จังหวะสอง settleBusted รอบถัดไปที่เวลาครบ ค่อยเก็บเงินและเรียกตัวแทน (ดู botLeaves)
    เทสต์เดินเป็นแสนรอบในไม่กี่วินาที จะนั่งรอนาฬิกาจริงไม่ได้ จึงเร่งเข็มให้แล้วเรียกซ้ำ
    ⚠️ ห้ามลัดไปเรียก finishLeaving ตรง ๆ — ต้องเดินทางเดียวกับเกมจริงทุกบรรทัด
       ไม่งั้นเทสต์จะผ่านทั้งที่ทางที่คนเล่นเจอจริงพัง */
 function settleNow(w) {
   w.mgr.settleBusted();
-  const going = w.st.seats.filter(function (x) { return x && x.isBot && x.leaving; });
+  const going = w.st.seats.filter(function (x) { return x && x.isBot && x.botBye; });
   if (!going.length) return;
-  going.forEach(function (x) { x.leaving = 1; });   /* ครบกำหนดไปนานแล้ว */
+  going.forEach(function (x) { x.botBye = 1; });   /* ครบกำหนดไปนานแล้ว */
   w.mgr.settleBusted();
 }
 
@@ -200,7 +200,7 @@ console.log("--- ลุกจากโต๊ะต้องกินเวลา
   for (let i = 0; i < 400 && !marked; i++) {
     w.st.handNo++;
     w.mgr.settleBusted();
-    if (w.st.seats[seatId] && w.st.seats[seatId].leaving) marked = true;
+    if (w.st.seats[seatId] && w.st.seats[seatId].botBye) marked = true;
   }
   ok("ตัดสินใจลุกแล้วต้องติดป้ายไว้ก่อน", marked);
   const mid = w.st.seats[seatId];
@@ -210,13 +210,15 @@ console.log("--- ลุกจากโต๊ะต้องกินเวลา
   ok("ต้องถูกพักมือไว้ จะได้ไม่ถูกแจกไพ่ในมือถัดไป", !!mid && mid.sitOut === true);
   ok("ชิปยังอยู่บนโต๊ะ ยังไม่ถูกเก็บ", !!mid && mid.stack === BUY_IN * 2);
 
-  /* เรียกซ้ำระหว่างที่ยังไม่ครบเวลา ต้องไม่มีอะไรขยับ (poke เรียกถี่มากในเกมจริง) */
-  for (let i = 0; i < 10; i++) { w.st.handNo++; w.mgr.settleBusted(); }
+  /* เรียกซ้ำ "ในมือเดียวกัน" ต้องไม่มีอะไรขยับ — poke เรียกถี่มากต่อหนึ่งมือ
+     ⚠️ ห้ามเดินเลขมือในลูปนี้ ตอนนี้คำลามีเส้นตายสองเส้น (เวลาจริง หรือครบ 2 มือ)
+     เดินเลขมือ 10 ครั้งคือครบเส้นที่สองไปแล้ว ซึ่งเป็นการเก็บที่ถูกต้อง ไม่ใช่เก็บก่อนเวลา */
+  for (let i = 0; i < 10; i++) w.mgr.settleBusted();
   const still = w.st.seats[seatId];
   ok("เรียกซ้ำสิบรอบก่อนครบเวลา ต้องยังไม่เก็บ", !!still && still.name === was);
 
   /* ครบเวลาแล้วค่อยเก็บจริง */
-  still.leaving = 1;
+  still.botBye = 1;
   w.mgr.settleBusted();
   const after = w.st.seats[seatId];
   ok("ครบเวลาแล้วต้องมีคนใหม่มานั่งแทน", !!after && after.name !== was, after && after.name);
@@ -235,8 +237,8 @@ console.log("--- กดเอาบอทออก ระหว่างที�
   w.mgr._addNamed("Toby", 1);
   const b = w.st.seats.filter(function (s) { return s && s.isBot; })[0];
   b.stack = BUY_IN * 2; b.wallet = 4000;
-  for (let i = 0; i < 400 && !b.leaving; i++) { w.st.handNo++; w.mgr.settleBusted(); }
-  ok("ตั้งต้น: มีตัวที่กำลังลุกอยู่จริง", !!b.leaving);
+  for (let i = 0; i < 400 && !b.botBye; i++) { w.st.handNo++; w.mgr.settleBusted(); }
+  ok("ตั้งต้น: มีตัวที่กำลังลุกอยู่จริง", !!b.botBye);
   w.mgr.removeAll();
   ok("กดเอาออกแล้วต้องไม่เหลือบอทค้างอยู่เลย",
      w.st.seats.filter(function (s) { return s && s.isBot; }).length === 0);
