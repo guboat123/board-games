@@ -656,6 +656,52 @@ button { font-family: inherit; }
   animation: think-pulse 1.1s ease-in-out infinite;
 }
 
+/* ---------- ฟองคำพูดของบอท ----------
+   ⚠️ ต้องลอยเหนือกล่องที่นั่ง ไม่ใช่ดันกล่องให้สูงขึ้น
+   ที่นั่งวางด้วย % บนโต๊ะ ถ้ากล่องสูงเปลี่ยนตอนพูด ที่นั่งจะกระตุกทุกครั้งที่มีใครพูด
+   และบนจอ 360px กล่องเก้าใบที่สูงไม่เท่ากันจะเบียดกันจนอ่านไม่ออก */
+.seat__say {
+  position: absolute; left: 50%; bottom: 100%;
+  transform: translateX(-50%);
+  margin-bottom: 6px; padding: 5px 9px;
+  max-width: 148px; width: max-content;
+  font-size: .68rem; line-height: 1.3; color: #10241a;
+  background: #f4efdd; border-radius: 11px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.45);
+  pointer-events: none; z-index: 6;
+  animation: say-pop .22s cubic-bezier(.2,.9,.3,1) both;
+}
+/* หางฟองชี้ลงไปที่เจ้าของคำพูด ไม่งั้นบนโต๊ะเก้าคนจะเดาไม่ออกว่าใครพูด */
+.seat__say::after {
+  content: ""; position: absolute; top: 100%; left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent; border-top-color: #f4efdd;
+}
+@keyframes say-pop {
+  0%   { transform: translateX(-50%) translateY(4px) scale(.9); opacity: 0; }
+  100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+}
+/* ที่นั่งแถวบนของโต๊ะ ฟองต้องออกด้านล่าง ไม่งั้นมันโผล่พ้นขอบโต๊ะไปอยู่บนขอบไม้ */
+.seat.say-below .seat__say { bottom: auto; top: 100%; margin: 6px 0 0; }
+.seat.say-below .seat__say::after {
+  top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: #f4efdd;
+}
+/* ⚠️ ที่นั่งริมซ้าย/ขวา ฟองที่จัดกลางจะยื่นออกนอกโต๊ะแล้วโดนตัดหายไปครึ่งประโยค
+   (เห็นชัดบนจอ 375px — ที่นั่งซ้ายสุดอ่านได้แค่ครึ่งหลัง)
+   ริมซ้ายให้ชิดซ้าย ริมขวาให้ชิดขวา แล้วย้ายหางไปอยู่ตรงหัวคนพูดแทน */
+.seat.say-lean-l .seat__say { left: 0; transform: none; }
+.seat.say-lean-l .seat__say::after { left: 22px; }
+.seat.say-lean-r .seat__say { left: auto; right: 0; transform: none; }
+.seat.say-lean-r .seat__say::after { left: auto; right: 22px; transform: none; }
+.seat.say-lean-l .seat__say, .seat.say-lean-r .seat__say { animation-name: say-pop-lean; }
+@keyframes say-pop-lean {
+  0%   { transform: translateY(4px) scale(.92); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@media (max-width: 380px) {
+  .seat__say { max-width: 118px; font-size: .62rem; padding: 4px 7px; }
+}
+
 /* ---------- ลุกจากโต๊ะ ----------
    ⚠️ เดิมบอทลุกแล้วตัวใหม่นั่งแทนในเฟรมเดียวกัน = ไม่มีใครเคยเห็นใครลุกเลย
    ต้องลอยขึ้นแล้วจางไปช้าพอที่จะทันอ่านว่าใครลุก (ฝั่งเซิร์ฟเวอร์หน่วงให้ 2.2 วิ) */
@@ -1380,6 +1426,7 @@ button { font-family: inherit; }
     </div>
     <button type="button" class="topbtn" id="btn-help" aria-label="ชุดไพ่ อะไรชนะอะไร">?</button>
     <button type="button" class="topbtn" id="btn-sound" aria-label="เปิด/ปิดเสียง">🔊</button>
+    <button type="button" class="topbtn" id="btn-chat" aria-label="เปิด/ปิดคำพูดของบอท">💬</button>
     <button type="button" class="topbtn" id="btn-table">โต๊ะ · เงิน</button>
     <div style="text-align:right">
       <div class="hand" id="t-me">—</div>
@@ -2372,6 +2419,29 @@ button { font-family: inherit; }
       if (taps >= 5) { taps = 0; dbgOpen(); }
     });
   })();
+
+  /* ---------- ปุ่มเปิด/ปิดคำพูดของบอท ----------
+     ⚠️ เป็นค่าของ "คนดู" ไม่ใช่ของโต๊ะ จึงเก็บไว้ในเครื่องแต่ละคน
+     สองคนนั่งโต๊ะเดียวกัน คนหนึ่งอยากอ่าน อีกคนรำคาญ ต้องได้ทั้งคู่
+     เซิร์ฟเวอร์ส่งคำพูดมาเสมอ หน้าจอเป็นคนตัดสินว่าจะแสดงไหม
+     (ห่อ try/catch ตามข้อจำกัดของโปรเจกต์ โหมดส่วนตัวบางเบราว์เซอร์ throw) */
+  var chatOn = true;
+  try { chatOn = localStorage.getItem("bg.poker.chat") !== "off"; } catch (e) {}
+  function paintChatBtn() {
+    var b = document.getElementById("btn-chat");
+    if (!b) return;
+    b.textContent = chatOn ? "💬" : "🔕";
+    b.style.opacity = chatOn ? "" : ".5";
+    b.setAttribute("aria-pressed", chatOn ? "true" : "false");
+  }
+  $("btn-chat").addEventListener("click", function () {
+    chatOn = !chatOn;
+    try { localStorage.setItem("bg.poker.chat", chatOn ? "on" : "off"); } catch (e) {}
+    paintChatBtn();
+    toast(chatOn ? "บอทพูดได้แล้ว" : "ปิดเสียงบอทแล้ว");
+    render();
+  });
+  paintChatBtn();
 
   /* ปุ่มเปิด/ปิดเสียง จำค่าไว้ในเครื่อง (ห่อ try/catch ตามข้อจำกัดของโปรเจกต์) */
   function paintSoundBtn() {
@@ -3944,6 +4014,20 @@ button { font-family: inherit; }
                        (freshAct[seatId] ? " is-fresh" : "");
         la.textContent = s.lastAction;
         box.appendChild(la);
+      }
+
+      /* ฟองคำพูด ต่อกับ el ไม่ใช่ box เพราะมันลอยอยู่นอกกล่อง
+         (ถ้าใส่ใน box กล่องจะสูงขึ้นตอนพูด แล้วที่นั่งจะกระตุก) */
+      if (chatOn && s.say) {
+        var sy = document.createElement("div");
+        sy.className = "seat__say";
+        sy.textContent = s.say;
+        el.appendChild(sy);
+        /* ที่นั่งครึ่งบนของโต๊ะ ให้ฟองออกด้านล่าง ไม่งั้นมันพ้นขอบโต๊ะขึ้นไป */
+        if (spot[1] < 45) el.classList.add("say-below");
+        /* ริมซ้าย/ขวา ให้ฟองเอนเข้าใน ไม่งั้นครึ่งประโยคหลุดออกนอกจอ */
+        if (spot[0] < 30) el.classList.add("say-lean-l");
+        else if (spot[0] > 70) el.classList.add("say-lean-r");
       }
 
       if (seatId === view.button) {

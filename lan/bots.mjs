@@ -11,6 +11,7 @@
 import { evaluate7, cardCode, RANK_CHARS, SUIT_CHARS } from "./poker-engine.mjs";
 import * as bank from "./bot-bank.mjs";
 import * as mind from "./bot-mind.mjs";
+import { lineFor, toneFor } from "./bot-chat.mjs";
 
 /* ---------- รายชื่อบอทประจำแต่ละระดับ ----------
    ⚠️ ระดับเป็น "ตัวตน" ของบอท ไม่ใช่ค่าที่เลือกตอนเรียกมาเล่น
@@ -1034,7 +1035,35 @@ export function createBotManager(room, broadcast) {
       if (net > 0 && got > stackNow * 0.3) {
         m.confidence = Math.min(1, m.confidence + 0.28);
       }
+
+      /* ---------- พูดถึงมือที่เพิ่งจบ ----------
+         จังหวะเดียวที่ทุกคนหยุดดูพร้อมกัน จึงเป็นจังหวะที่คำพูดมีน้ำหนักที่สุด
+         ⚠️ ใช้แต่ตัวเลขเงิน ไม่แตะไพ่ของใครทั้งนั้น */
+      const share = put > 0 ? Math.min(2, (got + put) / stackNow) : 0;
+      if (net > 0 && got > 0) {
+        say(b, r.showdown ? "won" : "wonQuiet", topFoe(st, i), share);
+      } else if (net < 0 && put > stackNow * 0.15) {
+        /* แพ้กองใหญ่: บ่นของตัวเอง หรือชมคนที่เพิ่งเล่นเอาชนะเรา
+           คนจริงทำทั้งสองอย่าง ขึ้นกับว่าเป็นคนแบบไหนและกำลังรวนอยู่รึเปล่า */
+        const winner = (r.payouts || [])[0];
+        const wname = winner && st.seats[winner.seatId] ? st.seats[winner.seatId].name : "";
+        const praise = wname && m.tilt < 0.45 && Math.random() < 0.35;
+        say(b, praise ? "niceHand" : "lost", wname, share);
+      }
     }
+  }
+
+  /* คู่แข่งที่ "น่าพูดถึงที่สุด" ในมือนี้ = คนที่ยังอยู่ถึงท้ายมือกับเรา
+     ใช้เลือกว่าจะหยิบความจำของใครมาพูด ไม่ได้ใช้ตัดสินใจอะไรในเกม */
+  function topFoe(st, meSeat) {
+    let best = "", bestPut = 0;
+    const r = st.lastResult;
+    (r && r.puts || []).forEach(function (x) {
+      if (x.seatId === meSeat) return;
+      const s2 = st.seats[x.seatId];
+      if (s2 && x.amount > bestPut) { bestPut = x.amount; best = s2.name; }
+    });
+    return best;
   }
 
   /* ---------- แผนประจำสตรีทของบอทแต่ละตัว ----------
@@ -1287,6 +1316,75 @@ export function createBotManager(room, broadcast) {
      เป็นกับดักตัวเดียวกับ rememberFoes ที่เคยทำความแค้นพองหลายเท่ามาแล้ว */
   const lifeHand = {};
   const farewell = {};      /* seatId -> ตัวจับเวลาปลุกให้มาเก็บคนที่กำลังลุก */
+
+  /* ---------- ให้บอทพูด ----------
+     ⚠️ ส่งเข้า lineFor ได้เฉพาะของที่ "ทุกคนที่โต๊ะเห็นอยู่แล้ว"
+     ห้ามส่งไพ่เข้าไปเด็ดขาด ไม่ว่าไพ่ใคร — ดูเหตุผลยาว ๆ ที่หัวไฟล์ bot-chat.mjs
+     และคำพูดต้องไม่ย้อนกลับเข้าไปในหัวบอทตัวไหนเลย มันเป็นทางเดียวออกอย่างเดียว */
+  const SAY_MS = 4200;
+  /* ⚠️ ความถี่อย่างเดียวไม่พอ ต้องมีช่วงเว้นด้วย ไม่งั้นจะเจอสองอาการที่พังความสมจริง:
+     คนเดียวพูดรัวสามประโยคติดในมือเดียว · และสี่ตัวพูดพร้อมกันจนฟองทับกันทั้งโต๊ะ
+     คนจริงพูดแล้วก็เงียบไปสักพัก และไม่มีใครพูดทับกันตลอดเวลา
+     (เจ้าของสั่ง "ไม่จำเป็นต้องพูดบ่อย เอาสมจริง") */
+  /* ⚠️ ช่วงเว้นต้องนับเป็น "มือ" ไม่ใช่วินาที
+     เคยเขียนเป็นวินาทีแล้วพบว่าวัดไม่ได้เลย: เครื่องมือวัดเดิน 159 มือในเสี้ยววินาที
+     ช่วงเว้น 3.5 วินาทีจึงบล็อกทุกอย่างหลังประโยคแรก วัดได้ 3 ประโยคต่อ 159 มือ
+     ซึ่งไม่ใช่สิ่งที่จะเกิดในเกมจริงที่มือหนึ่งใช้เวลาเป็นนาที
+     นับเป็นมือแล้ววัดได้ตรงกับของจริง และไม่ขึ้นกับว่าโต๊ะเดินเร็วแค่ไหน */
+  const SAY_GAP_HANDS = 5;      /* คนเดิมพูดซ้ำ เว้นอย่างน้อยเท่านี้ */
+  const saidHand = {};          /* ชื่อบอท -> เลขมือที่พูดครั้งล่าสุด */
+
+  /* ⚠️ ไม่สร้างสถานะใหม่ คำนวณสด ๆ จากเงินที่มีอยู่จริง
+     ตัวเดียวกับที่ walletPressure ใน decide() ใช้ตัดสินใจเล่นอยู่แล้ว
+     ปากกับมือจะได้พูดเรื่องเดียวกัน ไม่ใช่ปากกล้าแต่มือสั่น */
+  function scareOf(b) {
+    const purse = typeof b.wallet === "number" ? b.wallet : 0;
+    const startWallet = b.walletStart || 20000;
+    const runway = purse / (b.buyIn || DEFAULT_BUY_IN);
+    return Math.min(1,
+      (purse < 0 ? 0.6 : 0) +
+      (runway < 1 ? 0.4 : runway < 3 ? 0.2 : 0) +
+      Math.max(0, 1 - (purse + b.stack) / startWallet) * 0.35 +
+      Math.min(0.25, (b.busts || 0) * 0.08));
+  }
+
+  /* สีหน้า — อารมณ์ที่เห็นได้แม้ตอนไม่พูด
+     ต้องอัปเดตทุกครั้งที่อารมณ์ขยับ ไม่ใช่เฉพาะตอนพูด ไม่งั้นตัวที่เงียบจะดูว่างเปล่า */
+  function refreshFaces() {
+    for (const b of botSeats()) {
+      if (b.leaving) { b.mood = ""; continue; }
+      b.mood = toneFor({ mood: moodOf(b.name), trait: traitOf(b.name), scare: scareOf(b) });
+    }
+  }
+
+  function say(b, event, targetName, potShare) {
+    if (!b || !b.isBot) return;
+    const now = Date.now();
+    const handNo = room.table._state.handNo;
+    /* คำลาข้ามช่วงเว้นได้ ลุกจากโต๊ะเกิดครั้งเดียวและควรมีคำลาเสมอ */
+    if (event !== "leaving") {
+      const last = saidHand[b.name];
+      if (last !== undefined && handNo - last < SAY_GAP_HANDS) return;
+    }
+    /* คึกกับรวนใช้ของเดิมตรง ๆ (mood.confidence / mood.tilt) ส่วนกลัวคิดจากเงินจริง */
+    const scare = scareOf(b);
+    const line = lineFor({
+      name: b.name,
+      level: b.botLevel || 2,
+      trait: traitOf(b.name),
+      mood: moodOf(b.name),
+      scare: scare,
+      event: event,
+      target: targetName || "",
+      potShare: potShare || 0,
+      foe: targetName ? mind.foeOf(b.name, targetName) : null,
+      read: targetName ? mind.readOf(b.name, targetName) : null
+    });
+    if (!line) return;
+    b.say = line;
+    b.sayUntil = now + SAY_MS;
+    saidHand[b.name] = handNo;
+  }
   let bankedHand = -1;      /* บันทึกเงินบอทของมือไหนไปแล้ว */
 
   /* readOf ต้องรู้ว่า "ใครเป็นคนจำ" เพราะความจำเป็นของแต่ละตัว ไม่ใช่ของทั้งโต๊ะ */
@@ -1527,6 +1625,9 @@ export function createBotManager(room, broadcast) {
   function botLeaves(b) {
     if (b.leaving) return;                 /* สั่งซ้ำระหว่างที่ยังโบกมืออยู่ ไม่ต้องทำอะไร */
     b.leaving = Date.now() + LEAVE_MS;
+    /* คำลา — พูดเสมอ เป็นจังหวะที่เกิดครั้งเดียวจริง ๆ */
+    say(b, "leaving", "", 0);
+    b.sayUntil = Date.now() + LEAVE_MS;     /* ให้ค้างอยู่ตลอดช่วงที่ยังยืนโบกมือ */
     /* พักมือไว้ก่อน ไม่งั้นมือถัดไปจะแจกไพ่ให้คนที่กำลังจะเดินออกไปแล้ว */
     room.table.action(b.seatId, { type: "sitout", value: true });
     clearTimeout(pending[b.seatId]);
@@ -1597,6 +1698,25 @@ export function createBotManager(room, broadcast) {
             }
           }
         }
+          /* ---------- อารมณ์เสียแล้วขอพักมือ ----------
+           ⚠️ เจ้าของทัก: "อารมณ์เสีย บ่นมาก เงียบ พักมือ"
+           อารมณ์ออกได้สามทาง ไม่ใช่ทางเดียว — คำพูด · ความเงียบ · และการหยุดเล่นไปสักพัก
+           เดิมมีแต่สองทางแรก คนที่โดนกินกองใหญ่จึงนั่งเล่นต่อทันทีเหมือนไม่มีอะไรเกิดขึ้น
+           ซึ่งเป็นภาพที่ไม่มีที่โต๊ะไหน — คนจริงลุกไปสูบบุหรี่ ไปเข้าห้องน้ำ หรือนั่งเฉย ๆ สักตา
+           คนใจเย็น (patience สูง) พักบ่อยกว่า คนปากไวระบายทางปากแทน */
+        const mood0 = moodOf(b.name);
+        if (!topped && mood0.tilt > 0.55 && bench[b.seatId] === undefined) {
+          const tr0 = traitOf(b.name);
+          const wantRest = 0.10 + tr0.patience * 0.12 - Math.max(0, tr0.bluffy - 1) * 0.06;
+          if (Math.random() < wantRest) {
+            room.table.action(b.seatId, { type: "sitout", value: true });
+            bench[b.seatId] = st.handNo + 1 + Math.floor(Math.random() * 2);
+            /* พักแล้วอารมณ์ค่อย ๆ ลง ซึ่งคือเหตุผลที่คนพักจริง ๆ */
+            mood0.tilt *= 0.6;
+            mind.markDirty();
+            continue;
+          }
+        }
         /* สั้นแล้วยังไม่ยอมเติม = เหตุผลที่จะลุกแรงขึ้นอีก ไม่ใช่นั่งต่อเฉย ๆ */
         const extra = (!topped && b.stack < buyIn * 0.25) ? 0.02 : 0;
         if (Math.random() < leaveChance(b) + extra) botLeaves(b);
@@ -1630,6 +1750,7 @@ export function createBotManager(room, broadcast) {
       /* ซื้อชิปใหม่ = หยิบเงินออกจากกระเป๋าอีกก้อน ติดลบได้ นั่นคือเป็นหนี้ */
       b.wallet = (typeof b.wallet === "number" ? b.wallet : bank.bankrollOf(b.name)) - buyIn;
       b.buyIn = b.stack;
+      say(b, "bust", "", 0);
       const penalty = Math.min(Math.max(b.busts || 1, 1), 5);
       room.table.action(b.seatId, { type: "sitout", value: true });
       bench[b.seatId] = st.handNo + penalty;
@@ -1650,6 +1771,7 @@ export function createBotManager(room, broadcast) {
     const st = room.table._state;
     trackActions(st);
     updateMoods(st);
+    refreshFaces();
     /* ⚠️ ต้องขิงก่อนเก็บ ไม่ใช่หลัง — ไพ่ที่เพิ่งกดโชว์ต้องถูกจดในมือเดียวกัน
        (ในเซิร์ฟเวอร์จริงมันรอดเพราะ poke ถูกเรียกซ้ำหลายรอบต่อหนึ่งโชว์ดาวน์
         แต่เครื่องมือวัดเรียกจำกัดรอบ ลำดับเดิมจึงทำให้ไพ่ที่ตั้งใจโชว์หายไปเลย) */
@@ -2080,6 +2202,13 @@ export function createBotManager(room, broadcast) {
     if (bluffing && msg.action === "raise" && base < 0.5) noteBarrel(seatId);
 
     const out = room.table.action(seatId, msg);
+    /* ยั่วตอนไล่ · บ่นตอนหมอบ — พูดหลังคำสั่งผ่านแล้วเท่านั้น
+       ⚠️ ห้ามพูดก่อนส่งคำสั่ง ถ้าคำสั่งไม่ผ่านแล้วไปทำอย่างอื่นแทน คำพูดจะโกหกทันที */
+    if (!out || !out.error) {
+      const me2 = room.table._state.seats[seatId];
+      if (msg.action === "raise") say(me2, "raised", "", 0);
+      else if (msg.action === "fold") say(me2, "folded", "", 0);
+    }
     /* กันเหนียว: ถ้าคำสั่งไม่ผ่านด้วยเหตุใดก็ตาม อย่าปล่อยให้โต๊ะค้างรอบอท */
     if (out && out.error) {
       const fb = room.table.action(seatId, { type: "act", action: toCall > 0 ? "call" : "check" });
