@@ -1043,7 +1043,13 @@ refresh already has the new UI, but `lan/server.mjs` and `lan/bots.mjs` only cha
 Until then the UI degrades on purpose: the buy-in row does not render, and the history section
 says it cannot reach the server. Ask before restarting — it drops anyone connected.
 
-**Port 8080 stopped again, and again without explanation.** The owner started it at 22:26 on
+**Answered on the first night the log existed.** `lan/data/server.log` now holds two `[start]`
+lines - 23:08 and 00:21 local on 2026-09-04/05 - and **no `[stop]` line between them**. Per the
+table below that means the process was killed from outside: the console window was closed, Task
+Manager, or the machine slept. It did not crash; nothing threw. That is almost certainly what
+happened on both earlier nights too, and it is why nothing was ever found in the code.
+
+**Port 8080 stopped twice before, without explanation at the time.** The owner started it at 22:26 on
 2026-09-04; it was still listening when this session checked shortly before 22:52, and the
 process was gone by 22:57. Its data files
 were last written at 22:35:50, so nothing was lost and nobody was mid-hand. This session's
