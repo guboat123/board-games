@@ -889,9 +889,28 @@ process was gone by 22:57. Its data files
 were last written at 22:35:50, so nothing was lost and nobody was mid-hand. This session's
 testing cannot be the cause: it ran on port 8090 with `BOT_DATA_DIR` pointing at a temp folder,
 started at ~22:53 — after the last live write, on a different port, against different files.
-This is the second night in a row (see 2026-09-03 below), so **when it is next started, capture
-its output**: `node lan/server.mjs > lan/data/server.log 2>&1`. Without a log there is nothing
-to diagnose.
+This is the second night in a row (see 2026-09-03 below).
+
+**The server now writes its own log**, so nothing has to be remembered or typed: every start,
+every console line, uncaught exceptions and the exit code go to `lan/data/server.log` (gitignored,
+rotated at 5 MB, and redirected with the rest of the data when `BOT_DATA_DIR` is set). Telling
+someone to run `> server.log 2>&1` was never going to work - it has to be the right folder, and
+cmd and PowerShell disagree on the syntax, which is exactly how the first attempt failed.
+
+**Reading it after the server disappears - the last line is the answer:**
+
+| Last line | What happened |
+|---|---|
+| `[crash] ...` then `[stop] exit code 1` | the code threw; the stack is right there |
+| `[stop] got SIGINT` | someone pressed Ctrl+C in that window |
+| `[stop] exit code 0` | ordinary shutdown |
+| no `[stop]` line at all | killed from outside - window closed, Task Manager, sleep/restart |
+
+That last row is the useful one. Windows delivers no signal before a forced kill, so the absence
+of a line is itself the evidence, and it separates "the code crashed" from "something outside
+ended the process" - which is precisely the question the two silent deaths could not answer.
+Verified by running a second server into `EADDRINUSE`: `[crash] uncaughtException` followed by
+`[stop] exit code 1` both landed in the file.
 
 **Decided 2026-09-03: showing cards stays as it is.** Bots show after **25-63%** of uncontested
 wins (pros most, junk hands most often), which is far above a casino but normal in a game played

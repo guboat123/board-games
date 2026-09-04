@@ -43,11 +43,75 @@ store.load();
 /* เขียนลงดิสก์เป็นช่วงๆ ไม่ใช่ทุกมือ ดิสก์จะได้ไม่ถูกกวนตลอดเวลา
    ตัว save เองข้ามเองถ้าไม่มีอะไรเปลี่ยน */
 setInterval(() => store.save(), 20000);
-process.on("SIGINT", () => { store.save(); process.exit(0); });
+process.on("SIGINT", () => { logLine("stop", "got SIGINT (Ctrl+C)"); store.save(); process.exit(0); });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const PORT = Number(process.env.PORT || 8080);
+
+/* ---------- เขียน log ของตัวเองลงไฟล์ ----------
+   ⚠️ เซิร์ฟเวอร์หายไปเฉย ๆ สองคืนติด (2026-09-03 ~23:03 · 2026-09-04 ~22:5x)
+   ทั้งสองครั้งอธิบายไม่ได้เลย เพราะไม่มีอะไรถูกเก็บไว้ — output ออกหน้าจอแล้วหายไปกับหน้าต่าง
+   บอกให้คนพิมพ์ "> server.log 2>&1" ทุกครั้งใช้ไม่ได้จริง (ต้องจำ ต้องอยู่โฟลเดอร์ถูก
+   และไวยากรณ์ cmd กับ PowerShell ก็ไม่เหมือนกัน) มันจึงต้องเป็นหน้าที่ของตัวเซิร์ฟเวอร์เอง
+
+   สิ่งที่ต้องได้คำตอบคือ "ตายยังไง" ไม่ใช่แค่ "ตายตอนไหน" จึงจดสามอย่าง:
+   ข้อความปกติ · ข้อผิดพลาดที่ไม่มีใครรับ · และบรรทัดสุดท้ายตอนออกพร้อมรหัสออก
+
+   ⚠️ วิธีอ่าน log ตอนเซิร์ฟเวอร์หายไป — บรรทัดสุดท้ายคือคำตอบ:
+     [crash] ... แล้ว [stop] exit code 1  = โค้ดพังเอง มี stack ให้ตามต่อ
+     [stop] got SIGINT                     = มีคนกด Ctrl+C ในหน้าต่างนั้น
+     [stop] exit code 0 เฉย ๆ              = ออกตามปกติ
+     ไม่มีบรรทัด [stop] เลย                = ถูกฆ่าจากข้างนอก (ปิดหน้าต่าง · Task Manager ·
+                                             เครื่องหลับ/รีสตาร์ต) — บน Windows ไม่มีสัญญาณ
+                                             ส่งมาถึงโปรเซสก่อนตาย จึงจดอะไรไม่ได้เลย
+                                             และ "จดไม่ได้" นี่แหละคือข้อมูลที่แยกสองกรณีออกจากกัน */
+const LOG_FILE = path.join(process.env.BOT_DATA_DIR || path.join(__dirname, "data"),
+                           "server.log");
+let logCount = 0, logDirReady = false;
+function logLine(tag, text) {
+  try {
+    /* เขียนแบบ sync เพราะบรรทัดสำคัญที่สุดคือบรรทัดตอนกำลังจะตาย
+       ถ้าเขียนแบบ async มันจะไม่ทันได้ลงดิสก์ ซึ่งคือบรรทัดเดียวที่เราต้องการจริง ๆ
+       จึงต้องไม่ทำงานหนักต่อบรรทัด: สร้างโฟลเดอร์ครั้งเดียว เช็คขนาดทุก 500 บรรทัด */
+    if (!logDirReady) { fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true }); logDirReady = true; }
+    if (++logCount % 500 === 0) {
+      /* กันไฟล์โตไม่มีที่สิ้นสุด เก็บรอบก่อนหน้าไว้หนึ่งไฟล์ก็พอสำหรับงานนี้ */
+      try {
+        if (fs.statSync(LOG_FILE).size > 5 * 1024 * 1024) {
+          fs.renameSync(LOG_FILE, LOG_FILE + ".1");
+        }
+      } catch (e) {}
+    }
+    fs.appendFileSync(LOG_FILE,
+      new Date().toISOString() + " [" + tag + "] " + text + "\n");
+  } catch (e) {}   /* จดไม่ได้ก็ต้องไม่ล้มเซิร์ฟเวอร์ */
+}
+/* ⚠️ ต้องยังพิมพ์ออกหน้าจอเหมือนเดิม — หน้าต่างเซิร์ฟเวอร์คือที่ที่คนอ่านที่อยู่ WiFi
+   สีของ console (รหัส ANSI) ถอดออกก่อนเขียนไฟล์ ไม่งั้น log เต็มไปด้วยขยะ */
+["log", "error", "warn"].forEach(function (kind) {
+  const original = console[kind].bind(console);
+  console[kind] = function (...args) {
+    original(...args);
+    logLine(kind, args.map(a => typeof a === "string" ? a : String(a)).join(" ")
+                      .replace(/\u001b\[[0-9;]*m/g, ""));
+  };
+});
+logLine("start", "server starting · pid " + process.pid + " · port " + PORT +
+                 " · node " + process.version);
+process.on("uncaughtException", (e) => {
+  logLine("crash", "uncaughtException: " + (e && e.stack || e));
+  /* จดก่อนแล้วค่อยตายตามเดิม ไม่ฝืนเล่นต่อทั้งที่สถานะอาจพังไปแล้ว */
+  process.exit(1);
+});
+process.on("unhandledRejection", (e) => {
+  logLine("crash", "unhandledRejection: " + (e && e.stack || e));
+});
+for (const sig of ["SIGTERM", "SIGHUP", "SIGBREAK"]) {
+  try { process.on(sig, () => { logLine("stop", "got " + sig); store.save(); process.exit(0); }); }
+  catch (e) {}   /* บางสัญญาณไม่มีบน Windows */
+}
+process.on("exit", (code) => logLine("stop", "exit code " + code));
 
 /* ---------- เสิร์ฟไฟล์นิ่ง ---------- */
 
