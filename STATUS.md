@@ -1,6 +1,6 @@
 # STATUS — board-games (ก๊วนบอร์ดเกม)
 
-Last updated: 2026-09-04 · machine: BOAT-ZEPHYRUS
+Last updated: 2026-09-05 · machine: BOAT-ZEPHYRUS
 
 Public site: https://guboat123.github.io/board-games/ (GitHub Pages, branch `main`, root)
 
@@ -1084,10 +1084,13 @@ options, in increasing cost to the money mattering:
 
 ## Handoff / waiting on owner
 
-**Restart the server to get the two features above.** The page is served from disk, so a browser
-refresh already has the new UI, but `lan/server.mjs` and `lan/bots.mjs` only change on restart.
-Until then the UI degrades on purpose: the buy-in row does not render, and the history section
-says it cannot reach the server. Ask before restarting — it drops anyone connected.
+**Server restarted 2026-09-05 02:47 on the owner's instruction** (pid 13276) and is running
+everything from this session - verified by fetching the page and confirming the chat button, speech
+bubbles, mood faces and the buy-in row are all served. Its log records the restart.
+
+**One question is waiting on the owner** (also written up in `%OneDrive%\Desktop\Claude Plansบอทโป๊กเกอร์ - คืนที่บอทเริ่มพูด (5 ก.ย.69).md`): bots leave the table every 6.1 hands on his own
+table against the ~24 documented here. Three options are laid out in the research section above;
+it is a question about how his game should feel, not a bug, so it was not decided for him.
 
 **Answered on the first night the log existed.** `lan/data/server.log` now holds two `[start]`
 lines - 23:08 and 00:21 local on 2026-09-04/05 - and **no `[stop]` line between them**. Per the
