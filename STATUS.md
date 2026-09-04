@@ -1,6 +1,6 @@
 # STATUS — board-games (ก๊วนบอร์ดเกม)
 
-Last updated: 2026-09-01 · machine: BOAT-ZEPHYRUS
+Last updated: 2026-09-04 · machine: BOAT-ZEPHYRUS
 
 Public site: https://guboat123.github.io/board-games/ (GitHub Pages, branch `main`, root)
 
@@ -884,7 +884,8 @@ Until then the UI degrades on purpose: the buy-in row does not render, and the h
 says it cannot reach the server. Ask before restarting — it drops anyone connected.
 
 **Port 8080 stopped again, and again without explanation.** The owner started it at 22:26 on
-2026-09-04; it was still listening at ~22:49 and the process was gone by 22:57. Its data files
+2026-09-04; it was still listening when this session checked shortly before 22:52, and the
+process was gone by 22:57. Its data files
 were last written at 22:35:50, so nothing was lost and nobody was mid-hand. This session's
 testing cannot be the cause: it ran on port 8090 with `BOT_DATA_DIR` pointing at a temp folder,
 started at ~22:53 — after the last live write, on a different port, against different files.
