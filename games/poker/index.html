@@ -1233,6 +1233,9 @@ button { font-family: inherit; }
 .bank-row .up { color: var(--good); }
 .bank-row .dn { color: #ff6b5e; }
 .bank-row .busy { color: var(--gold); margin-left: auto; font-weight: 700; }
+/* เจ๊งจนเลิกเล่น — จางลงทั้งแถว จะได้อ่านออกจากหางตาว่าตัวนี้ไม่อยู่ในสารบบแล้ว */
+.bank-row.is-retired { opacity: .55; }
+.bank-row .retired { color: #ff8f84; margin-left: auto; font-weight: 700; }
 /* แถบบอกว่าเหลือกี่ส่วนของเงินตั้งต้น อ่านภาพรวมได้เร็วกว่าตัวเลข */
 .bank-bar { height: 3px; border-radius: 2px; background: rgba(255,255,255,.1); margin-top: 6px; overflow: hidden; }
 .bank-bar i { display: block; height: 100%; border-radius: 2px; }
@@ -2032,7 +2035,7 @@ button { font-family: inherit; }
 
       inGroup.forEach(function (b) {
         var row = document.createElement("div");
-        row.className = "bank-row" + (b.busy ? " is-busy" : "");
+        row.className = "bank-row" + (b.busy ? " is-busy" : "") + (b.retired ? " is-retired" : "");
 
         var top = document.createElement("div");
         top.className = "bank-row__top";
@@ -2056,7 +2059,15 @@ button { font-family: inherit; }
         var bu = document.createElement("span");
         bu.textContent = "ล้ม " + (b.busts || 0);
         bot.appendChild(d); bot.appendChild(bu);
-        if (b.busy) {
+        if (b.retired) {
+          /* ⚠️ ต้องบอกว่าทำไมตัวนี้ไม่โผล่มาอีก ไม่งั้นคนจะคิดว่าระบบพัง
+             (ติดลบเกินสองเท่าของเงินตั้งต้น = เลิกเล่น จนกว่าระดับนั้นจะเหลือคนไม่พอ
+              แล้วตัวที่ติดลบน้อยสุดจะกลับมาด้วยเงินก้อนใหม่ — ดู bot-bank.mjs) */
+          var rt = document.createElement("span");
+          rt.className = "retired";
+          rt.textContent = "เจ๊งเลิกเล่นแล้ว";
+          bot.appendChild(rt);
+        } else if (b.busy) {
           var bz = document.createElement("span");
           bz.className = "busy";
           bz.textContent = "\u25CF กำลังเล่น";

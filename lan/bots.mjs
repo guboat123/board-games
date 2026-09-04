@@ -1032,8 +1032,15 @@ export function createBotManager(room, broadcast) {
         const hurt = Math.min(1, put / (stackNow + put));
         m.tilt = Math.min(1, m.tilt + hurt * (0.30 + tr.tilt * 0.45));
       }
-      if (net > 0 && got > stackNow * 0.3) {
-        m.confidence = Math.min(1, m.confidence + 0.28);
+      /* ⚠️ ฝั่งชนะต้องคิดตามขนาดกองเหมือนฝั่งแพ้ (เจ้าของทัก 2026-09-04)
+         ของเดิมเป็น +0.28 ตายตัวเมื่อกองเกิน 30% ของตัก แปลว่า
+         "เก็บกองเท่าตัก" กับ "เก็บกองเฉียด ๆ 30%" ให้ความคึกเท่ากันเป๊ะ
+         และเก็บกองเล็ก ๆ ได้ไม่ให้ความรู้สึกอะไรเลย ทั้งที่คนเก็บกองเล็กติด ๆ กันก็เริ่มคึก
+         ฝั่งแพ้คิดตามขนาดมาตั้งแต่แรกแล้ว (hurt = put/(stack+put)) สองฝั่งจึงไม่สมมาตร
+         ⚠️ เพดานยังต้องมี ไม่งั้นเก็บกองยักษ์ทีเดียวแล้วคึกค้างไปทั้งวง */
+      if (net > 0) {
+        const gain = got / stackNow;
+        m.confidence = Math.min(1, m.confidence + Math.min(0.45, gain * 0.5));
       }
 
       /* ---------- พูดถึงมือที่เพิ่งจบ ----------
@@ -1478,9 +1485,16 @@ export function createBotManager(room, broadcast) {
       /* ⚠️ ต้องว่างทั้งบนโต๊ะนี้ และว่างทั้งเซิร์ฟเวอร์
          กระเป๋าเงินผูกกับชื่อ ถ้าชื่อเดียวกันนั่งสองโต๊ะ ทั้งสองโต๊ะจะหยิบจากกระเป๋าใบเดียวกัน
          แล้วเขียนทับกันไปมา ยอดของโต๊ะที่บันทึกก่อนจะหายทั้งก้อน */
+      /* ระดับนี้เหลือคนพอตั้งโต๊ะไหม ถ้าไม่ ให้ตัวที่เจ๊งไปกลับมาหนึ่งตัว
+         ⚠️ ไม่ใช่ความเมตตา — โต๊ะที่เหลือสามคนเป็นเกมคนละแบบ และวัดออกมาผิดกรอบทันที
+            (ดู reviveIfShort ใน bot-bank.mjs) */
+      bank.reviveIfShort(ROSTER[lv] || []);
       const used = room.table._state.seats.filter(Boolean).map(s => s.name);
+      /* ⚠️ ตัวที่เจ๊งจนเลิกแล้วต้องหลุดจากรายชื่อตั้งแต่ตรงนี้
+         ถ้าปล่อยให้ติดมา claim จะปฏิเสธเงียบ ๆ แล้ว add() จะ break ทิ้งทั้งรอบ
+         = กดเรียกบอท 3 ตัวแล้วได้ 0 ตัวโดยไม่มีอะไรบอกว่าทำไม */
       const free = (ROSTER[lv] || []).filter(n => used.indexOf(n) === -1 && !bank.isBusy(n) &&
-                                                  n !== avoid);
+                                                  !bank.isRetired(n) && n !== avoid);
       if (!free.length) { busyAll = true; break; }
       /* สุ่มว่าใครในระดับนั้นจะได้มาเล่น ไม่ใช่เรียกตัวแรกในรายชื่อทุกครั้ง
          ไม่งั้นจะเจอ Rex ทุกวงจนบอทตัวอื่นไม่มีประวัติของตัวเองเลย */
@@ -1506,7 +1520,9 @@ export function createBotManager(room, broadcast) {
        ไม่งั้นคนกดจะเห็นแค่ "ไม่มีอะไรเกิดขึ้น" แล้วกดซ้ำไปเรื่อยๆ */
     return { added, level: lv, levelName: LEVEL[lv].name,
              busy: busyAll, roster: (ROSTER[lv] || []).length,
-             inUse: (ROSTER[lv] || []).filter(n => bank.isBusy(n)).length };
+             inUse: (ROSTER[lv] || []).filter(n => bank.isBusy(n)).length,
+             /* แยก "ไม่ว่างเพราะนั่งโต๊ะอื่น" ออกจาก "เจ๊งจนเลิกไปแล้ว" — คนละเรื่องกันสำหรับคนกด */
+             retired: (ROSTER[lv] || []).filter(n => bank.isRetired(n)).length };
   }
 
   function removeAll() {
@@ -2239,7 +2255,8 @@ export function createBotManager(room, broadcast) {
      ผลต่างระหว่างรอบจึงมาจาก "ใครมานั่ง" มากกว่า "แก้อะไรไป" — เทียบกันไม่ได้เลย */
   function _addNamed(name, level) {
     const lv = LEVEL[level] ? level : 2;
-    if (!bank.claim(name)) return null;
+    /* force: ข้ามพื้นหนี้ — การทดลองเป็นคนเลือกว่าใครนั่ง ไม่ใช่เศรษฐกิจ (ดู claim ใน bot-bank) */
+    if (!bank.claim(name, true)) return null;
     const r = room.table.sit(name, null, buyIn, "bot:" + (++seq), { bot: true, level: lv });
     if (!r.ok) { bank.release(name); return null; }
     const bs = room.table._state.seats[r.seatId];

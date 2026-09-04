@@ -927,6 +927,73 @@ the bot stays seated with its own name, is sat out, keeps its chips, survives re
 before the deadline, and hands the seat over with the money intact afterwards - plus that
 "remove all bots" does not strand one mid-farewell.
 
+## Session 2026-09-04 (night): the bots talk, and debt finally has a floor
+
+### They talk, and the silence talks too
+
+`lan/bot-chat.mjs`, 341 Thai lines. The safety rule is structural rather than a comment:
+`lineFor`'s context has no field for cards - not the speaker's, not anyone's - so no line can leak
+one even if a future edit is careless. Bots never read each other's speech either; it is an output
+and never an input, because one bot's internal state reaching another is not something everyone at
+the table can see, which is the line the memory system has always held.
+
+The owner pushed back four times and each round changed the design:
+
+| Feedback | What changed |
+|---|---|
+| "too stiff" | every line rewritten as speech, not writing - particles, fragments, table noises |
+| "not too often - make it realistic" | per-event rates instead of one flat number; folds almost never draw a remark, showdowns and busts do |
+| "won't it just be fixed? shouldn't there be a cocky meter and a scare meter" | there already were - `mood.confidence` and `mood.tilt` have driven play for months and were simply never wired to the mouth. Speaking is now gated on emotional heat |
+| "silence is an emotion, don't forget" | the first version made everyone louder when hurt, which is wrong: the mouthy get loud, the contained go quiet, and that silence is what a table notices |
+| "personalities don't have to be the same" | the tilt reaction runs continuously off each bot's own `bluffy` trait (0.1x to 2.3x), and each name hashes to a fixed voice that favours part of every pool |
+| "bad mood: complains, goes quiet, sits out" | a bad mood can now also come out as sitting out a hand or two to cool off |
+| "winning a small pot and losing a big one are not the same feeling" | `confidence` scaled with pot size like `tilt` already did - it was a flat +0.28 for any pot over 30% of stack |
+
+A mood also shows as a small face on the seat, because most of the table is silent most of the
+time and "quietly pleased" should not look like "nothing".
+
+Pace, measured through the real game loop: about one line per bot every ten hands, one every two
+or three at the table.
+
+`test-bot-chat.mjs`, 35 assertions. The module source cannot name a card, every line is scanned
+for card words and codes, the call site is checked for what it passes in, nothing reads `.say`,
+pools are deep enough not to repeat - and the meters must measurably change both how often and
+how a bot speaks. If cocky, tilted, scared and flat ever produce the same rate, it has gone back
+to being a dice roll and the test fails.
+
+### Debt has a floor now - and the floor needed a way back
+
+The owner asked whether debt should be punished so the bots "play properly". It should not, and
+the answer is in the data: penalties already exist in four places (more fearful, calls tighter,
+stops bluffing 60% of the time, and only 15% as likely to sit back down), and they work - of the
+30 bots, 0/10 pros are in debt (+57,528 together) against 4/10 gamblers (-70,116) and 2/10
+beginners (-35,729). The economy already separates the levels correctly.
+
+Making debt improve play would also be backwards twice over: real players in debt play worse, which
+the code already models deliberately, and a gambler who tightens up after a bad night *is* a pro -
+the three levels would collapse into one and the 51-cell scorecard would fail on the spot.
+
+What was missing was a floor. Debt was unbounded; Rocco is 16 busts deep and could borrow forever,
+so fresh money entered the table without limit and busting had no long-run meaning. Past twice the
+level's starting wallet a bot now stops sitting down, and the money table says so.
+
+**That broke the scorecard, and the reason is worth keeping.** Retirement thinned each level's
+roster of ten, tables ran three-handed, and short-handed poker is a genuinely more aggressive game
+- pro aggression read 4.41 against a 1.4-3.6 band. The bots were fine; the table had changed shape.
+Two fixes, both of which say something:
+
+- When a level drops below four available names, the least indebted retiree comes back with a fresh
+  stake. Debt is cleared, but `busts` and `revivals` are kept forever. Real people who go broke do
+  not vanish permanently either.
+- `_addNamed`, the door the measuring tools use, bypasses retirement. The experiment decides who
+  sits; if the economy quietly withdraws bots from the sample, every number measured afterwards is
+  against a different table than intended. Play does not depend on debt (asserted by test), so the
+  measurement stays valid.
+
+`test-debt-floor.mjs`, 22 assertions, including one that reads `bot-bank.mjs` and fails if it ever
+mentions anything from the decision code - the structural version of "do not make debt change how
+they play".
+
 ## Handoff / waiting on owner
 
 **Restart the server to get the two features above.** The page is served from disk, so a browser
