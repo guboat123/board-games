@@ -1023,10 +1023,18 @@ show down. Information you already have is not worth paying for again. The pro's
 disciplined one: river only, price under 16% of the pot, and only against someone it has seen show
 down fewer than three times, because what it buys is a read that pays off in every later hand.
 
-⚠️ **The gate flaked once in ten runs** right after these changes and has passed nine times since,
-including three consecutive 12,000-hand runs. Some cell is sitting near its band edge. If
-`realism-check` goes red without anyone touching `decide`, that is the cause, and the three
-frequencies above are the first knobs to turn down.
+**The gate flaked once in ten runs after these changes - found and fixed.** Rather than guess,
+five runs were scanned for how close each of the 51 cells sat to its band edge as a fraction of
+band width. One cell was outside: pro fold-to-c-bet heads-up, 49.5-59% against a 40-58 band. The
+cause follows from the probe check - checking medium hands instead of betting them leaves a weaker
+range when someone bets into you, so folding more is the natural consequence. The heads-up flop
+defence went 0.075 -> 0.095, the same knob that fixed this cell once before, and no cell is
+outside its band across five runs now.
+
+That scan is worth repeating whenever `decide` changes: `realism-check` reports pass/fail, but a
+cell sitting at 2% of band width from its edge is a failure that has not happened yet. The nearest
+now are pro 4-bet (0.3-0.5 on a 0.3-3 band, inherently noisy at that frequency) and gambler
+late/early position (1.17-1.25 on 1.15-2.2).
 
 ## Handoff / waiting on owner
 
