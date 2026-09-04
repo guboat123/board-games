@@ -994,6 +994,40 @@ Two fixes, both of which say something:
 mentions anything from the decision code - the structural version of "do not make debt change how
 they play".
 
+## Session 2026-09-04 (late): three moves the bots did not have
+
+The owner asked for two things a real player does that these bots did not: checking to see how
+somebody reacts, calling to lure rather than raising, and paying to see cards ("if you want to see
+their cards you have to pay - not look for free without caring about the money").
+
+All three are pro-level except curiosity, which every level now has in its own form. All three
+were **measured for how often they actually fire**, because "it passes the scorecard" can equally
+mean "it never happens" - a trap this project has fallen into three times (`trap`, `check-raise`
+and the donk block were each written and then unreachable, and nobody knew).
+
+| Move | Fires | Note |
+|---|---|---|
+| เคาะเพื่อดูอาการ - check to see the reaction | 1.7% of pro decisions | first version fired 0.16%: `live >= 2` was the blocker (a pro table is usually heads-up after the flop) and the position test was inverted |
+| ตามเพื่อล่อ - smooth call instead of raising | 0.24% | first version fired **zero times in 900 hands**: tied to `plan.trap` alone, which needs a 0.86 hand *and* an opponent betting into it - measured at 18 of 552 spots |
+| จ่ายเพื่อดูไพ่ - paying to see | 0.30% | beginners already had this; it now has a price |
+
+**`seatsLeft` counts players still to act after you - 0 means you act last.** The probe check was
+written as `seatsLeft <= 1`, which is late position, so the bot was "checking to see the reaction"
+of people who had already acted. Note also that `latePos` in `decidePro` is added to the *calling
+requirement*, so a larger value means tighter - it reads like an inverted sign and is not.
+
+**Curiosity now costs money**, which was the owner's actual point. It scales down with the size of
+the bet, with the `scare` meter (a bot near the end of its wallet does not buy information), and
+with how much it already knows about that opponent - `readN`, the number of times it has seen them
+show down. Information you already have is not worth paying for again. The pro's version is the
+disciplined one: river only, price under 16% of the pot, and only against someone it has seen show
+down fewer than three times, because what it buys is a read that pays off in every later hand.
+
+⚠️ **The gate flaked once in ten runs** right after these changes and has passed nine times since,
+including three consecutive 12,000-hand runs. Some cell is sitting near its band edge. If
+`realism-check` goes red without anyone touching `decide`, that is the cause, and the three
+frequencies above are the first knobs to turn down.
+
 ## Handoff / waiting on owner
 
 **Restart the server to get the two features above.** The page is served from disk, so a browser
