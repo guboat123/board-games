@@ -867,6 +867,9 @@ export function createTable(opts = {}) {
         sitOut: s.sitOut,
         isBot: s.isBot,
         botLevel: s.botLevel,
+        /* กำลังเก็บของลุกจากโต๊ะ — หน้าจอใช้เล่นภาพลา (ดู botLeaves ใน bots.mjs)
+           ห้องแค่ส่งต่อ ไม่ได้ตัดสินใจอะไรเอง */
+        leaving: !!s.leaving,
         timeCards: s.timeCards,
         lastAction: s.lastAction,
         /* รหัสท่าแบบเครื่องอ่าน แยกจากข้อความที่คนอ่าน

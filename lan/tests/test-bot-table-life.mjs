@@ -37,6 +37,20 @@ function fresh() {
 }
 const BUY_IN = 2000;
 
+/* ---------- บอทลุกเป็นสองจังหวะ ----------
+   จังหวะแรก settleBusted ติดป้ายว่าจะลุก (b.leaving = เวลาที่ครบกำหนด) แล้วยืนโบกมืออยู่ 2.2 วิ
+   จังหวะสอง settleBusted รอบถัดไปที่เวลาครบ ค่อยเก็บเงินและเรียกตัวแทน (ดู botLeaves)
+   เทสต์เดินเป็นแสนรอบในไม่กี่วินาที จะนั่งรอนาฬิกาจริงไม่ได้ จึงเร่งเข็มให้แล้วเรียกซ้ำ
+   ⚠️ ห้ามลัดไปเรียก finishLeaving ตรง ๆ — ต้องเดินทางเดียวกับเกมจริงทุกบรรทัด
+      ไม่งั้นเทสต์จะผ่านทั้งที่ทางที่คนเล่นเจอจริงพัง */
+function settleNow(w) {
+  w.mgr.settleBusted();
+  const going = w.st.seats.filter(function (x) { return x && x.isBot && x.leaving; });
+  if (!going.length) return;
+  going.forEach(function (x) { x.leaving = 1; });   /* ครบกำหนดไปนานแล้ว */
+  w.mgr.settleBusted();
+}
+
 /* ---------- 1. เติมชิปเสริมตอนสั้น ---------- */
 console.log("");
 console.log("--- เติมชิปเสริมเมื่อชิปสั้นเกินจะเล่น ---");
@@ -90,7 +104,7 @@ console.log("--- ลุกเองทั้งที่ยังมีชิป
   let left = false;
   for (let i = 0; i < 400 && !left; i++) {
     w.st.handNo++;
-    w.mgr.settleBusted();
+    settleNow(w);
     const now = w.st.seats[seatId];
     if (!now || now.name !== nameGone) left = true;
   }
@@ -117,7 +131,7 @@ console.log("--- นิสัยประจำระดับต้องยั
     let n = 0;
     for (let i = 0; i < rounds; i++) {
       w.st.handNo++;
-      w.mgr.settleBusted();
+      settleNow(w);
       const now = w.st.seats[seatId];
       if (!now || now.name !== was) { n++; break; }
     }
@@ -149,7 +163,7 @@ console.log("--- เรียกซ้ำในมือเดียว ต้�
     b.stack = BUY_IN * 2; b.wallet = 4000;     /* กำไรเท่าตัว = อยากเก็บแล้วเลิก */
     for (let i = 0; i < calls; i++) {
       if (!sameHand) w.st.handNo++;
-      w.mgr.settleBusted();
+      settleNow(w);
       const now = w.st.seats[seatId];
       if (!now || now.name !== was) { w.mgr.stop(); return 1; }
     }
@@ -165,6 +179,68 @@ console.log("--- เรียกซ้ำในมือเดียว ต้�
      same * 3 < spread || same <= 12,
      "มือเดียว " + same + " · ยี่สิบมือ " + spread + " จาก 200 ครั้ง");
   ok("และต้องยังลุกได้จริงเมื่อมือเดินไปเรื่อย ๆ", spread > same);
+}
+
+/* ---------- 6. ช่วงโบกมือลา ต้องยืนอยู่ให้คนเห็นจริง ---------- */
+console.log("");
+console.log("--- ลุกจากโต๊ะต้องกินเวลา ไม่ใช่หายไประหว่างสองเฟรม ---");
+{
+  /* ⚠️ เหตุผลที่ต้องมีเทสต์นี้: ของเดิมลุกแล้วเรียกตัวใหม่มานั่งในบรรทัดถัดไป
+     ภายในการอัปเดตสถานะครั้งเดียว บนจอจึงไม่มีใครเคยเห็นบอทลุกเลยสักครั้ง
+     เจ้าของทักเองว่า "เรื่องลุกจากโต๊ะ ก็ไม่เห็นมีเกิด" ทั้งที่โค้ดทำงานถูกมาตลอด */
+  const w = fresh();
+  w.mgr._addNamed("Pip", 1);
+  const b = w.st.seats.filter(function (s) { return s && s.isBot; })[0];
+  const seatId = b.seatId, was = b.name;
+  b.stack = BUY_IN * 2; b.wallet = 4000;
+  const moneyBefore = b.stack + b.wallet;
+
+  /* เดินจนกว่าจะตัดสินใจลุก แต่ยังไม่เร่งนาฬิกา */
+  let marked = false;
+  for (let i = 0; i < 400 && !marked; i++) {
+    w.st.handNo++;
+    w.mgr.settleBusted();
+    if (w.st.seats[seatId] && w.st.seats[seatId].leaving) marked = true;
+  }
+  ok("ตัดสินใจลุกแล้วต้องติดป้ายไว้ก่อน", marked);
+  const mid = w.st.seats[seatId];
+  ok("ระหว่างโบกมือ ต้องยังเป็นคนเดิมนั่งอยู่ที่เดิม", !!mid && mid.name === was,
+     mid && mid.name);
+  /* ถ้าไม่พักมือไว้ มือถัดไปจะแจกไพ่ให้คนที่กำลังจะเดินออกไปแล้ว */
+  ok("ต้องถูกพักมือไว้ จะได้ไม่ถูกแจกไพ่ในมือถัดไป", !!mid && mid.sitOut === true);
+  ok("ชิปยังอยู่บนโต๊ะ ยังไม่ถูกเก็บ", !!mid && mid.stack === BUY_IN * 2);
+
+  /* เรียกซ้ำระหว่างที่ยังไม่ครบเวลา ต้องไม่มีอะไรขยับ (poke เรียกถี่มากในเกมจริง) */
+  for (let i = 0; i < 10; i++) { w.st.handNo++; w.mgr.settleBusted(); }
+  const still = w.st.seats[seatId];
+  ok("เรียกซ้ำสิบรอบก่อนครบเวลา ต้องยังไม่เก็บ", !!still && still.name === was);
+
+  /* ครบเวลาแล้วค่อยเก็บจริง */
+  still.leaving = 1;
+  w.mgr.settleBusted();
+  const after = w.st.seats[seatId];
+  ok("ครบเวลาแล้วต้องมีคนใหม่มานั่งแทน", !!after && after.name !== was, after && after.name);
+  ok("เงินต้องกลับเข้ากระเป๋าครบ ไม่หายระหว่างสองจังหวะ",
+     bank.bankrollOf(was) === moneyBefore,
+     bank.bankrollOf(was) + " vs " + moneyBefore);
+  ok("ชื่อเดิมถูกปล่อยแล้ว ไปนั่งโต๊ะอื่นได้", !bank.isBusy(was));
+  w.mgr.stop();
+}
+
+/* ---------- 7. สั่งเอาบอทออก ต้องออกทันที ไม่ต้องรอโบกมือ ---------- */
+console.log("");
+console.log("--- กดเอาบอทออก ระหว่างที่มีตัวกำลังลุกอยู่ ---");
+{
+  const w = fresh();
+  w.mgr._addNamed("Toby", 1);
+  const b = w.st.seats.filter(function (s) { return s && s.isBot; })[0];
+  b.stack = BUY_IN * 2; b.wallet = 4000;
+  for (let i = 0; i < 400 && !b.leaving; i++) { w.st.handNo++; w.mgr.settleBusted(); }
+  ok("ตั้งต้น: มีตัวที่กำลังลุกอยู่จริง", !!b.leaving);
+  w.mgr.removeAll();
+  ok("กดเอาออกแล้วต้องไม่เหลือบอทค้างอยู่เลย",
+     w.st.seats.filter(function (s) { return s && s.isBot; }).length === 0);
+  w.mgr.stop();
 }
 
 console.log("");

@@ -876,6 +876,57 @@ buy chips first, to look at numbers.
 - On GitHub Pages, and against a server too old to answer, both sections say so instead of
   spinning forever.
 
+## Session 2026-09-04 (later): you can now see what the bots are doing
+
+The owner asked to see bots leave the table, then "other animations that make the bots' actions
+readable". Both are about the same problem: the table was doing a lot that never reached the eye.
+
+### Leaving is now two steps, because one step was invisible
+
+`botLeaves` used to cash the bot out, free its name, remove the seat and sit a replacement in the
+next line - all inside one state update. On screen nobody ever left; a name simply changed between
+two frames. The owner said months ago that he never saw a bot leave, and he was right: the code
+had worked the whole time, it was just faster than sight.
+
+Now the first step marks the seat (`leaving`, plus sit-out so it cannot be dealt in) and
+broadcasts; the second step, 2.2s later, does the cash-out and calls the replacement. The second
+step runs inside `settleBusted`, not in a bare timer, because that function is only called between
+hands - which is the only safe moment to take a seat away. The timer just wakes the check up.
+
+**The bust-and-quit exit was routed through the same path.** It was the more interesting departure
+- broke, packs up, goes home - and it was the one nobody could see at all.
+
+### Actions are readable at a glance
+
+- Every action was the same muted grey; `Check` and `Raise to 240` differed only by letters. On a
+  nine-seat table with several bots acting, that cannot be read before it is gone. Actions are now
+  coloured by `lastKind` - raise warm, call teal, check grey, fold dim, all-in gold - and the fresh
+  one pops once.
+- **All-in had no visual at all.** The single moment where someone commits everything looked
+  exactly like a check. It now takes a gold border, a gold stack, and a ring that fires twice on
+  the hand it happens.
+- **A thinking indicator.** Bots take 0.7-3.4s, and a long think means the decision was genuinely
+  close (that is what `thinkMs` encodes). Without a marker the table looked frozen and then numbers
+  jumped. Bots only - a person already sees their own buttons.
+- A toast names whoever leaves and what they leave with (`Buddy ลุกจากโต๊ะ (กำไร 3,410)`), once per
+  departure - the state is broadcast many times during those 2.2 seconds.
+
+Verified through the real path end to end: a level-1 bot busted into debt, declined to rebuy, was
+marked `[กำลังลุก] [พักมือ]` while staying seated across six more `settleBusted` calls, and was
+replaced by Toby after the window with its -3,000 intact. Colours and the thinking dots were
+confirmed on a live table; the all-in and leaving styles were checked against the page's own
+stylesheet.
+
+### Tests
+
+`test-bot-table-life.mjs` grew from 12 to 22 assertions. The existing leave tests detected
+departure by "the seat's name changed", which the two-step exit broke - they now drive both steps
+through `settleNow()`, which advances the deadline rather than calling `finishLeaving` directly,
+so the test still walks every line the real game walks. New assertions cover the window itself:
+the bot stays seated with its own name, is sat out, keeps its chips, survives repeated calls
+before the deadline, and hands the seat over with the money intact afterwards - plus that
+"remove all bots" does not strand one mid-farewell.
+
 ## Handoff / waiting on owner
 
 **Restart the server to get the two features above.** The page is served from disk, so a browser

@@ -1286,6 +1286,7 @@ export function createBotManager(room, broadcast) {
      = บอทลุกถี่กว่าที่วัดไว้หลายเท่าในเกมจริง ทั้งที่ในเครื่องมือวัด (เรียกมือละครั้ง) ดูปกติดี
      เป็นกับดักตัวเดียวกับ rememberFoes ที่เคยทำความแค้นพองหลายเท่ามาแล้ว */
   const lifeHand = {};
+  const farewell = {};      /* seatId -> ตัวจับเวลาปลุกให้มาเก็บคนที่กำลังลุก */
   let bankedHand = -1;      /* บันทึกเงินบอทของมือไหนไปแล้ว */
 
   /* readOf ต้องรู้ว่า "ใครเป็นคนจำ" เพราะความจำเป็นของแต่ละตัว ไม่ใช่ของทั้งโต๊ะ */
@@ -1414,6 +1415,9 @@ export function createBotManager(room, broadcast) {
     for (const s of botSeats()) {
       clearTimeout(pending[s.seatId]);
       delete pending[s.seatId];
+      /* สั่งเอาออกเองต้องออกทันที ไม่ต้องรอคนที่กำลังโบกมือลาให้ครบจังหวะ */
+      clearTimeout(farewell[s.seatId]);
+      delete farewell[s.seatId];
       delete bench[s.seatId];
       /* เก็บเงินกลับกระเป๋าก่อนลุก ไม่งั้นชิปที่ชนะมาทั้งวงหายไปเฉยๆ
          แล้วปล่อยชื่อคืน ให้โต๊ะอื่นเรียกบอทตัวนี้ไปเล่นต่อได้ */
@@ -1508,7 +1512,35 @@ export function createBotManager(room, broadcast) {
   }
 
   /* พาบอทออกจากโต๊ะ แล้วเรียกตัวใหม่ระดับเดียวกันมานั่งแทน */
+  /* ---------- ลุกจากโต๊ะ: ต้องใช้เวลาให้คนเห็น ----------
+     ⚠️ ของเดิมลุกแล้วเรียกตัวใหม่มานั่งในบรรทัดถัดไปทันที ภายในการอัปเดตสถานะครั้งเดียว
+     บนจอจึงไม่มีใครลุกเลย มีแต่ "ชื่อในช่องนั้นเปลี่ยนไปเฉย ๆ" ระหว่างสองเฟรม
+     เจ้าของทักว่าไม่เคยเห็นบอทลุก ทั้งที่โค้ดทำงานถูกมาตลอด — มันเร็วเกินกว่าจะมองเห็น
+
+     คั่นเป็นสองจังหวะ: จังหวะแรกติดป้ายว่ากำลังจะลุกแล้วส่งออกไปให้ทุกเครื่องวาด
+     จังหวะสองค่อยเก็บเงินและเรียกตัวแทน ระหว่างนั้นให้พักมือไว้ จะได้ไม่ถูกแจกไพ่
+     ⚠️ จังหวะสองต้องเกิดใน settleBusted ไม่ใช่ใน setTimeout ตรง ๆ
+     เพราะ settleBusted ถูกเรียกเฉพาะตอนไม่มีมือกำลังเล่น ซึ่งเป็นเวลาเดียวที่ปลอดภัย
+     จะให้คนลุกออกกลางมือที่คนอื่นกำลังเล่นอยู่ไม่ได้ (ตัวจับเวลาแค่ปลุกให้มาเช็ค) */
+  const LEAVE_MS = 2200;
+
   function botLeaves(b) {
+    if (b.leaving) return;                 /* สั่งซ้ำระหว่างที่ยังโบกมืออยู่ ไม่ต้องทำอะไร */
+    b.leaving = Date.now() + LEAVE_MS;
+    /* พักมือไว้ก่อน ไม่งั้นมือถัดไปจะแจกไพ่ให้คนที่กำลังจะเดินออกไปแล้ว */
+    room.table.action(b.seatId, { type: "sitout", value: true });
+    clearTimeout(pending[b.seatId]);
+    delete pending[b.seatId];
+    broadcast();
+    /* ปลุกให้ settleBusted มาเก็บงานต่อ ถ้าไม่มีอะไรมากระตุ้นสถานะเองในช่วงนั้น */
+    farewell[b.seatId] = setTimeout(function () {
+      delete farewell[b.seatId];
+      broadcast();
+    }, LEAVE_MS + 60);
+  }
+
+  /* จังหวะสอง: เก็บเงิน คืนชื่อ แล้วเรียกตัวใหม่มานั่งแทน */
+  function finishLeaving(b) {
     const gone = b.name, lv = b.botLevel;
     const purse = typeof b.wallet === "number" ? b.wallet : bank.bankrollOf(gone);
     /* ชิปบนโต๊ะกลับเข้ากระเป๋า ไม่ได้หายไปไหน */
@@ -1517,6 +1549,8 @@ export function createBotManager(room, broadcast) {
     delete bench[b.seatId];
     clearTimeout(pending[b.seatId]);
     delete pending[b.seatId];
+    clearTimeout(farewell[b.seatId]);
+    delete farewell[b.seatId];
     room.table.leave(b.seatId);
     add(1, lv, gone);
   }
@@ -1529,6 +1563,12 @@ export function createBotManager(room, broadcast) {
   function settleBusted() {
     const st = room.table._state;
     for (const b of botSeats()) {
+      /* กำลังโบกมือลาอยู่ — ครบเวลาแล้วค่อยเก็บ ยังไม่ครบก็ปล่อยให้ยืนอยู่ตรงนั้น
+         ⚠️ ต้องมาก่อนทุกอย่าง คนที่กำลังจะเดินออกไม่ต้องเติมชิป ไม่ต้องทอยว่าจะลุกอีก */
+      if (b.leaving) {
+        if (Date.now() >= b.leaving) finishLeaving(b);
+        continue;
+      }
       if (bench[b.seatId] !== undefined && st.handNo >= bench[b.seatId]) {
         delete bench[b.seatId];
         if (b.sitOut) room.table.action(b.seatId, { type: "sitout", value: false });
@@ -1575,17 +1615,12 @@ export function createBotManager(room, broadcast) {
       lifeHand[b.seatId] = st.handNo;
       bank.noteBust(b.name);
       if (!wantsRebuy(b)) {
-        const gone = b.name, lv = b.botLevel;
-        bank.sync(gone, b.wallet, 0, Date.now());
-        bank.release(gone);
-        delete bench[b.seatId];
-        clearTimeout(pending[b.seatId]);
-        delete pending[b.seatId];
-        room.table.leave(b.seatId);
-        /* เรียกตัวใหม่ระดับเดียวกันมานั่งแทน โต๊ะจะได้ไม่ค่อยๆ ว่างลง
-           ถ้าระดับนั้นไม่ว่างเลย ก็ปล่อยที่นั่งว่างไว้ ดีกว่าลากตัวที่นั่งโต๊ะอื่นอยู่มา
-           ⚠️ ห้ามเรียกคนที่เพิ่งหมดตัวแล้วบอกว่าเลิกกลับมาทันที — เขาเพิ่งลุกไปเมื่อกี้นี้เอง */
-        add(1, lv, gone);
+        /* ⚠️ ออกทางเดียวกับ "ลุกทั้งที่ยังมีชิป" — สองจังหวะ มีเวลาให้คนเห็น
+           ของเดิมทางนี้ลบที่นั่งทิ้งทันทีแล้วเรียกตัวใหม่มาในบรรทัดถัดไป
+           ซึ่งเป็นการลุกที่น่าดูที่สุดในเกม (หมดตัวแล้วเก็บของกลับบ้าน)
+           แต่กลับเป็นทางเดียวที่ไม่มีใครได้เห็นเลย
+           botLeaves จัดการเก็บเงิน ปล่อยชื่อ และเรียกตัวแทนให้ครบเหมือนกัน */
+        botLeaves(b);
         continue;
       }
 
@@ -2054,6 +2089,7 @@ export function createBotManager(room, broadcast) {
 
   function stop() {
     for (const k in pending) clearTimeout(pending[k]);
+    for (const k in farewell) clearTimeout(farewell[k]);
   }
 
   /* ให้เครื่องมือทดสอบสั่งบอทลงมือทันทีได้ ไม่ต้องรอเวลาคิดจริง
