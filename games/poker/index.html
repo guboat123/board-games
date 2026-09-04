@@ -702,6 +702,20 @@ button { font-family: inherit; }
   .seat__say { max-width: 118px; font-size: .62rem; padding: 4px 7px; }
 }
 
+/* ---------- สีหน้า: อารมณ์ของตัวที่ไม่ได้พูด ----------
+   ⚠️ เจ้าของทัก "เงียบก็คืออารมณ์นะ อย่าลืม" และ "อารมณ์ดี เงียบยิ้ม ๆ"
+   ถ้าอารมณ์ออกทางคำพูดทางเดียว ตัวที่เงียบจะดูเหมือนไม่มีอะไรอยู่ข้างใน
+   ทั้งที่มันอาจกำลังคึกสุดหรือกำลังงอนอยู่ — และตัวที่เงียบคือส่วนใหญ่ของโต๊ะเสมอ
+   เล็กและจาง ตั้งใจให้เป็นของที่เห็นตอนกวาดตา ไม่ใช่ของที่แย่งความสนใจ */
+.seat__face {
+  position: absolute; top: -7px; right: -5px;
+  font-size: .74rem; line-height: 1;
+  filter: saturate(.85);
+  pointer-events: none;
+}
+.seat.is-leaving .seat__face { display: none; }
+@media (max-width: 380px) { .seat__face { font-size: .62rem; top: -5px; right: -3px; } }
+
 /* ---------- ลุกจากโต๊ะ ----------
    ⚠️ เดิมบอทลุกแล้วตัวใหม่นั่งแทนในเฟรมเดียวกัน = ไม่มีใครเคยเห็นใครลุกเลย
    ต้องลอยขึ้นแล้วจางไปช้าพอที่จะทันอ่านว่าใครลุก (ฝั่งเซิร์ฟเวอร์หน่วงให้ 2.2 วิ) */
@@ -4014,6 +4028,21 @@ button { font-family: inherit; }
                        (freshAct[seatId] ? " is-fresh" : "");
         la.textContent = s.lastAction;
         box.appendChild(la);
+      }
+
+      /* สีหน้าตามอารมณ์ — ขึ้นตลอด ไม่ใช่เฉพาะตอนพูด
+         ⚠️ อารมณ์ดีแบบเงียบ ๆ ต้องเห็นได้ ไม่งั้น "เงียบยิ้ม ๆ" จะเหมือน "ไม่มีอะไร" */
+      if (chatOn && s.mood && !s.leaving) {
+        var FACE = { cocky: "😎", tilted: "😤", sulk: "😑", meek: "😰" };
+        if (FACE[s.mood]) {
+          var fc = document.createElement("div");
+          fc.className = "seat__face";
+          fc.textContent = FACE[s.mood];
+          fc.setAttribute("aria-label",
+            { cocky: "กำลังคึก", tilted: "กำลังหัวร้อน", sulk: "เงียบไปเลย",
+              meek: "เงินใกล้หมด" }[s.mood]);
+          box.appendChild(fc);
+        }
       }
 
       /* ฟองคำพูด ต่อกับ el ไม่ใช่ box เพราะมันลอยอยู่นอกกล่อง
