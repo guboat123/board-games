@@ -245,6 +245,36 @@ console.log("--- กดเอาบอทออก ระหว่างที�
   w.mgr.stop();
 }
 
+/* ---------- 8. บอทต้องลุกจากโต๊ะได้จริงในตัวจำลอง ---------- */
+console.log("");
+console.log("--- ลุกจากโต๊ะต้องเกิดในตัวจำลองด้วย ไม่ใช่แค่ในเกมจริง ---");
+{
+  /* ⚠️ เทสต์นี้มาจากบั๊กจริง: รัน 5,100,000 มือแล้วพบว่าทั้ง 30 ตัว ลุก 0 ครั้ง
+     สองสาเหตุ ทั้งคู่เงียบสนิท —
+       1) เส้นตายของคำลาเขียนเป็นวินาที ตัวจำลองเดินล้านมือในไม่กี่นาที เวลาจึงไม่เคยผ่าน
+       2) ตั้งชื่อฟิลด์เป็น s.leaving ซึ่งชนกับของ poker-room (คนกดออกกลางมือ)
+          ห้องจึง cashOut บอททิ้งเองก่อนที่ finishLeaving จะได้ทำงาน
+     ทั้งสองอย่างสกอร์การ์ดผ่านหมด เพราะ "ไม่มีใครลุก" ก็อยู่ในกรอบเหมือนกัน
+     ตรงนี้จึงต้องถามตรง ๆ ว่า "เดินไปหลายร้อยมือแล้วมีใครลุกบ้างไหม" */
+  const w = fresh();
+  ["Milo", "Pip", "Toby", "Bruno"].forEach(function (n) { w.mgr._addNamed(n, 1); });
+  const seen = {};
+  for (const s of w.st.seats) if (s && s.isBot) seen[s.name] = 1;
+  let changed = 0;
+  for (let h = 0; h < 400; h++) {
+    w.st.handNo++;
+    /* ให้มีเหตุให้ลุก: กำไรเท่าตัว = เข้าเงื่อนไข "ได้แล้วเลิก" ของมือใหม่ */
+    for (const s of w.st.seats) {
+      if (s && s.isBot) { s.stack = BUY_IN * 2; s.wallet = 4000; if (s.sitOut) s.sitOut = false; }
+    }
+    w.mgr.settleBusted();
+    for (const s of w.st.seats) if (s && s.isBot && !seen[s.name]) { seen[s.name] = 1; changed++; }
+  }
+  ok("เดิน 400 มือแล้วต้องมีคนลุกและมีตัวใหม่มาแทน", changed > 0,
+     "มีหน้าใหม่มานั่ง " + changed + " ตัว");
+  w.mgr.stop();
+}
+
 console.log("");
 if (fail) { console.log("=== ไม่ผ่าน " + fail + " ข้อ (ผ่าน " + pass + ") ==="); process.exit(1); }
 console.log("=== ผ่านทั้งหมด " + pass + " ข้อ ===");

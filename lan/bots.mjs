@@ -1605,6 +1605,7 @@ export function createBotManager(room, broadcast) {
         /* จำเงินตั้งต้นไว้ด้วย ใช้เทียบว่า "ตอนนี้ขึ้นหรือลงจากที่เริ่มมา" (ดู decide) */
         bs.walletStart = WALLET_START[lv] || 20000;
         bs.buyIn = bs.stack;   /* ตักของตัวนี้ ใช้เทียบว่าตอนนี้ขึ้นหรือลง (ดู stakeOf) */
+        bs.satHand = room.table._state.handNo;   /* เพิ่งนั่งตอนมือที่เท่าไหร่ (ดู leaveChance) */
       }
       added.push(r.name);
     }
@@ -1845,7 +1846,16 @@ export function createBotManager(room, broadcast) {
         }
         /* สั้นแล้วยังไม่ยอมเติม = เหตุผลที่จะลุกแรงขึ้นอีก ไม่ใช่นั่งต่อเฉย ๆ */
         const extra = (!topped && b.stack < buyIn * 0.25) ? 0.02 : 0;
-        if (Math.random() < leaveChance(b) + extra) botLeaves(b);
+        /* ---------- เพิ่งนั่งลงก็ยังไม่ลุก ----------
+           ⚠️ วัดที่ 3,000,000 มือหลังแก้บั๊ก "ลุกไม่ได้": มีคนลุกทุก 12.8 มือ
+           ทั้งที่ตัวเลขที่ออกแบบไว้ (เขียนใน STATUS) คือทุก ~24 มือ = ถี่เกินเท่าตัว
+           และมันไปกินฟีเจอร์ที่ทำมาทั้งคืนพอดี — บอทจำคนได้ มีนิสัย มีอารมณ์
+           แต่ถ้ามันเปลี่ยนตัวทุกสิบกว่ามือ คนเล่นก็ไม่มีวันได้สร้างเรื่องกับใครสักคน
+           ไม่มีใครซื้อชิปเข้าโต๊ะแล้วลุกภายในสิบมือด้วยความสมัครใจ
+           ⚠️ ใช้กับ "ลุกทั้งที่ยังมีชิป" เท่านั้น — หมดตัวแล้วเงินไม่พอซื้อเข้าใหม่ ยังลุกได้ทันที
+              ไม่งั้นเงินก็ไม่มีความหมายอีก ซึ่งเป็นหัวใจของทั้งระบบ */
+        const justSat = b.satHand !== undefined && (st.handNo - b.satHand) < 12;
+        if (!justSat && Math.random() < leaveChance(b) + extra) botLeaves(b);
         continue;
       }
 
@@ -2382,6 +2392,7 @@ export function createBotManager(room, broadcast) {
       bs.wallet = bank.startSession(r.name, WALLET_START[lv] || 20000, Date.now()) - bs.stack;
       bs.walletStart = WALLET_START[lv] || 20000;
       bs.buyIn = bs.stack;
+      bs.satHand = room.table._state.handNo;
     }
     return r;
   }
